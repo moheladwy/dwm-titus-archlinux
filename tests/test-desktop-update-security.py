@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Run as root only in a disposable Fedora container."""
+"""Run as root only in a disposable Arch Linux container."""
 import copy
 import hashlib
 import importlib.machinery
@@ -42,7 +42,7 @@ class Security(unittest.TestCase):
         self.binary.chmod(0o755)
         self.manifest_path = self.prefix / "share/dwm-titus/desktop-install.json"
         self.manifest_path.parent.mkdir(parents=True)
-        self.manifest = {"schema": 1, "source": "https://github.com/ChrisTitusTech/dwm-titus.git",
+        self.manifest = {"schema": 1, "source": "https://github.com/moheladwy/dwm-titus-archlinux.git",
                          "revision": "a" * 40, "layout": {"prefix": str(self.prefix)}, "packages": ["gcc"],
                          "files": {str(self.binary): {"mode": 0o755, "sha256": hashlib.sha256(b"updated").hexdigest()}}}
         self.manifest_path.write_text(json.dumps(self.manifest, sort_keys=True) + "\n")
@@ -163,17 +163,17 @@ class Security(unittest.TestCase):
         self.assertIn("prepared dependency plan", result.stderr)
 
     def test_session_installs_changed_package_plan(self):
-        # rpm is already installed in Fedora: exercise the plan without network.
-        self.archive(lambda value: value.update(packages=["rpm"]))
+        # pacman is already installed on Arch: exercise the plan without network.
+        self.archive(lambda value: value.update(packages=["pacman"]))
         generation = hashlib.sha256(self.manifest_path.read_bytes()).hexdigest()
         result = self.session_command([["begin", generation, self.operation],
-                                      ["packages", generation, self.operation, '["rpm"]'],
+                                      ["packages", generation, self.operation, '["pacman"]'],
                                       ["apply", str(self.bundle), generation, self.operation,
                                        hashlib.sha256(self.bundle.read_bytes()).hexdigest(), "b" * 40],
                                       ["complete", self.operation]])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(all(json.loads(line)["ok"] for line in result.stdout.splitlines()), result.stdout)
-        self.assertEqual(json.loads(self.manifest_path.read_text())["packages"], ["rpm"])
+        self.assertEqual(json.loads(self.manifest_path.read_text())["packages"], ["pacman"])
 
     def command(self, *args, helper=None, uid=1000):
         return subprocess.run([str(helper or self.helper), *args], capture_output=True, text=True,
@@ -238,14 +238,14 @@ class Security(unittest.TestCase):
         status.write_text(json.dumps({**initial, "state": "starting", "operation": "f" * 32}))
         subprocess.run(["chown", "-R", "nobody:nobody", home], check=True)
         marker = home / "intercepted"
-        for name in ("rpm", "systemctl"):
+        for name in ("pacman", "systemctl"):
             shadow = poison / name
             shadow.write_text("#!/usr/bin/python3\nfrom pathlib import Path\nPath(" + repr(str(marker)) + ").write_text('intercepted')\n")
             shadow.chmod(0o755)
             os.chown(shadow, 65534, 65534)
         user_args = args[:5] + ["HOME=" + str(home), "XDG_STATE_HOME=" + str(home / "state"),
                                 "XDG_CONFIG_HOME=" + str(home / "config"), "XDG_DATA_HOME=" + str(home / "data")] + args[5:]
-        baseline = user_args[:user_args.index("/usr/bin/python3")] + ["rpm"]
+        baseline = user_args[:user_args.index("/usr/bin/python3")] + ["pacman"]
         subprocess.run(baseline, check=True)
         self.assertTrue(marker.exists(), "Downstream shadow fixture did not execute")
         marker.unlink()
@@ -257,7 +257,7 @@ class Security(unittest.TestCase):
         result = subprocess.run(user_args[:-1] + ["check", "--force"], text=True, capture_output=True, timeout=65)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["installed"], "a" * 40)
-        self.assertFalse(marker.exists(), "Check executed PATH-shadowed rpm")
+        self.assertFalse(marker.exists(), "Check executed PATH-shadowed pacman")
 
     def test_source_install_guard_holds_shared_root_lock(self):
         functions = runpy.run_path(str(REPO / "scripts/dwm-desktop-update"))
@@ -313,7 +313,8 @@ raise SystemExit(17)
 
     def test_dependency_action_rejects_unfinished_transactions_before_package_commands(self):
         marker = self.prefix / "package-commands.json"
-        injected = "\ndef observed_package_command(args, **kwargs):\n    path = Path(" + repr(str(marker)) + ")\n    calls = json.loads(path.read_text()) if path.exists() else []\n    calls.append(args)\n    path.write_text(json.dumps(calls))\n    return subprocess.CompletedProcess(args, 1 if args[0] == '/usr/bin/rpm' else 0)\nsubprocess.run = observed_package_command\n"
+        pending = self.prefix / "updates-pending"
+        injected = "\ndef observed_package_command(args, **kwargs):\n    path = Path(" + repr(str(marker)) + ")\n    calls = json.loads(path.read_text()) if path.exists() else []\n    calls.append(args)\n    path.write_text(json.dumps(calls))\n    if args[:2] == ['/usr/bin/pacman', '-T']:\n        return subprocess.CompletedProcess(args, 127)\n    if args[:2] == ['/usr/bin/pacman', '-Qu']:\n        pending = Path(" + repr(str(pending)) + ").exists()\n        return subprocess.CompletedProcess(args, 0 if pending else 1, 'linux 1-1 -> 2-1\\n' if pending else '')\n    return subprocess.CompletedProcess(args, 0)\nsubprocess.run = observed_package_command\n"
         self.helper.write_text(self.helper.read_text().replace('if __name__ == "__main__":', injected + '\nif __name__ == "__main__":'))
         generation = hashlib.sha256(self.manifest_path.read_bytes()).hexdigest()
         directory = Path("/var/lib/dwm-titus/desktop-updates") / self.operation
@@ -325,10 +326,21 @@ raise SystemExit(17)
             self.assertIn("finish or recover first", result.stderr)
             self.assertFalse(marker.exists())
         (directory / "journal.json").write_text(json.dumps({"state": "complete", "uid": 1000}))
+        # Pending system updates block installation: Arch does not support
+        # partial upgrades, so no package transaction may run.
+        pending.write_text("")
+        result = self.command("dependencies", generation, uid=1001)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Update system packages first", result.stderr)
+        self.assertEqual(json.loads(marker.read_text()), [["/usr/bin/pacman", "-T", "--", "gcc"],
+                                                        ["/usr/bin/pacman", "-Qu"]])
+        pending.unlink()
+        marker.unlink()
         result = self.command("dependencies", generation, uid=1001)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(marker.read_text()), [["/usr/bin/rpm", "-q", "--quiet", "--", "gcc"],
-                                                        ["/usr/bin/dnf", "install", "-y", "--", "gcc"]])
+        self.assertEqual(json.loads(marker.read_text()), [["/usr/bin/pacman", "-T", "--", "gcc"],
+                                                        ["/usr/bin/pacman", "-Qu"],
+                                                        ["/usr/bin/pacman", "-S", "--needed", "--noconfirm", "--", "gcc"]])
 
     def test_preparation_reservation_blocks_source_install_and_other_users(self):
         generation = hashlib.sha256(self.manifest_path.read_bytes()).hexdigest()

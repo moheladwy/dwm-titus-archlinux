@@ -79,7 +79,7 @@ source, stage = directory / "source", directory / "stage"
 def boundary(args, cwd=None, timeout=60, capture=True):
     args = [str(arg) for arg in args]
     if args[0].endswith("dwm-packages.sh") and scenario == "migration":
-        return "rpm\n"
+        return "pacman\n"
     if args[:2] == ["git", "init"]:
         (source / "config/quickshell").mkdir(parents=True)
         (source / "scripts").mkdir()
@@ -106,7 +106,7 @@ def boundary(args, cwd=None, timeout=60, capture=True):
             staged.write_text("new theme")
             staged.chmod(0o644)
             candidate["files"][str(added)] = update.fingerprint(staged)
-            candidate["packages"] = ["rpm"]
+            candidate["packages"] = ["pacman"]
         update.write_json(stage / str(manifest_path).lstrip("/"), candidate)
     elif args[0] == "/usr/bin/pkexec":
         status = update.read_json(state / "status.json")
@@ -121,7 +121,7 @@ def boundary(args, cwd=None, timeout=60, capture=True):
             (state / "reserved").write_text("reserved")
             return ""
         if args[2] == "packages":
-            assert json.loads(args[5]) == ["rpm"]
+            assert json.loads(args[5]) == ["pacman"]
             return ""
         if args[2] == "rollback":
             assert status["state"] == "recovering", status

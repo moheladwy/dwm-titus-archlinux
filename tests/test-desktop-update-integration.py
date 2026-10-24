@@ -11,7 +11,7 @@ import tempfile
 import time
 
 if os.geteuid() != 0 or not Path("/run/.containerenv").exists():
-    sys.exit("Run only as root in a disposable Fedora container")
+    sys.exit("Run only as root in a disposable Arch Linux container")
 os.umask(0o002)
 repo = Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix="desktop-integration-", dir="/opt") as temporary:
@@ -139,11 +139,13 @@ loader = importlib.machinery.SourceFileLoader("desktop", sys.argv[1] + "/scripts
 spec = importlib.util.spec_from_loader("desktop", loader)
 update = importlib.util.module_from_spec(spec)
 loader.exec_module(update)
+official_source = update.SOURCE
+assert official_source == "https://github.com/moheladwy/dwm-titus-archlinux.git", official_source
 update.SOURCE = sys.argv[1]
 official_trust = update.trusted_installation
 def trust(path):
     local_source = update.SOURCE
-    update.SOURCE = "https://github.com/ChrisTitusTech/dwm-titus.git"
+    update.SOURCE = official_source
     try: official_trust(path)
     finally: update.SOURCE = local_source
 update.trusted_installation = trust
@@ -197,7 +199,7 @@ sys.exit(result)
         assert (prefix / "share/icons/Capitaine-Cursors-White/cursors").stat().st_uid == 0
         user("python3", prefix / "bin/dwm-desktop-update", "verify-receipts", source,
              prefix / "share/dwm-titus/desktop-install.json")
-        print("Real Fedora build / user worker / polkit installation: PASS", flush=True)
+        print("Real Arch Linux build / user worker / polkit installation: PASS", flush=True)
     finally:
         polkit.terminate()
         polkit.wait(timeout=10)

@@ -176,22 +176,34 @@ def trusted_parent(path, create=False):
 
 
 def validate_packages(packages):
+    # Plain repository package names only: no files, URLs, version constraints,
+    # repository prefixes, or option-like values.
     if (not isinstance(packages, list) or len(packages) > 256
-            or any(not isinstance(item, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9+_.-]{0,127}", item)
-                   or item.endswith(".rpm") for item in packages) or packages != sorted(set(packages))):
+            or any(not isinstance(item, str) or not re.fullmatch(r"[a-z0-9@_+][a-z0-9@._+-]{0,127}", item)
+                   or ".pkg.tar" in item for item in packages) or packages != sorted(set(packages))):
         fail("Invalid desktop package names")
+
+
+PACKAGE_ENV = {"PATH": "/usr/bin:/bin", "HOME": "/root", "LANG": "C.UTF-8"}
 
 
 def install_packages(packages):
     validate_packages(packages)
     missing = [package for package in packages if subprocess.run(
-        ["/usr/bin/rpm", "-q", "--quiet", "--", package], stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, timeout=10).returncode != 0]
+        ["/usr/bin/pacman", "-T", "--", package], stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, env=PACKAGE_ENV, timeout=10).returncode != 0]
     if missing:
+        # Arch does not support partial upgrades. Installing while updates are
+        # pending would pair new packages with outdated libraries, so require a
+        # fully upgraded system instead of upgrading it implicitly.
+        pending = subprocess.run(["/usr/bin/pacman", "-Qu"], stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                                 env=PACKAGE_ENV, cwd="/", timeout=60, text=True)
+        if pending.returncode == 0 and pending.stdout.strip():
+            fail("Update system packages first with sudo pacman -Syu, then retry the desktop update")
         print("Installing required desktop packages: " + ", ".join(missing), flush=True)
-        subprocess.run(["/usr/bin/dnf", "install", "-y", "--", *missing], check=True,
-                       env={"PATH": "/usr/bin:/bin", "HOME": "/root", "LANG": "C.UTF-8"},
-                       stdin=subprocess.DEVNULL, cwd="/", timeout=1800)
+        subprocess.run(["/usr/bin/pacman", "-S", "--needed", "--noconfirm", "--", *missing], check=True,
+                       env=PACKAGE_ENV, stdin=subprocess.DEVNULL, cwd="/", timeout=1800)
 
 
 def validate_candidate(candidate, installed):
@@ -369,8 +381,8 @@ def main():
     trusted(Path(__file__).absolute())
     if not os.access(__file__, os.X_OK):
         fail("Installed helper is not executable")
-    if not re.search(r'^ID=["\']?fedora["\']?$', Path("/etc/os-release").read_text(), re.M):
-        fail("Desktop updates support Fedora only")
+    if not re.search(r'^ID=["\']?arch["\']?$', Path("/etc/os-release").read_text(), re.M):
+        fail("Desktop updates support Arch Linux only")
     if uid == 0:
         fail("A desktop user must request this operation")
     args = sys.argv[1:]
