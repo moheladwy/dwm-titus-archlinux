@@ -34,8 +34,9 @@ owner authorization.
    pacman hook replace PackageKit discovery. (Future.)
 6. Update stack, mutation: confirmed updates run as interactive
    `sudo pacman -Syu` in a terminal; PackageKit paths are removed. (Future.)
-7. Desktop-update dependencies through pacman with a pending-update preflight,
-   and an optional user-scope AUR provider. (Future.)
+7. Desktop-update dependencies through pacman with a pending-update preflight
+   (landed with Phases 0-4, because the Arch gate needed it), and an optional
+   user-scope AUR provider. (AUR provider: future.)
 8. Remaining Settings and system-management platform work. (Future.)
 9. Documentation site and reference-doc sweep. (Future.)
 10. Retire Fedora-only, image, and gaming code. (Future.)

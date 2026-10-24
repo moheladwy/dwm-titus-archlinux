@@ -233,7 +233,7 @@ but X11/EWMH behavior remains the compatibility boundary for this project.
 The supported installation flow must:
 
 1. Read `/etc/os-release`, require `ID=arch`, and reject every other identity
-   before making changes. Require `pacman` and `pacman-conf`.
+   before making changes. Require `pacman`.
 2. Resolve Arch package names from one maintained dependency map.
 3. Show required and optional packages before installing them. The plan,
    including the system upgrade in step 4, appears in `--dry-run` output.
@@ -586,8 +586,9 @@ target design (plan Phases 5-8, not yet implemented) is:
   partial-upgrade state described in Section 5.11.
 
 Until that work lands, the Update Center distribution provider, Settings >
-System package updates, the desktop-update dependency install, and the
-first-boot initial update remain Fedora-only code. On Arch they must report an
+System package updates, and the first-boot initial update remain Fedora-only
+code. The desktop source updater already uses pacman for its dependency
+install (see "Desktop source updates" below). On Arch they must report an
 unsupported state (or, for the first-boot update, remain inactive) and must
 not attempt a package operation.
 
@@ -711,12 +712,15 @@ authorization are rejected.
 It never executes a staged Makefile or repository helper as root. Changes to
 installation roots still require the source installer. Changes to the release's
 build/source-update package list are handled within the reserved transaction.
-The Arch target (plan Phase 7, not yet implemented; see Section 5.10) is: the
-helper first verifies that no package updates are pending (`pacman -Qu` is
-empty) and that the pacman database lock is not held, and otherwise blocks
-with "Update system packages first". It then passes only validated official
-repository package names to `/usr/bin/pacman -S --needed`, and the resulting
-manifest must match that prepared list. The root helper never installs AUR
+On Arch, the helper first checks missing packages with `pacman -T` and then
+verifies that no package updates are pending: `pacman -Qu` lists nothing other
+than entries held back by `IgnorePkg` (marked `[ignored]`). Otherwise it blocks
+with "Update system packages first". This reflects the last database sync; the
+helper never refreshes the sync databases itself, and pacman's own lock
+reports a concurrent package manager. It then passes only validated
+repository package names (lowercase, no paths, URLs, versions, or options) to
+`/usr/bin/pacman -S --needed --noconfirm --`, and the resulting manifest must
+match that prepared list. The root helper never installs AUR
 packages. pacman owns package recovery; desktop rollback does not uninstall
 packages. After explicit update or recovery confirmation, authorization
 reuses an existing non-interactive sudo grant when available. Otherwise it uses
@@ -1010,9 +1014,8 @@ The following remain open and are not yet implemented on Arch:
   `sudo pacman -Syu` updates. Until then the Update Center distribution
   provider and Settings > System package updates are Fedora-only code (DNF and
   PackageKit) that reports unsupported on Arch.
-- Phase 7: desktop-update dependency installation through pacman and the
-  optional user-scope AUR provider. Until then desktop source updates that
-  require new packages report unsupported on Arch.
+- Phase 7: the optional user-scope AUR provider in the Update Center. The
+  desktop source updater's pacman dependency install landed with this port.
 - Phase 8: shared platform identity in system management, the regional
   actions, delegates, and security information rows. The first-boot initial
   update is image-only, is never armed on Arch, and is retired in Phase 10.
