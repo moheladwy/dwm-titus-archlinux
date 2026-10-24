@@ -624,15 +624,21 @@ def session_configuration():
         return NativeConfiguration(path)
 
 
-def launch(config, original=None, previous=None):
-    # Xorg can release a dead client's selection after its process disappears.
-    # A brief startup grace avoids a transient refusal; stopping stays entirely
-    # process-based, including when X authorization is unavailable.
-    deadline = time.monotonic() + 0.5
+def await_selection_release(seconds=2):
+    # Xorg can release a dead client's selection after its process disappears,
+    # and a loaded server can take well over half a second to do so. Picom
+    # refuses to start while the selection is owned, so wait before each
+    # attempt; stopping stays entirely process-based, including when X
+    # authorization is unavailable.
+    deadline = time.monotonic() + seconds
     while owner():
         if time.monotonic() >= deadline:
             raise Error("Another compositor owns this display; it was not stopped")
         time.sleep(0.05)
+
+
+def launch(config, original=None, previous=None):
+    await_selection_release()
     previous = previous or []
     if isinstance(config, NativeConfiguration):
         override = os.environ.get("PICOM_BACKEND", "")
@@ -687,6 +693,9 @@ def launch(config, original=None, previous=None):
     log_path = private_dir() / "session.log"
     safe_target(log_path)
     for index, command in enumerate(attempts):
+        if index:
+            # The failed attempt was just stopped; let X release its selection.
+            await_selection_release()
         launch_id = uuid.uuid4().hex
         with open(log_path, "w" if index == 0 else "a") as log:
             child = subprocess.Popen(

@@ -589,7 +589,7 @@ class PicomTests(unittest.TestCase):
     def test_launch_grace_does_not_stop_existing_compositor(self):
         with (
             patch.object(picom, "owner", return_value=88),
-            patch.object(picom.time, "monotonic", side_effect=[0, 0, 1]),
+            patch.object(picom.time, "monotonic", side_effect=[0, 0, 3]),
             patch.object(picom.time, "sleep"),
             patch.object(picom, "stop") as stop,
             patch.object(picom.subprocess, "Popen") as spawn,
@@ -598,6 +598,22 @@ class PicomTests(unittest.TestCase):
             picom.launch(picom.Configuration())
         stop.assert_not_called()
         spawn.assert_not_called()
+
+    def test_fallback_attempt_waits_for_selection_release(self):
+        # The XRender fallback starts right after the failed GLX attempt was
+        # stopped, so it must also wait for X to release the selection.
+        child = Mock()
+        child.poll.return_value = 1
+        with (
+            patch.object(picom, "backend", return_value=("auto", "glx", "", "intel")),
+            patch.object(picom, "await_selection_release") as wait,
+            patch.object(picom, "processes", return_value=[]),
+            patch.object(picom.subprocess, "Popen", return_value=child) as spawn,
+            self.assertRaisesRegex(picom.Error, "Picom failed to start"),
+        ):
+            picom.launch(picom.Configuration())
+        self.assertEqual(spawn.call_count, 2)
+        self.assertEqual(wait.call_count, 2)
 
     def test_failed_import_storage_limit_preserves_existing_copies(self):
         vendor = self.home / "vendor.conf"
