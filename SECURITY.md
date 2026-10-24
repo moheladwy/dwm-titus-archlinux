@@ -8,8 +8,9 @@ asked to upgrade before receiving a fix.
 
 ## Reporting a Vulnerability
 
-Do not open a public issue for a suspected vulnerability. Email
-`contact@christitus.com` with the subject `dwm-titus security report`.
+Do not open a public issue for a suspected vulnerability. Use GitHub private
+vulnerability reporting on
+https://github.com/moheladwy/dwm-titus-archlinux/security.
 
 Include affected versions or commits, reproduction steps, impact, relevant
 logs, and any proposed mitigation. Do not include credentials, private keys,

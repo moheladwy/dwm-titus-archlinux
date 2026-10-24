@@ -992,6 +992,7 @@ def trusted_desktop_helper():
     return None
 
 
+DESKTOP_PROJECT_URL = "https://github.com/moheladwy/dwm-titus-archlinux"
 DESKTOP_ACTIVE = {"starting", "downloading", "dependencies", "building", "backing-up",
                   "installing", "verifying", "activating", "recovering"}
 
@@ -1058,7 +1059,7 @@ def scan_desktop():
     items = ()
     if value["installed"] != "unknown" and value["available"] != "unknown" and value["installed"] != value["available"]:
         items = (ItemResult("update", "DWM-Titus", value["installed"], value["available"],
-                            value["available"], url="https://github.com/ChrisTitusTech/dwm-titus"),)
+                            value["available"], url=DESKTOP_PROJECT_URL),)
     busy = state in DESKTOP_ACTIVE | {"checking", "interrupted"}
     code = "interrupted" if state == "interrupted" else "busy" if busy else "scan-failed" if state == "failed" else ""
     detail = value["detail"] + ("; restart: " + value["restart"] if value["restart"] != "none" else "")

@@ -30,8 +30,8 @@ body:
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives and Fedora impact
-      description: Explain alternatives and effects on supported Fedora installations.
+      label: Alternatives and Arch Linux impact
+      description: Explain alternatives and effects on supported Arch Linux installations.
 
   - type: checkboxes
     id: scope
