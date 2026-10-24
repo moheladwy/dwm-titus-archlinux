@@ -237,23 +237,24 @@ printf '%s\n' "$health" | grep -Fqx 'ok	light-locker	light-locker is available'
 printf '%s\n' "$health" | grep -Fqx 'ok	Themes configuration	Readable'
 printf '%s\n' "$health" | grep -Fqx 'ok	Quickshell configuration	Readable'
 
-fedora_health=$(DWM_TEST_QUICKSHELL_VERSION='0.2.1, revision dacfa9de829ac7cb173825f593236bf2c21f637e' run_helper health)
-printf '%s\n' "$fedora_health" | grep -Fqx "$(printf 'ok\tQuickshell\tAvailable')"
-DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION='0.2.1^git20260209.dacfa9d-3.fc44' \
-	"$repo/scripts/dwm-quickshell-version-check"
-DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION='0.2.1, revision dacfa9de829ac7cb173825f593236bf2c21f637e' \
-	"$repo/scripts/dwm-quickshell-version-check"
-DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION='quickshell pre-release, revision: dacfa9de829ac7cb173825f593236bf2c21f637e' \
+arch_health=$(DWM_TEST_QUICKSHELL_VERSION='Quickshell 0.3.2 (revision , distributed by Arch Linux)' run_helper health)
+printf '%s\n' "$arch_health" | grep -Fqx "$(printf 'ok\tQuickshell\tAvailable')"
+DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION='Quickshell 0.3.2 (revision , distributed by Arch Linux)' \
 	"$repo/scripts/dwm-quickshell-version-check"
 DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION=0.3.0 \
 	"$repo/scripts/dwm-quickshell-version-check"
+# A newer rolling release is accepted, with a warning that it is untested.
+DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION='Quickshell 0.4.0' \
+	"$repo/scripts/dwm-quickshell-version-check" 2>"$work/quickshell-newer.err"
+grep -Fq 'newer than the tested 0.3 series' "$work/quickshell-newer.err"
+# Fedora's 0.2.1 git snapshot is no longer a supported build.
 for unsupported_snapshot in \
-	0.2.1^git20260209.dacfa9d-3.fc43 \
-	0.2.1^git20260209.dacfa9d-3.fc45 \
-	0.2.1^git20260209.dacfa9d; do
+	0.2.1^git20260209.dacfa9d-3.fc44 \
+	'0.2.1, revision dacfa9de829ac7cb173825f593236bf2c21f637e' \
+	'quickshell pre-release, revision: dacfa9de829ac7cb173825f593236bf2c21f637e'; do
 	if DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION=$unsupported_snapshot \
 		"$repo/scripts/dwm-quickshell-version-check" 2>/dev/null; then
-		printf 'Version check accepted snapshot outside the Fedora 44 contract: %s.\n' \
+		printf 'Version check accepted an unsupported Quickshell build: %s.\n' \
 			"$unsupported_snapshot" >&2
 		exit 1
 	fi
@@ -267,8 +268,8 @@ grep -Fq 'unsupported Quickshell version: 0.2.1' "$work/quickshell-version.err"
 
 outdated_health=$(DWM_TEST_QUICKSHELL_VERSION=0.2.1 run_helper health)
 printf '%s\n' "$outdated_health" | grep -Fqx 'error	Quickshell	Outdated'
-fc43_health=$(DWM_TEST_QUICKSHELL_VERSION=0.2.1^git20260209.dacfa9d-3.fc43 run_helper health)
-printf '%s\n' "$fc43_health" | grep -Fqx 'error	Quickshell	Outdated'
+fedora_health=$(DWM_TEST_QUICKSHELL_VERSION=0.2.1^git20260209.dacfa9d-3.fc44 run_helper health)
+printf '%s\n' "$fedora_health" | grep -Fqx 'error	Quickshell	Outdated'
 
 sed -i 's/^\[active\]$/  [active] # retained header comment/' \
 	"$work/config/dwm-titus/themes.toml"
@@ -411,7 +412,7 @@ if DWM_TEST_QUICKSHELL_VERSION=0.2.1 run_helper action restart-quickshell \
 	printf 'Restart accepted an unsupported Quickshell version.\n' >&2
 	exit 1
 fi
-grep -Fq 'compatible Quickshell 0.3.0 or Fedora 44 snapshot is required' \
+grep -Fq 'Quickshell 0.3.0 or newer is required' \
 	"$work/quickshell-outdated.err"
 grep -Fq 'pkill -x quickshell' "$work/actions.log"
 grep -Fq 'quickshell --no-duplicate' "$work/actions.log"

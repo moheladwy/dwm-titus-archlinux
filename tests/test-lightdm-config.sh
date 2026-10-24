@@ -8,26 +8,32 @@ repo=$(
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-fedora_stage="$work/fedora"
+arch_stage="$work/arch"
 
+# Defaults must render the Arch Linux configuration without overrides.
 make -C "$repo/lightdm" --no-print-directory \
-	DESTDIR="$fedora_stage" \
-	LIGHTDM_SEAT_SECTION='Seat:*' \
-	LIGHTDM_GREETER_SESSION=slick-greeter \
-	LIGHTDM_SESSION_WRAPPER= \
-	LIGHTDM_LOGIND_CHECK=true \
+	DESTDIR="$arch_stage" \
 	install >/dev/null
-cat >"$work/fedora.expected" <<'CONF'
+cat >"$work/arch.expected" <<'CONF'
 [LightDM]
 logind-check-graphical=true
 
 [Seat:*]
-greeter-session=slick-greeter
+greeter-session=lightdm-slick-greeter
 user-session=dwm
+session-wrapper=/etc/lightdm/Xsession
 CONF
-cmp -s "$work/fedora.expected" "$fedora_stage/etc/lightdm/lightdm.conf"
+cmp -s "$work/arch.expected" "$arch_stage/etc/lightdm/lightdm.conf"
 
-grep -Fqx 'xft-dpi=96' "$fedora_stage/etc/lightdm/slick-greeter.conf"
-grep -Fqx 'activate-numlock=false' "$fedora_stage/etc/lightdm/slick-greeter.conf"
+grep -Fqx 'xft-dpi=96' "$arch_stage/etc/lightdm/slick-greeter.conf"
+grep -Fqx 'activate-numlock=false' "$arch_stage/etc/lightdm/slick-greeter.conf"
+
+# install.sh must pass the same Arch values explicitly.
+for expected in 'LIGHTDM_SEAT_SECTION="Seat:*"' \
+	'LIGHTDM_GREETER_SESSION="lightdm-slick-greeter"' \
+	'LIGHTDM_SESSION_WRAPPER="/etc/lightdm/Xsession"' \
+	'LIGHTDM_LOGIND_CHECK=true'; do
+	grep -Fq "$expected" "$repo/install.sh"
+done
 
 printf 'LightDM config rendering: PASS\n'

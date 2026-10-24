@@ -178,9 +178,9 @@ make_malformed_known_input_stub() {
 }
 
 base_bin=$work/base-bin
-fedora_bin=$work/fedora-bin
+arch_bin=$work/arch-bin
 make_tools "$base_bin" dirname awk tr stat find grep timeout readlink
-cp -a "$base_bin" "$fedora_bin"
+cp -a "$base_bin" "$arch_bin"
 
 grep -Fq "*' (deleted)') process_executable=\${process_executable%' (deleted)'} ;;" \
 	"$provider"
@@ -189,29 +189,29 @@ grep -Fq "*) config_home=\${HOME:-}/.config ;;" "$provider"
 
 for command_name in xrandr nmcli bluetoothctl pactl xset gsettings light-locker \
 	xdg-settings xdg-mime xinput xkbset; do
-	make_stub "$fedora_bin/$command_name"
+	make_stub "$arch_bin/$command_name"
 done
-make_notification_bus_stub "$fedora_bin/busctl"
-make_stub "$fedora_bin/dwm-xdg-autostart"
-make_appearance_stub "$fedora_bin/dwm-settings-appearance"
-make_personalization_stub "$fedora_bin/dwm-settings-personalization"
-make_accessibility_stub "$fedora_bin/dwm-accessibility-settings"
-make_input_stub "$fedora_bin/dwm-settings-input"
-make_stub "$fedora_bin/dwm-settings-theme"
-make_stub "$fedora_bin/inotifywait"
-make_failing_stub "$fedora_bin/pkexec"
-make_failing_stub "$fedora_bin/sudo"
+make_notification_bus_stub "$arch_bin/busctl"
+make_stub "$arch_bin/dwm-xdg-autostart"
+make_appearance_stub "$arch_bin/dwm-settings-appearance"
+make_personalization_stub "$arch_bin/dwm-settings-personalization"
+make_accessibility_stub "$arch_bin/dwm-accessibility-settings"
+make_input_stub "$arch_bin/dwm-settings-input"
+make_stub "$arch_bin/dwm-settings-theme"
+make_stub "$arch_bin/inotifywait"
+make_failing_stub "$arch_bin/pkexec"
+make_failing_stub "$arch_bin/sudo"
 
-mkdir -p "$work/fedora-config/dwm-titus"
-cp "$repo/config/themes.toml" "$work/fedora-config/dwm-titus/themes.toml"
+mkdir -p "$work/arch-config/dwm-titus"
+cp "$repo/config/themes.toml" "$work/arch-config/dwm-titus/themes.toml"
 
-printf 'ID=fedora\nPRETTY_NAME="Fedora\tLinux 44"\n' \
-	>"$work/fedora-os-release"
+printf 'ID=arch\nPRETTY_NAME="Arch\tLinux"\n' \
+	>"$work/arch-os-release"
 
-fedora_output=$(PATH="$fedora_bin" XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+arch_output=$(PATH="$arch_bin" XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 notification_monitor_bin=$work/notification-monitor-bin
-cp -a "$fedora_bin" "$notification_monitor_bin"
+cp -a "$arch_bin" "$notification_monitor_bin"
 make_notification_monitor_stub "$notification_monitor_bin/busctl"
 PATH="$notification_monitor_bin" DWM_SETTINGS_MONITOR_LOG="$work/notification-monitor.log" \
 	"$provider" watch-notifications >"$work/notification-monitor.out"
@@ -219,51 +219,51 @@ grep -Fqx 'signal' "$work/notification-monitor.out"
 grep -Fqx -- \
 	"--user --no-pager monitor --match=type='signal',sender='org.freedesktop.DBus',path='/org/freedesktop/DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.freedesktop.Notifications'" \
 	"$work/notification-monitor.log"
-printf '%s\n' "$fedora_output" | grep -Fqx 'settings-protocol	1'
-printf '%s\n' "$fedora_output" | grep -Fqx 'platform	fedora	fedora	Fedora Linux 44'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx 'settings-protocol	1'
+printf '%s\n' "$arch_output" | grep -Fqx 'platform	arch	arch	Arch Linux'
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	displays	randr	Display discovery	available	read-only	xrandr	RandR display state is available'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	displays	display-changes	Display changes	available	user-session	dwm-settings-display	Validated layout previews, rollback, and user profiles are available'
-if ! printf '%s\n' "$fedora_output" | grep -Fqx \
+if ! printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	displays	display-persistence	Persistent display profiles	available	privileged	dwm-settings-display-root	Managed Xorg install and rollback are available through polkit' &&
-	! printf '%s\n' "$fedora_output" | grep -Fqx \
+	! printf '%s\n' "$arch_output" | grep -Fqx \
 		'capability	displays	display-persistence	Persistent display profiles	restricted	privileged	dwm-settings-display-root	Live previews remain available; install the trusted root helper for persistence'; then
 	printf '%s\n' 'unexpected display-persistence capability state' >&2
 	exit 1
 fi
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	input	input-devices	Input devices	available	user-session	dwm-settings-input	Stable device discovery, preview, reset, and persistence are available'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	network	networkmanager	NetworkManager	available	delegated	nmcli	NetworkManager state is available'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	audio	pipewire-audio	Audio	available	user-session	pactl	PipeWire Pulse-compatible session controls are available'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	defaults	xdg-autostart	Startup applications	available	user-session	xdg-autostart	Per-user XDG autostart overrides and live updates are available'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	available	user-session	dwm-settings-theme	Theme inventory, bounded preview, apply, reset, and recovery are available'
 available_theme_record='capability	appearance	themes	Themes	available	user-session	dwm-settings-theme	Theme inventory, bounded preview, apply, reset, and recovery are available'
 
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	appearance	accessibility-text-scale	Text scaling	available	user-session	dwm-settings-personalization	Persistent desktop text scale'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	appearance	accessibility-contrast	High contrast	available	user-session	dwm-accessibility-settings	Persistent managed-shell high-contrast policy is available'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	appearance	accessibility-reduced-motion	Reduced motion	available	user-session	dwm-accessibility-settings	Persistent managed-shell reduced-motion policy is available'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	appearance	accessibility-notifications	Notification policy	partial	read-only	dbus	A notification owner is active, but it is not the managed policy provider'
-printf '%s\n' "$fedora_output" | grep -Fqx \
+printf '%s\n' "$arch_output" | grep -Fqx \
 	'capability	appearance	accessibility-input	Keyboard and pointer access	available	user-session	dwm-settings-input	Persistent XKB accessibility controls are available'
-[ "$(printf '%s\n' "$fedora_output" |
+[ "$(printf '%s\n' "$arch_output" |
 	grep -c '^capability	appearance	accessibility-')" -eq 5 ]
 
 slow_input_bin=$work/slow-input-bin
-cp -a "$fedora_bin" "$slow_input_bin"
+cp -a "$arch_bin" "$slow_input_bin"
 make_input_stub "$slow_input_bin/dwm-settings-input"
 sed -i '2i /usr/bin/sleep 3' "$slow_input_bin/dwm-settings-input"
 slow_input_output=$(PATH="$slow_input_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$slow_input_output" | grep -Fqx \
 	'capability	input	input-devices	Input devices	available	user-session	dwm-settings-input	Stable device discovery, preview, reset, and persistence are available'
 printf '%s\n' "$slow_input_output" | grep -Fqx \
@@ -271,7 +271,7 @@ printf '%s\n' "$slow_input_output" | grep -Fqx \
 
 for invalid_accessibility_case in malformed duplicate-setting missing-complete; do
 	invalid_accessibility_bin=$work/invalid-accessibility-$invalid_accessibility_case-bin
-	cp -a "$fedora_bin" "$invalid_accessibility_bin"
+	cp -a "$arch_bin" "$invalid_accessibility_bin"
 	case $invalid_accessibility_case in
 	malformed)
 		invalid_accessibility_payload='not-an-accessibility-status'
@@ -289,8 +289,8 @@ for invalid_accessibility_case in malformed duplicate-setting missing-complete; 
 		"$invalid_accessibility_bin/dwm-accessibility-settings" \
 		"$invalid_accessibility_payload"
 	invalid_accessibility_output=$(PATH="$invalid_accessibility_bin" \
-		XDG_CONFIG_HOME="$work/fedora-config" \
-		DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+		XDG_CONFIG_HOME="$work/arch-config" \
+		DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 	printf '%s\n' "$invalid_accessibility_output" | grep -Fqx \
 		'capability	appearance	accessibility-contrast	High contrast	unavailable	user-session	dwm-accessibility-settings	The accessibility settings provider returned an unsupported response'
 	printf '%s\n' "$invalid_accessibility_output" | grep -Fqx \
@@ -298,44 +298,44 @@ for invalid_accessibility_case in malformed duplicate-setting missing-complete; 
 done
 
 unsafe_accessibility_bin=$work/unsafe-accessibility-bin
-cp -a "$fedora_bin" "$unsafe_accessibility_bin"
+cp -a "$arch_bin" "$unsafe_accessibility_bin"
 unsafe_accessibility_payload=$(printf \
 	'accessibility-settings-protocol\t1\t0\nstate\tunavailable\tUnsafe fixture state\nsetting\tcontrast\tstandard\nsetting\tmotion\tfull\nmutation\tunavailable\tFixture mutations disabled\ncomplete\tstatus')
 make_custom_accessibility_stub \
 	"$unsafe_accessibility_bin/dwm-accessibility-settings" \
 	"$unsafe_accessibility_payload"
 unsafe_accessibility_output=$(PATH="$unsafe_accessibility_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$unsafe_accessibility_output" | grep -Fqx \
 	'capability	appearance	accessibility-contrast	High contrast	unavailable	user-session	dwm-accessibility-settings	Persistent accessibility state cannot be safely updated'
 printf '%s\n' "$unsafe_accessibility_output" | grep -Fqx \
 	'capability	appearance	accessibility-reduced-motion	Reduced motion	unavailable	user-session	dwm-accessibility-settings	Persistent accessibility state cannot be safely updated'
 
 hanging_accessibility_bin=$work/hanging-accessibility-bin
-cp -a "$fedora_bin" "$hanging_accessibility_bin"
+cp -a "$arch_bin" "$hanging_accessibility_bin"
 make_hanging_accessibility_stub \
 	"$hanging_accessibility_bin/dwm-accessibility-settings"
 hanging_accessibility_output=$(PATH="$hanging_accessibility_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" \
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" \
 	timeout --signal=KILL 10 "$provider" discover)
 printf '%s\n' "$hanging_accessibility_output" | grep -Fqx \
 	'capability	appearance	accessibility-contrast	High contrast	unavailable	user-session	dwm-accessibility-settings	The accessibility settings provider returned an unsupported response'
 
 incomplete_personalization_bin=$work/incomplete-personalization-bin
-cp -a "$fedora_bin" "$incomplete_personalization_bin"
+cp -a "$arch_bin" "$incomplete_personalization_bin"
 make_incomplete_personalization_stub \
 	"$incomplete_personalization_bin/dwm-settings-personalization"
 incomplete_personalization_output=$(PATH="$incomplete_personalization_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$incomplete_personalization_output" | grep -Fqx \
 	'capability	appearance	accessibility-text-scale	Text scaling	unavailable	user-session	dwm-settings-personalization	The personalization provider returned an unsupported response'
 
 for malformed_text_scale_case in incomplete-status-shape empty-value empty-preference unsupported-preference malformed-scale duplicate-header malformed-duplicate malformed-known-record oversized-known-field; do
 	malformed_text_scale_bin=$work/malformed-text-scale-$malformed_text_scale_case-bin
-	cp -a "$fedora_bin" "$malformed_text_scale_bin"
+	cp -a "$arch_bin" "$malformed_text_scale_bin"
 	case $malformed_text_scale_case in
 	incomplete-status-shape)
 		malformed_text_scale_payload=$(printf \
@@ -371,7 +371,7 @@ for malformed_text_scale_case in incomplete-status-shape empty-value empty-prefe
 		;;
 	oversized-known-field)
 		oversized_option=$(awk 'BEGIN { for (i = 0; i < 4096; i++) printf "x" }')
-		malformed_text_scale_payload=$("$fedora_bin/dwm-settings-personalization" status |
+		malformed_text_scale_payload=$("$arch_bin/dwm-settings-personalization" status |
 			awk -F '\t' -v option="$oversized_option" '
 				BEGIN { OFS = "\t" }
 				$1 == "selection" && $2 == "font" { $5 = option }
@@ -383,15 +383,15 @@ for malformed_text_scale_case in incomplete-status-shape empty-value empty-prefe
 		"$malformed_text_scale_bin/dwm-settings-personalization" \
 		"$malformed_text_scale_payload"
 	malformed_text_scale_output=$(PATH="$malformed_text_scale_bin" \
-		XDG_CONFIG_HOME="$work/fedora-config" \
-		DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+		XDG_CONFIG_HOME="$work/arch-config" \
+		DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 	printf '%s\n' "$malformed_text_scale_output" | grep -Fqx \
 		'capability	appearance	accessibility-text-scale	Text scaling	unavailable	user-session	dwm-settings-personalization	The personalization provider returned an unsupported response'
 done
 
 unavailable_text_scale_bin=$work/unavailable-text-scale-bin
-cp -a "$fedora_bin" "$unavailable_text_scale_bin"
-unavailable_text_scale_payload=$("$fedora_bin/dwm-settings-personalization" status |
+cp -a "$arch_bin" "$unavailable_text_scale_bin"
+unavailable_text_scale_payload=$("$arch_bin/dwm-settings-personalization" status |
 	awk -F '\t' '
 		$1 == "selection" && $2 == "text-size" {
 			print "selection\ttext-size\tunavailable\t\tfollow-system\tGSettings key is unavailable"
@@ -403,32 +403,32 @@ make_custom_personalization_stub \
 	"$unavailable_text_scale_bin/dwm-settings-personalization" \
 	"$unavailable_text_scale_payload"
 unavailable_text_scale_output=$(PATH="$unavailable_text_scale_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$unavailable_text_scale_output" | grep -Fqx \
 	'capability	appearance	accessibility-text-scale	Text scaling	unavailable	user-session	dwm-settings-personalization	GSettings key is unavailable'
 
 hanging_personalization_bin=$work/hanging-personalization-bin
-cp -a "$fedora_bin" "$hanging_personalization_bin"
+cp -a "$arch_bin" "$hanging_personalization_bin"
 make_hanging_personalization_stub \
 	"$hanging_personalization_bin/dwm-settings-personalization"
 hanging_personalization_output=$(PATH="$hanging_personalization_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" \
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" \
 	timeout --signal=KILL 10 "$provider" discover)
 printf '%s\n' "$hanging_personalization_output" | grep -Fqx \
 	'capability	appearance	accessibility-text-scale	Text scaling	unavailable	user-session	dwm-settings-personalization	The personalization provider is not responding'
 
 missing_personalization_bin=$work/missing-personalization-bin
-cp -a "$fedora_bin" "$missing_personalization_bin"
+cp -a "$arch_bin" "$missing_personalization_bin"
 rm -f "$missing_personalization_bin/dwm-settings-personalization" \
 	"$missing_personalization_bin/dwm-accessibility-settings"
 missing_personalization_provider_dir=$work/missing-personalization-provider
 mkdir "$missing_personalization_provider_dir"
 cp "$provider" "$missing_personalization_provider_dir/dwm-settings-provider"
 missing_personalization_output=$(PATH="$missing_personalization_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" \
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" \
 	"$missing_personalization_provider_dir/dwm-settings-provider" discover)
 printf '%s\n' "$missing_personalization_output" | grep -Fqx \
 	'capability	appearance	accessibility-text-scale	Text scaling	unavailable	user-session	dwm-settings-personalization	Install the managed personalization provider'
@@ -438,49 +438,49 @@ printf '%s\n' "$missing_personalization_output" | grep -Fqx \
 	'capability	appearance	accessibility-reduced-motion	Reduced motion	unavailable	user-session	dwm-accessibility-settings	Install the managed accessibility settings provider'
 
 missing_accessibility_input_bin=$work/missing-accessibility-input-bin
-cp -a "$fedora_bin" "$missing_accessibility_input_bin"
+cp -a "$arch_bin" "$missing_accessibility_input_bin"
 rm -f "$missing_accessibility_input_bin/xinput"
 missing_accessibility_input_output=$(PATH="$missing_accessibility_input_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$missing_accessibility_input_output" | grep -Fqx \
 	'capability	appearance	accessibility-input	Keyboard and pointer access	unavailable	read-only	x11	Install xinput and the managed input Settings provider'
 
 missing_xkbset_bin=$work/missing-xkbset-bin
-cp -a "$fedora_bin" "$missing_xkbset_bin"
+cp -a "$arch_bin" "$missing_xkbset_bin"
 rm -f "$missing_xkbset_bin/xkbset"
 missing_xkbset_output=$(PATH="$missing_xkbset_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$missing_xkbset_output" | grep -Fqx \
 	'capability	appearance	accessibility-input	Keyboard and pointer access	unavailable	user-session	x11	Install xkbset to manage XKB accessibility controls'
 
 unready_xkbset_bin=$work/unready-xkbset-bin
-cp -a "$fedora_bin" "$unready_xkbset_bin"
+cp -a "$arch_bin" "$unready_xkbset_bin"
 make_failing_stub "$unready_xkbset_bin/xkbset"
 unready_xkbset_output=$(PATH="$unready_xkbset_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$unready_xkbset_output" | grep -Fqx \
 	'capability	appearance	accessibility-input	Keyboard and pointer access	unavailable	user-session	x11	xkbset is installed, but no complete responsive XKB state is available'
 
 incomplete_xkb_input_bin=$work/incomplete-xkb-input-bin
-cp -a "$fedora_bin" "$incomplete_xkb_input_bin"
+cp -a "$arch_bin" "$incomplete_xkb_input_bin"
 make_incomplete_accessibility_input_stub "$incomplete_xkb_input_bin/dwm-settings-input"
 incomplete_xkb_input_output=$(PATH="$incomplete_xkb_input_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$incomplete_xkb_input_output" | grep -Fqx \
 	'capability	input	input-devices	Input devices	available	user-session	dwm-settings-input	Stable device discovery, preview, reset, and persistence are available'
 printf '%s\n' "$incomplete_xkb_input_output" | grep -Fqx \
 	'capability	appearance	accessibility-input	Keyboard and pointer access	unavailable	user-session	x11	xkbset is installed, but no complete responsive XKB state is available'
 
 unready_accessibility_input_bin=$work/unready-accessibility-input-bin
-cp -a "$fedora_bin" "$unready_accessibility_input_bin"
+cp -a "$arch_bin" "$unready_accessibility_input_bin"
 make_failing_stub "$unready_accessibility_input_bin/dwm-settings-input"
 unready_accessibility_input_output=$(PATH="$unready_accessibility_input_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$unready_accessibility_input_output" | grep -Fqx \
 	'capability	input	input-devices	Input devices	unavailable	user-session	dwm-settings-input	Input tools are installed, but no responsive XInput session is available'
 printf '%s\n' "$unready_accessibility_input_output" | grep -Fqx \
@@ -488,15 +488,15 @@ printf '%s\n' "$unready_accessibility_input_output" | grep -Fqx \
 
 for invalid_input_case in empty malformed-version malformed-known; do
 	invalid_input_bin=$work/invalid-input-$invalid_input_case-bin
-	cp -a "$fedora_bin" "$invalid_input_bin"
+	cp -a "$arch_bin" "$invalid_input_bin"
 	case $invalid_input_case in
 	empty) make_stub "$invalid_input_bin/dwm-settings-input" ;;
 	malformed-version) make_malformed_input_stub "$invalid_input_bin/dwm-settings-input" ;;
 	malformed-known) make_malformed_known_input_stub "$invalid_input_bin/dwm-settings-input" ;;
 	esac
 	invalid_input_output=$(PATH="$invalid_input_bin" \
-		XDG_CONFIG_HOME="$work/fedora-config" \
-		DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+		XDG_CONFIG_HOME="$work/arch-config" \
+		DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 	printf '%s\n' "$invalid_input_output" | grep -Fqx \
 		'capability	input	input-devices	Input devices	unavailable	user-session	dwm-settings-input	Input tools are installed, but no responsive XInput session is available'
 	printf '%s\n' "$invalid_input_output" | grep -Fqx \
@@ -504,28 +504,28 @@ for invalid_input_case in empty malformed-version malformed-known; do
 done
 
 missing_notification_owner_bin=$work/missing-notification-owner-bin
-cp -a "$fedora_bin" "$missing_notification_owner_bin"
+cp -a "$arch_bin" "$missing_notification_owner_bin"
 make_failing_stub "$missing_notification_owner_bin/busctl"
 missing_notification_owner_output=$(PATH="$missing_notification_owner_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$missing_notification_owner_output" | grep -Fqx \
 	'capability	appearance	accessibility-notifications	Notification policy	unavailable	read-only	dbus	No notification D-Bus owner is observable in this session'
 
 mismatched_notification_owner_bin=$work/mismatched-notification-owner-bin
-cp -a "$fedora_bin" "$mismatched_notification_owner_bin"
+cp -a "$arch_bin" "$mismatched_notification_owner_bin"
 make_live_notification_bus_stub "$mismatched_notification_owner_bin/busctl"
 mismatched_notification_owner_output=$(PATH="$mismatched_notification_owner_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$mismatched_notification_owner_output" | grep -Fqx \
 	'capability	appearance	accessibility-notifications	Notification policy	partial	read-only	dbus	A notification owner is active, but it is not the managed policy provider'
 
 unsafe_theme_bin=$work/unsafe-theme-bin
-cp -a "$fedora_bin" "$unsafe_theme_bin"
+cp -a "$arch_bin" "$unsafe_theme_bin"
 make_failing_stub "$unsafe_theme_bin/dwm-settings-theme"
-unsafe_theme_output=$(PATH="$unsafe_theme_bin" XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+unsafe_theme_output=$(PATH="$unsafe_theme_bin" XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$unsafe_theme_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	partial	read-only	dwm-settings-appearance	Theme inventory is available; the theme source is not safely mutable'
 if printf '%s\n' "$unsafe_theme_output" | grep -Fqx "$available_theme_record"; then
@@ -539,18 +539,18 @@ mkdir -p "$repo_source_home" "$repo_source_config/dwm-titus"
 cp "$repo/config/themes.toml" "$repo_source_config/dwm-titus/themes.toml"
 repo_source_output=$(PATH="$repo/scripts:/usr/bin" HOME="$repo_source_home" \
 	XDG_CONFIG_HOME="$repo_source_config" XDG_DATA_HOME="$work/missing-repo-source-data" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$repo_source_output" | grep -Fqx \
 	"$available_theme_record"
 
 read_only_appearance_bin=$work/read-only-appearance-bin
-cp -a "$fedora_bin" "$read_only_appearance_bin"
+cp -a "$arch_bin" "$read_only_appearance_bin"
 rm -f "$read_only_appearance_bin/dwm-settings-theme"
 read_only_provider_dir=$work/read-only-provider
 mkdir "$read_only_provider_dir"
 cp "$provider" "$read_only_provider_dir/dwm-settings-provider"
-read_only_appearance_output=$(PATH="$read_only_appearance_bin" XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" \
+read_only_appearance_output=$(PATH="$read_only_appearance_bin" XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" \
 	"$read_only_provider_dir/dwm-settings-provider" discover)
 printf '%s\n' "$read_only_appearance_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	partial	read-only	dwm-settings-appearance	Theme inventory is available; install the managed mutation helper for changes'
@@ -558,17 +558,17 @@ if printf '%s\n' "$read_only_appearance_output" | grep -Fqx "$available_theme_re
 	printf 'read-only appearance provider was also advertised as mutable\n' >&2
 	exit 1
 fi
-printf '%s\n' "$fedora_output" | grep -Eq \
+printf '%s\n' "$arch_output" | grep -Eq \
 	'^capability	system	authorization	Administrative authorization	(available|restricted)	privileged	polkit	'
 
 runtime_down_bin=$work/runtime-down-bin
-cp -a "$fedora_bin" "$runtime_down_bin"
+cp -a "$arch_bin" "$runtime_down_bin"
 for command_name in xrandr nmcli bluetoothctl pactl xset; do
 	make_failing_stub "$runtime_down_bin/$command_name"
 done
 make_failing_stub "$runtime_down_bin/dwm-settings-appearance"
-runtime_down_output=$(PATH="$runtime_down_bin" XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+runtime_down_output=$(PATH="$runtime_down_bin" XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$runtime_down_output" | grep -Fqx \
 	'capability	displays	randr	Display discovery	unavailable	read-only	xrandr	RandR tools are installed, but no responsive X11 display is available'
 printf '%s\n' "$runtime_down_output" | grep -Fqx \
@@ -581,47 +581,47 @@ printf '%s\n' "$runtime_down_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	unavailable	read-only	dwm-settings-appearance	Restore a valid themes.toml configuration or inspect the appearance snapshot errors'
 
 malformed_appearance_bin=$work/malformed-appearance-bin
-cp -a "$fedora_bin" "$malformed_appearance_bin"
+cp -a "$arch_bin" "$malformed_appearance_bin"
 make_malformed_appearance_stub "$malformed_appearance_bin/dwm-settings-appearance"
-malformed_appearance_output=$(PATH="$malformed_appearance_bin" XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+malformed_appearance_output=$(PATH="$malformed_appearance_bin" XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$malformed_appearance_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	unavailable	read-only	dwm-settings-appearance	Restore a valid themes.toml configuration or inspect the appearance snapshot errors'
 
 preamble_appearance_bin=$work/preamble-appearance-bin
-cp -a "$fedora_bin" "$preamble_appearance_bin"
+cp -a "$arch_bin" "$preamble_appearance_bin"
 make_preamble_appearance_stub "$preamble_appearance_bin/dwm-settings-appearance"
-preamble_appearance_output=$(PATH="$preamble_appearance_bin" XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+preamble_appearance_output=$(PATH="$preamble_appearance_bin" XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$preamble_appearance_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	unavailable	read-only	dwm-settings-appearance	Restore a valid themes.toml configuration or inspect the appearance snapshot errors'
 
 header_only_appearance_bin=$work/header-only-appearance-bin
-cp -a "$fedora_bin" "$header_only_appearance_bin"
+cp -a "$arch_bin" "$header_only_appearance_bin"
 make_header_only_appearance_stub "$header_only_appearance_bin/dwm-settings-appearance"
 header_only_appearance_output=$(PATH="$header_only_appearance_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$header_only_appearance_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	unavailable	read-only	dwm-settings-appearance	Restore a valid themes.toml configuration or inspect the appearance snapshot errors'
 
 empty_active_appearance_bin=$work/empty-active-appearance-bin
-cp -a "$fedora_bin" "$empty_active_appearance_bin"
+cp -a "$arch_bin" "$empty_active_appearance_bin"
 make_empty_active_appearance_stub "$empty_active_appearance_bin/dwm-settings-appearance"
 empty_active_appearance_output=$(PATH="$empty_active_appearance_bin" \
-	XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" "$provider" discover)
+	XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" "$provider" discover)
 printf '%s\n' "$empty_active_appearance_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	unavailable	read-only	dwm-settings-appearance	Restore a valid themes.toml configuration or inspect the appearance snapshot errors'
 
 missing_appearance_bin=$work/missing-appearance-bin
-cp -a "$fedora_bin" "$missing_appearance_bin"
+cp -a "$arch_bin" "$missing_appearance_bin"
 rm -f "$missing_appearance_bin/dwm-settings-appearance"
 isolated_provider_dir=$work/isolated-provider
 mkdir "$isolated_provider_dir"
 cp "$provider" "$isolated_provider_dir/dwm-settings-provider"
-missing_appearance_output=$(PATH="$missing_appearance_bin" XDG_CONFIG_HOME="$work/fedora-config" \
-	DWM_SETTINGS_OS_RELEASE="$work/fedora-os-release" \
+missing_appearance_output=$(PATH="$missing_appearance_bin" XDG_CONFIG_HOME="$work/arch-config" \
+	DWM_SETTINGS_OS_RELEASE="$work/arch-os-release" \
 	"$isolated_provider_dir/dwm-settings-provider" discover)
 printf '%s\n' "$missing_appearance_output" | grep -Fqx \
 	'capability	appearance	themes	Themes	unavailable	read-only	dwm-settings-appearance	Install the managed appearance provider'
@@ -813,10 +813,10 @@ grep -Fq 'root.settingsModel.openOnScreen(targetScreen)' "$repo/config/quickshel
 grep -Fq '{ title="dwm settings",             isfloating=1, alwaysontop=1 }' \
 	"$repo/config/window-rules.toml"
 
-fedora_qml=$(bash -c '. "$1"; dwm_packages fedora qml-development' sh \
+arch_qml=$(bash -c '. "$1"; dwm_packages arch qml-development' sh \
 	"$repo/scripts/dwm-packages.sh")
-[ "$fedora_qml" = qt6-qtdeclarative-devel ]
-bash -c '. "$1"; dwm_packages fedora runtime-required' sh \
+[ "$arch_qml" = qt6-declarative ]
+bash -c '. "$1"; dwm_packages arch runtime-required' sh \
 	"$repo/scripts/dwm-packages.sh" | grep -Fx util-linux >/dev/null
 
 if grep -Eq '^[[:space:]]*(sudo|pkexec)([[:space:]]|$)' "$provider"; then

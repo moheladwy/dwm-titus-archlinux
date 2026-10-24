@@ -1,5 +1,5 @@
 #!/bin/bash
-# Seed fresh Fedora accounts; never replace existing application preferences.
+# Seed fresh accounts; never replace existing application preferences.
 set -euo pipefail
 [[ $(id -u) != 0 ]]
 [[ $# == 0 || ($# == 1 && $1 == --image) ]]
@@ -54,8 +54,7 @@ def entry(desktop, command, prefixes, required=True):
 entry('io.github.celluloid_player.Celluloid.desktop', 'celluloid', ('audio/', 'video/', 'application/'))
 entry('sxiv.desktop', 'sxiv', ('image/',))
 entry('brave-origin.desktop', 'brave-origin', ('text/html', 'x-scheme-handler/http', 'application/xhtml', 'application/pdf'), required=sys.argv[1] == '--image')
-entry('pathfm.desktop', 'pathfm', ('inode/directory',), required=False)
-entry('thunar.desktop', 'thunar', ('inode/directory',), required=False)
+entry('org.kde.dolphin.desktop', 'dolphin', ('inode/directory',), required=False)
 PY
 )
 # Atomic publication avoids leaving a partial MIME file after an error.

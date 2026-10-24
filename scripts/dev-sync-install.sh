@@ -157,15 +157,15 @@ source_update_dependencies_ready() {
 	if [ "$dependency_profile" = source-update ]; then
 		command -v xsettingsd >/dev/null 2>&1 &&
 			command -v dump_xsettings >/dev/null 2>&1 &&
-			command -v xkbset >/dev/null 2>&1 &&
 			command -v bwrap >/dev/null 2>&1 &&
 			/usr/bin/python3 -c 'import ctypes; ctypes.CDLL("libseccomp.so.2")' >/dev/null 2>&1 || return 1
 	fi
-	"$repo_dir/scripts/dwm-packages.sh" fedora "$dependency_profile" >"$work/source-update-packages" || return 1
+	"$repo_dir/scripts/dwm-packages.sh" arch "$dependency_profile" >"$work/source-update-packages" || return 1
+	set --
 	while IFS= read -r package; do
-		[ -n "$package" ] || continue
-		rpm -q "$package" >/dev/null 2>&1 || return 1
+		[ -n "$package" ] && set -- "$@" "$package"
 	done <"$work/source-update-packages"
+	[ "$#" -eq 0 ] || pacman -T -- "$@" >/dev/null 2>&1
 }
 
 source_update_dependencies_needed() {
@@ -180,7 +180,7 @@ source_update_dependencies_needed() {
 	command -v quickshell >/dev/null 2>&1
 }
 
-require_fedora_for_package_changes() {
+require_arch_for_package_changes() {
 	distro_id=$(awk -F= '
 		$1 == "ID" {
 			value = $2
@@ -190,7 +190,7 @@ require_fedora_for_package_changes() {
 		}
 	' "$os_release_file" 2>/dev/null) ||
 		die "cannot read $os_release_file before installing source-update dependencies"
-	[ "$distro_id" = fedora ] ||
+	[ "$distro_id" = arch ] ||
 		die "unsupported distribution for source-update dependencies: ${distro_id:-unknown}"
 }
 
@@ -208,18 +208,20 @@ reconcile_source_update_dependencies() {
 	fi
 	command -v sudo >/dev/null 2>&1 ||
 		die "sudo is required to install source-update dependencies"
-	command -v dnf >/dev/null 2>&1 ||
-		die "dnf is required to install source-update dependencies"
-	require_fedora_for_package_changes
-	"$repo_dir/scripts/dwm-packages.sh" fedora "$source_update_profile" >"$packages_file" ||
+	command -v pacman >/dev/null 2>&1 ||
+		die "pacman is required to install source-update dependencies"
+	require_arch_for_package_changes
+	"$repo_dir/scripts/dwm-packages.sh" arch "$source_update_profile" >"$packages_file" ||
 		die "could not resolve source-update dependencies"
 	set --
 	while IFS= read -r package; do
 		[ -n "$package" ] && set -- "$@" "$package"
 	done <"$packages_file"
 	[ "$#" -gt 0 ] || die "source-update dependency profile is empty"
-	note "Installing required source-update dependencies: $*"
-	sudo dnf install -y "$@"
+	# Installing against stale sync databases is a partial upgrade, which Arch
+	# does not support, so the dependencies are installed with a full upgrade.
+	note "Upgrading the system and installing source-update dependencies: $*"
+	sudo pacman -Syu --needed -- "$@"
 	source_update_dependencies_ready "$source_update_profile" ||
 		die "source-update dependencies are still unavailable after installation"
 }

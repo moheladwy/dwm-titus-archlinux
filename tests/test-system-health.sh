@@ -7,13 +7,13 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/bin" "$work/home/.config/dwm-titus" "$work/home/.config/quickshell"
-printf 'ID=fedora\nPRETTY_NAME="Fedora Test"\n' >"$work/os-release"
+printf 'ID=arch\nPRETTY_NAME="Arch Linux Test"\n' >"$work/os-release"
 : >"$work/home/.config/dwm-titus/hotkeys.toml"
 : >"$work/home/.config/dwm-titus/themes.toml"
 : >"$work/home/.config/dwm-titus/window-rules.toml"
 : >"$work/home/.config/quickshell/shell.qml"
 
-cat >"$work/bin/dnf" <<'SCRIPT'
+cat >"$work/bin/pacman" <<'SCRIPT'
 #!/bin/sh
 printf 'package consistency problem\n'
 exit 1
@@ -26,7 +26,7 @@ SCRIPT
 
 cat >"$work/bin/quickshell" <<'SCRIPT'
 #!/bin/sh
-printf '%s\n' 'quickshell pre-release, revision: dacfa9de829ac7cb173825f593236bf2c21f637e'
+printf '%s\n' 'Quickshell 0.3.2 (revision , distributed by Arch Linux)'
 SCRIPT
 
 cat >"$work/bin/systemctl" <<'SCRIPT'
@@ -37,7 +37,7 @@ case " $* " in
 *) exit 1 ;;
 esac
 SCRIPT
-chmod +x "$work/bin/dnf" "$work/bin/quickshell" "$work/bin/systemctl" "$work/bin/xclip"
+chmod +x "$work/bin/pacman" "$work/bin/quickshell" "$work/bin/systemctl" "$work/bin/xclip"
 
 DWM_HEALTH_XCLIP_OUTPUT="$work/clipboard.txt" \
 	PATH="$work/bin:/usr/bin:/bin" \

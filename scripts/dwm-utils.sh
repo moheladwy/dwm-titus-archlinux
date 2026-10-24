@@ -22,16 +22,27 @@ if [[ -r $OS_RELEASE_FILE ]]; then
 	DISTRO_NAME="${PRETTY_NAME:-${NAME:-Unknown Linux}}"
 fi
 
-if [[ $DISTRO_ID == "fedora" ]]; then
-	DISTRO_FAMILY="fedora"
-fi
+# Plain Arch Linux is the only supported identity. ID_LIKE is deliberately
+# ignored: derivatives such as EndeavourOS, CachyOS, and Manjaro are rejected.
+dwm_platform_family() {
+	case "$1" in
+	arch) printf '%s\n' arch ;;
+	*) printf '%s\n' unknown ;;
+	esac
+}
+
+DISTRO_FAMILY=$(dwm_platform_family "$DISTRO_ID")
+
+# Set DWM_PACKAGE_NONINTERACTIVE=1 to pass --noconfirm. Interactive runs keep
+# pacman's own confirmation, conflict, and provider prompts.
+DWM_PACKAGE_NONINTERACTIVE=${DWM_PACKAGE_NONINTERACTIVE:-0}
 
 case "$DISTRO_FAMILY" in
-fedora)
+arch)
 	if ((EUID == 0)); then
-		DWM_PACKAGE_COMMAND=(dnf install -y)
+		DWM_PACKAGE_COMMAND=(pacman -S --needed)
 	else
-		DWM_PACKAGE_COMMAND=(sudo dnf install -y)
+		DWM_PACKAGE_COMMAND=(sudo pacman -S --needed)
 	fi
 	PKG_CMD="${DWM_PACKAGE_COMMAND[*]}"
 	;;
@@ -41,39 +52,85 @@ fedora)
 esac
 export PKG_CMD
 
+dwm_pacman_confirm_args() {
+	if [[ $DWM_PACKAGE_NONINTERACTIVE == 1 ]]; then
+		printf '%s\n' --noconfirm
+	fi
+}
+
 install_packages() {
+	local confirm_args=()
+
 	case "$DISTRO_FAMILY" in
-	fedora)
-		"${DWM_PACKAGE_COMMAND[@]}" "$@"
+	arch)
+		mapfile -t confirm_args < <(dwm_pacman_confirm_args)
+		"${DWM_PACKAGE_COMMAND[@]}" "${confirm_args[@]}" -- "$@"
 		;;
 	*)
-		printf 'Unsupported distribution: %s (Fedora is required)\n' "$DISTRO_NAME" >&2
+		printf 'Unsupported distribution: %s (Arch Linux is required)\n' "$DISTRO_NAME" >&2
 		return 1
 		;;
 	esac
 }
 
-package_available() {
-	local package_arch
+# Synchronize and upgrade the whole system. Arch does not support partial
+# upgrades, so package installation must never follow a bare `pacman -Sy`.
+dwm_system_upgrade() {
+	local confirm_args=()
+	local prefix=()
 
+	[[ $DISTRO_FAMILY == arch ]] || return 1
+	((EUID == 0)) || prefix=(sudo)
+	mapfile -t confirm_args < <(dwm_pacman_confirm_args)
+	"${prefix[@]}" pacman -Syu "${confirm_args[@]}"
+}
+
+package_available() {
 	case "$DISTRO_FAMILY" in
-	fedora)
-		package_arch=${1##*.}
-		case "$package_arch" in
-		i686 | x86_64 | aarch64)
-			dnf -q repoquery --available --qf '%{name}.%{arch}' "$1" 2>/dev/null |
-				command grep -Fxq "$1"
-			;;
-		*)
-			dnf -q repoquery --available --qf '%{name}' "$1" 2>/dev/null |
-				command grep -Fxq "$1"
-			;;
-		esac
+	arch)
+		pacman -Si -- "$1" >/dev/null 2>&1
 		;;
 	*)
 		return 1
 		;;
 	esac
+}
+
+# Satisfied when the package or a provider of it is installed.
+package_installed() {
+	[[ $DISTRO_FAMILY == arch ]] || return 1
+	pacman -T -- "$1" >/dev/null 2>&1
+}
+
+# AUR packages are opt-in and only use an AUR helper that is already
+# installed. The helper runs as the invoking user, never as root, and is never
+# used for official repository packages.
+dwm_aur_helper() {
+	local helper
+
+	for helper in paru yay; do
+		if command -v "$helper" >/dev/null 2>&1; then
+			printf '%s\n' "$helper"
+			return 0
+		fi
+	done
+	return 1
+}
+
+install_aur_packages() {
+	local helper
+	local confirm_args=()
+
+	if ((EUID == 0)); then
+		printf 'Refusing to run an AUR helper as root.\n' >&2
+		return 1
+	fi
+	helper=$(dwm_aur_helper) || {
+		printf 'No AUR helper (paru or yay) is installed; skipping AUR packages: %s\n' "$*" >&2
+		return 1
+	}
+	mapfile -t confirm_args < <(dwm_pacman_confirm_args)
+	"$helper" -S --needed "${confirm_args[@]}" -- "$@"
 }
 
 install_optional_package() {

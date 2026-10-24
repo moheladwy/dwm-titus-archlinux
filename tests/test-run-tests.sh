@@ -162,18 +162,18 @@ stale_marker_out=$work/stale-marker.out
 mkdir "$work/stale-workspace" "$work/stale-tmp"
 DWM_TEST_WORKSPACE=$work/stale-workspace TMPDIR=$work/stale-tmp \
 	DWM_TEST_TMP_ROOT=$work/stale-marker-root \
-	make -s -C "$repo" check-fedora-platform >"$stale_marker_out"
+	make -s -C "$repo" check-arch-platform >"$stale_marker_out"
 grep -Fq '==> Test workspace: ' "$stale_marker_out"
-grep -Fq 'Fedora-only platform contract: PASS' "$stale_marker_out"
+grep -Fq 'Arch-only platform contract: PASS' "$stale_marker_out"
 
 forged_marker_out=$work/forged-marker.out
 mkdir "$work/forged-workspace"
 printf '%s\n' forged >"$work/forged-workspace/.runner"
 DWM_TEST_WORKSPACE=$work/forged-workspace TMPDIR=$work/forged-workspace \
 	DWM_TEST_RUNNER_TOKEN=wrong DWM_TEST_TMP_ROOT=$work/forged-marker-root \
-	make -s -C "$repo" check-fedora-platform >"$forged_marker_out"
+	make -s -C "$repo" check-arch-platform >"$forged_marker_out"
 grep -Fq '==> Test workspace: ' "$forged_marker_out"
-grep -Fq 'Fedora-only platform contract: PASS' "$forged_marker_out"
+grep -Fq 'Arch-only platform contract: PASS' "$forged_marker_out"
 
 link_root=$work/link-root
 ln -s "$test_root" "$link_root"

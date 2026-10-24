@@ -92,14 +92,24 @@ check_required_cmd() {
 
 check_keyring() {
 	local package
+	local pam_module="${DWM_PAM_SECURITY_DIR:-/usr/lib/security}/pam_gnome_keyring.so"
+
 	while IFS= read -r package; do
-		if have_cmd rpm && rpm -q "$package" >/dev/null 2>&1; then
+		if have_cmd pacman && pacman -T -- "$package" >/dev/null 2>&1; then
 			ok "dependency-package-$package" "$package" "$package is installed"
 		else
 			required_missing "dependency-package-$package" "$package" \
 				"Install $package for secret storage and automatic keyring unlock at password login; then log out and back in"
 		fi
-	done < <(dwm_packages fedora keyring)
+	done < <(dwm_packages arch keyring)
+	# Arch ships the PAM module inside gnome-keyring, but a running daemon does
+	# not prove that the module is present for the display manager.
+	if [[ -e $pam_module ]]; then
+		ok "dependency-pam-gnome-keyring" "pam_gnome_keyring.so" "The GNOME Keyring PAM module is installed"
+	else
+		required_missing "dependency-pam-gnome-keyring" "pam_gnome_keyring.so" \
+			"Reinstall gnome-keyring to restore pam_gnome_keyring.so for automatic keyring unlock at password login"
+	fi
 }
 
 check_optional_cmd() {

@@ -723,14 +723,10 @@ if process_running "$hung_helper_pid" || process_running "$hung_monitor_pid" ||
 	exit 1
 fi
 
-source_packages=$(bash -c '. "$1"; dwm_packages fedora desktop' _ "$repo/scripts/dwm-packages.sh")
+source_packages=$(bash -c '. "$1"; dwm_packages arch desktop' _ "$repo/scripts/dwm-packages.sh")
 printf '%s\n' "$source_packages" | grep -Fqx upower
 printf '%s\n' "$source_packages" | grep -Fqx power-profiles-daemon
-printf '%s\n' "$source_packages" | grep -Fqx dbus-tools
-for kickstart in "$repo/dwm-fedora.ks" "$repo/dwm-fedora-nvidia.ks"; do
-	grep -Fqx upower "$kickstart"
-	grep -Fqx power-profiles-daemon "$kickstart"
-	grep -Fqx dbus-tools "$kickstart"
-done
+# dbus-send and dbus-monitor ship in the dbus package on Arch.
+printf '%s\n' "$source_packages" | grep -Fqx dbus
 
 printf 'Quickshell power backend: PASS\n'

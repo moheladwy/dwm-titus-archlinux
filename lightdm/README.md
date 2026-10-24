@@ -1,10 +1,12 @@
 # LightDM Slick Greeter - dwm-titus
 
-A modern Fedora LightDM login screen using Slick Greeter with a Nord colour
+A LightDM login screen for Arch Linux using Slick Greeter with a Nord colour
 palette, blurred background, and the MesloLGS NF font.
 
-The Fedora installer uses `slick-greeter`. The dwm-titus LightDM install target
-renders the matching Fedora `lightdm.conf`.
+Arch packages the greeter as `lightdm-slick-greeter`. The dwm-titus LightDM
+install target renders an Arch `lightdm.conf` that selects that greeter, the
+`dwm` session, and the packaged `/etc/lightdm/Xsession` session wrapper. An
+existing different `lightdm.conf` is backed up first.
 
 ## Files
 
@@ -22,7 +24,7 @@ The main `install.sh` handles this automatically. To apply manually:
 sudo make install
 ```
 
-The direct `make install` defaults match Fedora. Prefer the top-level
+The direct `make install` defaults match Arch Linux. Prefer the top-level
 `install.sh` for a complete installation.
 
 ## Customisation

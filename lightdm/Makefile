@@ -4,9 +4,9 @@ LIGHTDM_DIR = $(DESTDIR)/etc/lightdm
 LIGHTDM_CONF = $(LIGHTDM_DIR)/lightdm.conf
 PIXMAPS_DIR = $(DESTDIR)/usr/share/pixmaps
 LIGHTDM_SEAT_SECTION ?= Seat:*
-LIGHTDM_GREETER_SESSION ?= slick-greeter
+LIGHTDM_GREETER_SESSION ?= lightdm-slick-greeter
 LIGHTDM_USER_SESSION ?= dwm
-LIGHTDM_SESSION_WRAPPER ?=
+LIGHTDM_SESSION_WRAPPER ?= /etc/lightdm/Xsession
 LIGHTDM_LOGIND_CHECK ?= true
 
 print-config:

@@ -109,9 +109,11 @@ else
 	printf "  ${RED}✗${NC} Xorg or Xlibre ${YELLOW}(missing)${NC}\n"
 	MISSING=$((MISSING + 1))
 fi
-for command in startx xrandr xset xsetroot xkbset; do
+for command in startx xrandr xset xsetroot; do
 	check_cmd "$command"
 done
+# xkbset is AUR-only on Arch; AccessX controls are unavailable without it.
+check_optional_cmd "xkbset"
 
 # ── Runtime dependencies ────────────────────────────────
 echo "Runtime Dependencies (desktop experience):"
@@ -121,13 +123,20 @@ check_cmd "feh"
 check_cmd "xsettingsd"
 check_cmd "bwrap"
 while IFS= read -r package; do
-	if command -v rpm >/dev/null 2>&1 && rpm -q "$package" >/dev/null 2>&1; then
+	if package_installed "$package"; then
 		printf '  ok %s\n' "$package"
 	else
 		printf '  missing %s (required for keyring login integration; log out and back in after installation)\n' "$package"
 		MISSING=$((MISSING + 1))
 	fi
 done < <(dwm_packages "$DISTRO_FAMILY" keyring)
+# Arch ships the PAM module inside gnome-keyring; check the module itself.
+if [ -e "${DWM_PAM_SECURITY_DIR:-/usr/lib/security}/pam_gnome_keyring.so" ]; then
+	printf '  ok pam_gnome_keyring.so\n'
+else
+	printf '  missing pam_gnome_keyring.so (required for keyring login integration)\n'
+	MISSING=$((MISSING + 1))
+fi
 check_optional_cmd "maim"
 check_cmd "xclip"
 check_cmd "xdotool"
