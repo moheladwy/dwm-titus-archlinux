@@ -12,16 +12,16 @@ repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 	printf 'Missing executable scripts/run-tests-podman\n' >&2
 	exit 1
 }
-[[ -f $repo/tests/containers/fedora-44/Containerfile ]] || {
-	printf 'Missing Fedora 44 Containerfile\n' >&2
+[[ -f $repo/tests/containers/arch/Containerfile ]] || {
+	printf 'Missing Arch Linux Containerfile\n' >&2
 	exit 1
 }
 work=$(mktemp -d "${TMPDIR:-/tmp}/podman-contract.XXXXXX")
 trap 'find "$work" -depth -delete' EXIT
-mkdir -p "$work/bin" "$work/repository/scripts" "$work/repository/tests/containers/fedora-44"
+mkdir -p "$work/bin" "$work/repository/scripts" "$work/repository/tests/containers/arch"
 cp "$repo/scripts/run-tests-podman" "$work/repository/scripts/"
 cp "$repo/scripts/run-tests" "$repo/scripts/dwm-packages.sh" "$work/repository/scripts/"
-cp "$repo/tests/containers/fedora-44/Containerfile" "$work/repository/tests/containers/fedora-44/"
+cp "$repo/tests/containers/arch/Containerfile" "$work/repository/tests/containers/arch/"
 printf 'ignored/\n' >"$work/repository/.gitignore"
 printf 'original\n' >"$work/repository/tracked"
 printf 'deleted\n' >"$work/repository/deleted"
@@ -60,6 +60,7 @@ cat >"$work/bin/podman" <<'PY'
 import io
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tarfile
@@ -73,14 +74,20 @@ if args[0] == 'info':
     print(os.environ.get('CONTRACT_ROOTLESS', 'true'))
     sys.exit(int(os.environ.get('CONTRACT_INFO_STATUS', '0')))
 if args[0] == 'build':
-    assert args == ['build', '--tag', 'localhost/dwm-titus-tests:fedora-44',
-                    '--file', 'tests/containers/fedora-44/Containerfile', '-'], args
+    assert args == ['build', '--tag', 'localhost/dwm-titus-tests:arch',
+                    '--file', 'tests/containers/arch/Containerfile', '-'], args
     archive = tarfile.open(fileobj=io.BytesIO(sys.stdin.buffer.read()))
     assert set(archive.getnames()) == {'scripts/dwm-packages.sh',
-                                      'tests/containers/fedora-44/Containerfile'}
-    text = archive.extractfile('tests/containers/fedora-44/Containerfile').read().decode()
-    assert text.splitlines()[0] == 'FROM registry.fedoraproject.org/fedora:44'
+                                      'tests/containers/arch/Containerfile'}
+    text = archive.extractfile('tests/containers/arch/Containerfile').read().decode()
+    assert re.fullmatch(r'FROM docker\.io/library/archlinux:base-devel@sha256:[0-9a-f]{64}',
+                        text.splitlines()[0]), text.splitlines()[0]
+    assert re.search(r'^ARG ARCH_ARCHIVE_DATE=\d{4}/\d{2}/\d{2}$', text, re.M)
+    assert 'https://archive.archlinux.org/repos/%s/' in text
+    assert 'pacman -Syyuu' in text
+    assert 'pacman -Sy ' not in text
     assert 'scripts/dwm-packages.sh' in text
+    assert 'dwm_packages arch' in text
     for profile in ['ci-smoke', 'desktop', 'system-management', 'qml-validation']:
         assert profile in text
     sys.exit(int(os.environ.get('CONTRACT_BUILD_STATUS', '0')))
@@ -90,7 +97,7 @@ assert args[1:7] == ['--rm', '--interactive', '--network=private',
                       f'type=bind,src={work}/repository/.git,dst=/source/repository,ro=true,bind-nonrecursive'], args
 assert args[7:9] == ['--mount',
                     f'type=bind,src={work}/current worktree,dst=/source/worktree,ro=true,bind-nonrecursive'], args
-assert args[9:13] == ['localhost/dwm-titus-tests:fedora-44', 'bash', '-c', args[12]], args
+assert args[9:13] == ['localhost/dwm-titus-tests:arch', 'bash', '-c', args[12]], args
 assert args[13] == 'container-stage', args
 assert len(args[14]) == 40, args
 script = args[12]
@@ -169,7 +176,7 @@ for child in "$mount_source/ignored" "$work/repository/.git/objects"; do
 done
 expect_failure 2 'Nested host mounts are unsupported' env CONTRACT_POST_BUILD_MOUNT="$mount_source/ignored" "$runner"
 [[ $(<"$work/calls") == $'info\nbuild' ]]
-expect_failure 23 'Fedora 44 image build failed' env CONTRACT_BUILD_STATUS=23 "$runner"
+expect_failure 23 'Arch Linux image build failed' env CONTRACT_BUILD_STATUS=23 "$runner"
 [[ $(<"$work/calls") == $'info\nbuild' ]]
 expect_failure 128 'Container staging failed (status 128)' env CONTRACT_STAGE_FAILURE=1 "$runner"
 mkdir "$work/no-podman"
@@ -207,4 +214,4 @@ rm "$source_tree/Makefile"
 snapshot >"$work/after"
 cmp "$work/before" "$work/after"
 [[ ! -e $work/container ]]
-printf 'Rootless Fedora 44 runner contract: PASS\n'
+printf 'Rootless Arch Linux runner contract: PASS\n'

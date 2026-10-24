@@ -19,17 +19,24 @@ jobs:
   validate:
     name: Desktop smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    container: fedora:44
+    # The Arch Linux Archive can be slower than a live mirror.
+    timeout-minutes: 20
+    # Keep the image digest and archive date in step with
+    # tests/containers/arch/Containerfile.
+    container: docker.io/library/archlinux:base-devel@sha256:3cbf69d2d5958d6a294f3722c5668e6187c4df8e00fa27f72352f0bf83e495e1
     defaults:
       run:
         shell: bash
     env:
+      ARCH_ARCHIVE_DATE: 2026/10/22
       DWM_TEST_TMP_ROOT: /var/tmp/dwm-ci
 
     steps:
-      - name: Install checkout dependency
-        run: dnf install -y --setopt=install_weak_deps=False git-core
+      - name: Pin Arch Linux Archive snapshot and install checkout dependency
+        run: |
+          printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' \
+            "$ARCH_ARCHIVE_DATE" >/etc/pacman.d/mirrorlist
+          pacman -Syu --noconfirm --needed --disable-download-timeout git
 
       - uses: actions/checkout@v7
         with:
@@ -38,8 +45,8 @@ jobs:
       - name: Install build and smoke dependencies
         run: |
           source scripts/dwm-packages.sh
-          mapfile -t packages < <(dwm_packages fedora ci-smoke)
-          dnf install -y --setopt=install_weak_deps=False "${packages[@]}"
+          mapfile -t packages < <(dwm_packages arch ci-smoke)
+          pacman -Syu --noconfirm --needed --disable-download-timeout "${packages[@]}"
 
       - name: Build dwm
         run: |

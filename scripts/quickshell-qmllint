@@ -58,16 +58,39 @@ find_qmllint() {
 		return 0
 	fi
 
-	for cmd in qmllint-qt6 qmllint /usr/lib64/qt6/bin/qmllint /usr/lib/qt6/bin/qmllint; do
-		if command -v "$cmd" >/dev/null 2>&1; then
-			printf '%s\n' "$cmd"
-			return 0
+	# A bare qmllint can be the Qt 5 tool (Arch qt5-declarative owns
+	# /usr/bin/qmllint), so prefer explicit Qt 6 names and binary directories.
+	qt6_bins=
+	if command -v qmake6 >/dev/null 2>&1; then
+		qt6_bins=$(qmake6 -query QT_INSTALL_BINS 2>/dev/null) || qt6_bins=
+	fi
+	rejected=
+	for cmd in qmllint-qt6 qmllint6 ${qt6_bins:+"$qt6_bins/qmllint"} \
+		/usr/lib/qt6/bin/qmllint /usr/lib64/qt6/bin/qmllint qmllint; do
+		command -v "$cmd" >/dev/null 2>&1 || continue
+		if is_qt5_qmllint "$cmd"; then
+			rejected=${rejected:+$rejected, }$cmd
+			continue
 		fi
+		printf '%s\n' "$cmd"
+		return 0
 	done
 
+	if [ -n "$rejected" ]; then
+		printf '%s\n' "ignored Qt 5 qmllint: $rejected" >&2
+	fi
 	printf '%s\n' \
 		"qmllint not found; install the Qt 6 declarative development tools." >&2
 	exit 127
+}
+
+# Qt 5 qmllint reports version 1.0; Qt 6 reports the Qt version.
+is_qt5_qmllint() {
+	version=$("$1" --version 2>/dev/null) || version=
+	case "$version" in
+	*" 1.0"* | *" 5."* | *"Qt 5"* | *"Qt5"*) return 0 ;;
+	esac
+	return 1
 }
 
 abs_path() {

@@ -19,11 +19,21 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    container: fedora:44
+    # Keep the image digest and archive date in step with
+    # tests/containers/arch/Containerfile.
+    container: docker.io/library/archlinux:base-devel@sha256:3cbf69d2d5958d6a294f3722c5668e6187c4df8e00fa27f72352f0bf83e495e1
+    defaults:
+      run:
+        shell: bash
+    env:
+      ARCH_ARCHIVE_DATE: 2026/10/22
 
     steps:
-      - name: Install checkout dependency
-        run: dnf install -y --setopt=install_weak_deps=False git
+      - name: Pin Arch Linux Archive snapshot and install checkout dependency
+        run: |
+          printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' \
+            "$ARCH_ARCHIVE_DATE" >/etc/pacman.d/mirrorlist
+          pacman -Syu --noconfirm --needed --disable-download-timeout git
 
       - uses: actions/checkout@v7
         with:
@@ -31,11 +41,9 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          dnf install -y --setopt=install_weak_deps=False \
-            gcc make pkgconf-pkg-config \
-            libX11-devel libXft-devel libXinerama-devel libXrender-devel \
-            imlib2-devel libxcb-devel xcb-util-devel \
-            fontconfig-devel freetype-devel
+          source scripts/dwm-packages.sh
+          mapfile -t packages < <(dwm_packages arch build)
+          pacman -Syu --noconfirm --needed --disable-download-timeout "${packages[@]}"
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4.38.3
