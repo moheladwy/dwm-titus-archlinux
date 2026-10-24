@@ -182,7 +182,7 @@ confirm_aur_packages() {
 	if [[ $AUR_APPROVED == true ]]; then
 		return
 	fi
-	if [[ $NON_INTERACTIVE == true ]] || ! dwm_aur_helper >/dev/null; then
+	if [[ $NON_INTERACTIVE == true || $DRY_RUN == true ]] || ! dwm_aur_helper >/dev/null; then
 		return
 	fi
 
@@ -484,8 +484,9 @@ info "Distribution: $DISTRO_NAME"
 info "Family: $DISTRO_FAMILY"
 info "Package manager: $PKG_CMD"
 info "Install profile: $INSTALL_PROFILE"
-confirm_install_summary
+# Ask the optional AUR question first so the confirmed summary is the real plan.
 confirm_aur_packages
+confirm_install_summary
 
 if [[ $NON_INTERACTIVE == true ]]; then
 	DWM_PACKAGE_NONINTERACTIVE=1

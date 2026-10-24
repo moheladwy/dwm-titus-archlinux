@@ -196,10 +196,16 @@ def install_packages(packages):
         # Arch does not support partial upgrades. Installing while updates are
         # pending would pair new packages with outdated libraries, so require a
         # fully upgraded system instead of upgrading it implicitly.
+        # pacman -Qu exits 1 with no output when nothing is pending. Entries held
+        # back by IgnorePkg are marked "[ignored]" and never block. This reflects
+        # the last database sync; the helper deliberately never refreshes it.
         pending = subprocess.run(["/usr/bin/pacman", "-Qu"], stdout=subprocess.PIPE,
                                  stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
                                  env=PACKAGE_ENV, cwd="/", timeout=60, text=True)
-        if pending.returncode == 0 and pending.stdout.strip():
+        if pending.returncode not in (0, 1):
+            fail("Could not read pending system updates; retry after pacman -Syu")
+        if any(line.strip() and not line.rstrip().endswith("[ignored]")
+               for line in (pending.stdout or "").splitlines()):
             fail("Update system packages first with sudo pacman -Syu, then retry the desktop update")
         print("Installing required desktop packages: " + ", ".join(missing), flush=True)
         subprocess.run(["/usr/bin/pacman", "-S", "--needed", "--noconfirm", "--", *missing], check=True,

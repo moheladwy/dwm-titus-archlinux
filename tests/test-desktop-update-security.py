@@ -314,7 +314,7 @@ raise SystemExit(17)
     def test_dependency_action_rejects_unfinished_transactions_before_package_commands(self):
         marker = self.prefix / "package-commands.json"
         pending = self.prefix / "updates-pending"
-        injected = "\ndef observed_package_command(args, **kwargs):\n    path = Path(" + repr(str(marker)) + ")\n    calls = json.loads(path.read_text()) if path.exists() else []\n    calls.append(args)\n    path.write_text(json.dumps(calls))\n    if args[:2] == ['/usr/bin/pacman', '-T']:\n        return subprocess.CompletedProcess(args, 127)\n    if args[:2] == ['/usr/bin/pacman', '-Qu']:\n        pending = Path(" + repr(str(pending)) + ").exists()\n        return subprocess.CompletedProcess(args, 0 if pending else 1, 'linux 1-1 -> 2-1\\n' if pending else '')\n    return subprocess.CompletedProcess(args, 0)\nsubprocess.run = observed_package_command\n"
+        injected = "\ndef observed_package_command(args, **kwargs):\n    path = Path(" + repr(str(marker)) + ")\n    calls = json.loads(path.read_text()) if path.exists() else []\n    calls.append(args)\n    path.write_text(json.dumps(calls))\n    if args[:2] == ['/usr/bin/pacman', '-T']:\n        return subprocess.CompletedProcess(args, 127)\n    if args[:2] == ['/usr/bin/pacman', '-Qu']:\n        pending = Path(" + repr(str(pending)) + ")\n        listed = pending.read_text() if pending.exists() else ''\n        return subprocess.CompletedProcess(args, 0 if listed else 1, listed)\n    return subprocess.CompletedProcess(args, 0)\nsubprocess.run = observed_package_command\n"
         self.helper.write_text(self.helper.read_text().replace('if __name__ == "__main__":', injected + '\nif __name__ == "__main__":'))
         generation = hashlib.sha256(self.manifest_path.read_bytes()).hexdigest()
         directory = Path("/var/lib/dwm-titus/desktop-updates") / self.operation
@@ -328,13 +328,15 @@ raise SystemExit(17)
         (directory / "journal.json").write_text(json.dumps({"state": "complete", "uid": 1000}))
         # Pending system updates block installation: Arch does not support
         # partial upgrades, so no package transaction may run.
-        pending.write_text("")
+        pending.write_text("linux 1-1 -> 2-1\n")
         result = self.command("dependencies", generation, uid=1001)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Update system packages first", result.stderr)
         self.assertEqual(json.loads(marker.read_text()), [["/usr/bin/pacman", "-T", "--", "gcc"],
                                                         ["/usr/bin/pacman", "-Qu"]])
-        pending.unlink()
+        # Packages held back by IgnorePkg are listed as "[ignored]" and must not
+        # block installation forever.
+        pending.write_text("linux 1-1 -> 2-1 [ignored]\n")
         marker.unlink()
         result = self.command("dependencies", generation, uid=1001)
         self.assertEqual(result.returncode, 0, result.stderr)
