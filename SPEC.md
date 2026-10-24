@@ -2,31 +2,35 @@
 
 ## 1. Product Definition
 
-dwm-titus is a Fedora-only desktop environment for X11. It combines a small,
-maintained fork of suckless dwm with runtime-configurable hotkeys, themes, and
-window rules, a managed Quickshell shell and Settings layer, and supporting
-desktop services and helpers.
+dwm-titus is an Arch Linux-only desktop environment for X11. It combines a
+small, maintained fork of suckless dwm with runtime-configurable hotkeys,
+themes, and window rules, a managed Quickshell shell and Settings layer, and
+supporting desktop services and helpers.
 
-The product is a cohesive Fedora desktop installed from the official Fedora
-Server installer environment with a prebuilt compressed system image, or onto an
-existing Fedora installation. Factory image builds resolve packages online;
-end-user compressed-image installation must work without network access. Other
-distributions are outside the supported product and validation contract.
+This repository (`github.com/moheladwy/dwm-titus-archlinux`) is a fork of
+`ChrisTitusTech/dwm-titus` that replaces Fedora with Arch Linux as the only
+supported platform. The product is a cohesive desktop installed onto an
+existing Arch Linux system. Users install Arch Linux themselves with the
+official Arch ISO (manually or with `archinstall`), then run `./install.sh`
+from a checkout of this repository. The project ships no installer image.
+Other distributions, including Arch derivatives, are outside the supported
+product and validation contract.
 
 ## 2. Goals
 
-- Install a complete, daily-usable Fedora desktop from a minimal network
-  installer base, with packages and desktop assets prepared at image-build time.
+- Turn a minimal, current Arch Linux installation into a complete,
+  daily-usable X11 desktop with one installer run.
 - Provide one cohesive Settings experience for common display, input,
   connectivity, audio, power, appearance, default-application, update, and
   system-information workflows.
-- Build and run the complete dwm-titus desktop on supported Fedora releases.
-- Provide safe, idempotent dependency installation and system integration.
+- Build and run the complete dwm-titus desktop on current Arch Linux.
+- Provide safe, idempotent dependency installation and system integration that
+  never leaves the system in an unsupported partial-upgrade state.
 - Preserve the speed, simplicity, and direct configuration model of dwm.
-- Provide consistent defaults and complete Settings behavior on Fedora.
+- Provide consistent defaults and complete Settings behavior on Arch Linux.
 - Support display-manager login and `startx`.
-- Support Fedora x86_64. Fedora aarch64 remains future scope until its installer
-  and desktop runtime complete the release validation contract.
+- Support Arch Linux x86_64. Other architectures, including Arch Linux ARM,
+  are not supported.
 - Keep user configuration under standard XDG paths and preserve it on upgrade.
 
 ## 3. Non-Goals
@@ -34,43 +38,51 @@ distributions are outside the supported product and validation contract.
 - A Wayland compositor or Wayland-native session.
 - Pixel-identical behavior across every theme, driver, display manager, or
   third-party desktop utility.
-- Automatic installation of proprietary GPU drivers outside the explicitly
-  selected Fedora NVIDIA image.
-- Automatic bootloader, Plymouth, firewall, or kernel changes outside a
-  dedicated image flow that documents and validates them.
+- Automatic installation of proprietary GPU drivers.
+- Automatic bootloader, Plymouth, firewall, kernel, initramfs, or PAM changes.
 - Turning the Settings frontend into a general-purpose root shell, service
   editor, firewall editor, or partition manager.
 - Bundling every optional desktop application.
-- Supporting Fedora releases after they reach end of life.
+- Installer images of any kind (ISO, archiso, offline, or NVIDIA variants).
+- Hosted infrastructure: a project pacman repository, prebuilt AUR packages,
+  download servers, or repository and image signing keys.
+- Gaming integrations, including Steam, Gamescope, GameMode, MangoHud, and the
+  `multilib` repository.
+- Arch Linux derivatives (for example EndeavourOS, CachyOS, Manjaro, and Arch
+  Linux ARM) and every other distribution.
+- Bootstrapping an AUR helper, or making any AUR package a requirement.
 
-## 4. Fedora Support Contract
+## 4. Arch Linux Support Contract
 
-The primary release target is the Fedora desktop image:
+The sole supported platform is Arch Linux:
 
 | Target | Current contract |
 | --- | --- |
-| Base media | Fedora 44 Server Network Install ISO as the Anaconda runtime |
-| Installation payload | Prebuilt compressed Fedora root filesystem, installed offline |
+| Base system | Arch Linux installed by the user from the official Arch ISO or `archinstall` |
+| Installation path | `./install.sh` from a checkout of this repository |
+| Package source | Official Arch repositories (`core`, `extra`) through pacman |
 | Session | Xorg with dwm and the managed Quickshell shell |
-| Variants | Standard and explicitly selected NVIDIA image |
-| Initial release architecture | x86_64 |
+| Architecture | x86_64 |
+| Release model | Rolling; there is no supported version number |
 
-Fedora aarch64 is not currently a supported release target. Architecture-aware
-package filtering may remain in shared helpers, but it does not constitute an
-aarch64 support claim without native installer and desktop runtime evidence.
+The installer and every platform-aware helper must read `/etc/os-release` and
+accept only `ID=arch`. `ID_LIKE` is ignored. Every derivative (including
+EndeavourOS, CachyOS, Manjaro, and Arch Linux ARM) and every other
+operating-system identity must be rejected with a clear message before any
+package installation or system change. There is no override flag. Arch Linux
+does not set `VERSION_ID`; its absence is expected and must not be treated as
+an error.
 
-Both image variants default to regular partitions with `/home` as an ordinary
-directory on a growing XFS root filesystem that uses available space on the
-selected drive without the Fedora Server autopart root-size cap. Anaconda creates the boot partitions needed
-for BIOS or UEFI. Drive selection and confirmation of destructive storage
-changes remain explicit in Anaconda; the public Kickstarts must not preselect
-or erase disks. Custom partitioning remains available.
+The project hosts nothing. There are no installer images, project package
+repositories, download servers, or signing keys. Source releases may be
+published as optional GitHub release tarballs (`make release`).
 
-The existing-system installer supports Fedora and uses `dnf`/RPM. It must
-report the detected distribution and accept only `ID=fedora` before package
-installation or system changes. Every other operating-system identity must be
-rejected. Fedora is the sole supported distribution; derivative distributions
-are not included by implication.
+Arch Linux does not configure SELinux or another mandatory access control
+policy by default. The installer must never change host LSM state.
+
+Fedora is not supported by this fork. Fedora-specific code, Kickstarts, and
+image tooling remain in the tree only until a later phase removes them; their
+presence is not a support claim.
 
 ## 5. Functional Requirements
 
@@ -147,10 +159,10 @@ managed shell must create one `PanelWindow` for every active screen so each
 monitor has a bar. The per-screen Quickshell `Variants` design must share its
 state providers and be explicitly profiled to show that it remains near idle.
 
-The managed shell requires Quickshell 0.3.0 or Fedora 44's compatible
-`0.2.1^git20260209.dacfa9d` snapshot. That Fedora snapshot contains the
-`PopupWindow.grabFocus` API used by the shell; an unpatched upstream 0.2.1 is
-not sufficient. Update Center opens as a popup anchored beneath its panel icon,
+The managed shell requires Quickshell 0.3.0 or newer, installed from the
+official Arch `extra` repository. Because Arch is a rolling release, the
+version check must also warn when it detects an untested Quickshell major
+version instead of silently accepting it. Update Center opens as a popup anchored beneath its panel icon,
 with content-based sizing and bounds clamped to the active screen. Its
 Settings tab offers a persistent Float update terminal toggle that applies to
 the next update or recovery terminal; those terminals default to tiled.
@@ -172,6 +184,13 @@ The project must support:
   session is restarted.
 
 Missing optional components must be logged or skipped without terminating dwm.
+
+Display-manager integration (the `full` profile) uses LightDM with
+`lightdm-slick-greeter`. The managed configuration must keep Arch's packaged
+LightDM defaults rather than overwrite them, and set only what the session
+needs under `[Seat:*]`: `greeter-session=lightdm-slick-greeter`,
+`session-wrapper=/etc/lightdm/Xsession`, and `logind-check-graphical=true`.
+Enabling the display-manager service must be visible to the user.
 
 The default screenshot-to-clipboard binding must capture through the managed
 `dwm-screenshot` helper. On X11, the helper must use `maim` to capture without
@@ -213,46 +232,50 @@ but X11/EWMH behavior remains the compatibility boundary for this project.
 
 The supported installation flow must:
 
-1. Read `/etc/os-release`, require Fedora, and reject unsupported systems
-   before making changes.
-2. Resolve Fedora package names from one maintained dependency map.
-3. Show required and optional packages before installing them.
-4. Install only missing required packages unless the user requests a broader
+1. Read `/etc/os-release`, require `ID=arch`, and reject every other identity
+   before making changes. Require `pacman` and `pacman-conf`.
+2. Resolve Arch package names from one maintained dependency map.
+3. Show required and optional packages before installing them. The plan,
+   including the system upgrade in step 4, appears in `--dry-run` output.
+4. Run exactly one visible `sudo pacman -Syu` before any package installation,
+   as described in Section 5.11. Abort the installation if it fails.
+5. Install only missing required packages unless the user requests a broader
    desktop setup.
-5. Create a missing `config.h` from guided compile-time questions, or detected
+6. Create a missing `config.h` from guided compile-time questions, or detected
    and documented defaults for an unattended installation. Preserve an
    existing `config.h`.
-6. Build dwm with the system compiler and detected X11 flags.
-7. Install the binary, man page, X session file, scripts, and default
+7. Build dwm with the system compiler and detected X11 flags.
+8. Install the binary, man page, X session file, scripts, and default
    configuration.
-8. Seed missing user configuration while preserving existing files.
-9. Install Celluloid, mpv, and sxiv in every profile. Seed fresh-account
-   audio/video and image MIME defaults using Celluloid and sxiv respectively;
-   preserve existing MIME preference files. Both ISO variants include these
-   applications and defaults, with Brave Origin as their fresh-account browser.
-10. Set ownership to the invoking user for files in that user's home.
-11. Support repeated execution without destructive side effects.
-12. Print a summary, skipped optional features, and actionable next steps.
-13. Offer interactive Xorg display setup when installation runs inside an
+9. Seed missing user configuration while preserving existing files.
+10. Install Celluloid, mpv, and sxiv in every profile. Seed fresh-account
+    audio/video and image MIME defaults using Celluloid and sxiv respectively;
+    preserve existing MIME preference files. The fresh-account
+    `inode/directory` default is Dolphin (`org.kde.dolphin.desktop`), which
+    the `full` profile installs.
+11. Set ownership to the invoking user for files in that user's home.
+12. Support repeated execution without destructive side effects.
+13. Print a summary, skipped optional features, and actionable next steps.
+14. Offer interactive Xorg display setup when installation runs inside an
     active X11 session. The setup must support resolution, refresh rate,
     position, rotation, primary-output selection, and compatible TearFree
     drivers; preview changes with rollback; and preserve existing system Xorg
     configuration through an isolated managed fragment and backups. When no
     X11 session is available, print the deferred setup command instead.
 
-The existing-system installer may enable RPM Fusion nonfree and the
-`christitustech/copr-fedora` COPR only for the explicitly requested gaming
-profile. Interactive runs require a direct confirmation; non-interactive runs
-require the explicit `--enable-fedora-gaming-repos` approval flag. Recommended
-and full profiles may also add the official Flathub remote for the target user
-and install Gear Lever (`it.mijorus.gearlever`) as the default AppImage manager.
-It must not enable any other third-party repository.
+The installer profiles are `core`, `recommended`, and `full`. `full` adds the
+Dolphin file manager, wallpaper, and display-manager integration to
+`recommended`. There is no gaming profile. Recommended and full profiles may
+add the official Flathub remote for the target user and install Gear Lever
+(`it.mijorus.gearlever`) as the default AppImage manager. The installer must
+not enable any other third-party repository, must not enable `multilib`, and
+must not edit `/etc/pacman.conf`.
 
-The Fedora Kickstart image profiles separately predeclare the four image
-repository groups required by that product: RPM Fusion, Brave Browser, MWT
-Packages, and `christitustech/copr-fedora`. Their inclusion is validated as
-part of the reviewed ISO profile rather than inferred from existing-system
-installer approval.
+AUR packages are optional and follow the AUR policy in Section 5.11. The
+installer uses an AUR helper only when the user opts in with `--enable-aur`
+and a supported helper is already installed. Interactive runs may instead ask
+an explicit y/N question that defaults to No; `--non-interactive` without
+`--enable-aur` never uses the AUR.
 
 A source-checkout update of an existing live installation must use the complete
 supported install path. Updating only the `dwm` executable is not a supported
@@ -319,34 +342,36 @@ Quickshell-aware language server:
   editor language server for this repository because it understands Quickshell
   imports, singletons, types, snippets, and workspace QML components.
 
-Fedora provides the Qt tools through `qt6-qtdeclarative-devel`. Helper binaries
-may live outside the default `PATH`, such as `/usr/lib64/qt6/bin` or
-`/usr/lib/qt6/bin`, and `qmllint` may be named `qmllint-qt6`.
+Arch provides the Qt 6 tools through `qt6-declarative`. The Qt 6 `qmllint` is
+`/usr/lib/qt6/bin/qmllint`, which is outside the default `PATH`. On Arch,
+`/usr/bin/qmllint` may belong to the Qt 5 `qt5-declarative` package; a Qt 5
+`qmllint` cannot lint this shell and must be rejected rather than used.
 
 `qmllint` must be run with explicit Qt and Quickshell QML import roots. Without
 those roots it can report false import failures for modules such as
-`Quickshell`, even when the shell runs correctly. Typical roots are:
+`Quickshell`, even when the shell runs correctly. The Arch root is:
 
-| Fedora QML import roots |
+| Arch QML import root |
 | --- |
-| `/usr/lib64/qt6/qml`, `/usr/lib/qt6/qml` |
+| `/usr/lib/qt6/qml` |
 
-Language-server environments should expose the same roots:
+Language-server environments should expose the same root:
 
 ```sh
-export QMLLS_BUILD_DIRS="/usr/lib64/qt6/qml:/usr/lib/qt6/qml"
+export QMLLS_BUILD_DIRS="/usr/lib/qt6/qml"
 export QML_IMPORT_PATH="$PWD/config/quickshell"
 ```
 
-The repository wrapper resolves `qmllint-qt6`, `qmllint`, and the Fedora Qt
-binary paths, discovers the explicit Qt import roots, and creates the temporary
-`qmldir` module map needed for local `qs.*` imports:
+The repository wrapper prefers `/usr/lib/qt6/bin/qmllint` (or the Qt 6 binary
+directory reported by `qmake6 -query QT_INSTALL_BINS`) over a bare `qmllint`,
+rejects a Qt 5 `qmllint`, discovers the explicit Qt import root, and creates
+the temporary `qmldir` module map needed for local `qs.*` imports:
 
 ```sh
 scripts/quickshell-qmllint --root config/quickshell
 ```
 
-For Fedora x86_64, install the pinned `qml-language-server` v1.7.0 Linux AMD64
+For x86_64, install the pinned `qml-language-server` v1.7.0 Linux AMD64
 asset only after verifying the repository-pinned SHA-256 checksum:
 
 ```sh
@@ -387,53 +412,91 @@ and exercising the relevant IPC targets.
 
 ### 5.8 Dependency Mapping
 
-The maintained Fedora dependency map covers these capabilities:
+The maintained dependency map is `scripts/dwm-packages.sh`
+(`dwm_packages arch <profile>`). Package names must not be scattered across
+other scripts. Arch packages ship headers with the library, so there are no
+`-devel` splits. The build capabilities map to:
 
-| Capability | Fedora package examples |
+| Capability | Arch packages |
 | --- | --- |
-| Compiler and make | `gcc`, `make`, `pkgconf-pkg-config` |
-| Xlib development | `libX11-devel` |
-| Xft and fonts | `libXft-devel`, `fontconfig-devel`, `freetype-devel` |
-| Xinerama | `libXinerama-devel` |
-| Xrender | `libXrender-devel` |
-| Imlib2 | `imlib2-devel` |
-| XCB | `libxcb-devel`, `xcb-util-devel` |
+| Compiler and make | `gcc`, `make`, `pkgconf` (or `base-devel`) |
+| Xlib | `libx11` |
+| Xft and fonts | `libxft`, `fontconfig`, `freetype2` |
+| Xinerama | `libxinerama` |
+| Xrender | `libxrender` |
+| Imlib2 | `imlib2` |
+| XCB | `libxcb`, `xcb-util` |
+
+Runtime capabilities map to these Arch names:
+
+| Capability | Arch packages |
+| --- | --- |
+| X11 server and session | `xorg-server`, `xorg-xinit`, `xorg-xrandr`, `xorg-xset`, `xorg-xsetroot`, `xorg-xinput`, `xorg-setxkbmap`, `xorg-xprop` |
+| Session runtime | `dbus`, `curl`, `git`, `psmisc`, `unzip`, `util-linux`, `procps-ng`, `xclip`, `xdotool`, `xdg-utils` |
+| Credential storage | `gnome-keyring` (includes the PAM module) |
+| Media defaults | `celluloid`, `mpv`, `sxiv`, `python`, `desktop-file-utils` |
+| Desktop shell and services | `quickshell`, `picom`, `feh`, `mate-polkit`, `xsettingsd`, `dex`, `libnotify`, `light-locker`, `jq`, `inotify-tools`, `bubblewrap`, `libseccomp`, `python` |
+| Audio | `pipewire`, `wireplumber`, `pipewire-pulse`, `libpulse`, `pavucontrol`, `alsa-utils`, `playerctl` |
+| Bluetooth, power, input | `bluez`, `bluez-utils`, `blueman`, `upower`, `power-profiles-daemon` (or an installed provider such as `tuned-ppd`), `brightnessctl`, `xf86-input-libinput` |
+| Flatpak | `flatpak`, `xdg-desktop-portal-gtk` |
+| System management | `pyalpm`, `pacman-contrib`, `python-gobject`, `accountsservice`, `cups`, `system-config-printer` (optional delegate: `lxqt-admin`) |
+| Source updates | `xsettingsd`, `bubblewrap`, `libseccomp`, `networkmanager` |
+| File manager (`full`) | `dolphin`, `ark`, `ffmpegthumbs`, `kdegraphics-thumbnailers`, `kio-admin`, `archlinux-xdg-menu`, `gvfs`, `xdg-user-dirs`, `rsync`, `networkmanager` |
+| Theme | `dconf`, `adwaita-icon-theme`, `papirus-icon-theme`, `adw-gtk-theme`, `deepin-gtk-theme`, `qt6ct`, `qt5ct` |
+| Fonts | `noto-fonts`, `noto-fonts-emoji`, `ttf-meslo-nerd` |
+| QML tooling | `qt6-declarative` |
+| Display manager (`full`) | `lightdm`, `lightdm-slick-greeter` |
+| Terminals and screenshots | `alacritty`, `kitty`, `maim` |
+
+`pipewire-pulse` conflicts with `pulseaudio`, and `tuned-ppd` provides
+`power-profiles-daemon`. The installer must detect installed providers and
+conflicting packages before it asks pacman to install a package, rather than
+rely on `--noconfirm` to resolve them.
+
+The `aur-optional` profile lists AUR-only packages: `xkbset` and the
+`arc-gtk-theme`, `numix-gtk-theme`, `yaru-gtk-theme`, and `xfce-theme-bluebird`
+GTK themes. No required profile contains an AUR package. Features that use
+them, such as the AccessX input controls that use `xkbset`, must degrade
+cleanly when they are absent.
+
+PackageKit, `dnfdragora`, Path, Thunar and its plugins, and every gaming
+package are not part of the map.
 
 These are capability mappings, not immutable package lists. Availability must
-be validated against the supported Fedora release.
+be validated against the official repositories at the pinned Arch Linux
+Archive snapshot used by the test container, and against current repositories
+when a rolling-release validation record is written (Section 9.4).
 
 Runtime dependencies are classified as:
 
 - Core: an X11 server/session, D-Bus session support, one usable terminal
-  emulator, the GNOME Keyring packages for credential storage
-  (`gnome-keyring` and `gnome-keyring-pam`), and the tools required by configured
-  core keybindings. Alacritty is the preferred emulator, with the existing
-  supported-terminal fallback chain retained when Alacritty is unavailable.
-  Source synchronization must reconcile the keyring pair even without
-  Quickshell installed, while keeping desktop-only update dependencies gated
-  on Quickshell. Dependency diagnostics must report a missing daemon or PAM
-  package and offer the installer repair path. Automatic keyring unlock at
-  password login also requires the display manager's PAM stack to load
-  `pam_gnome_keyring.so` and matching account/keyring passwords. Installing the
-  package pair does not configure PAM services. Autologin and `startx` do not
-  supply a password to this PAM path.
+  emulator, `gnome-keyring` for credential storage, and the tools required by
+  configured core keybindings. Alacritty is the preferred emulator, with the
+  existing supported-terminal fallback chain retained when Alacritty is
+  unavailable. On Arch the keyring PAM module
+  (`/usr/lib/security/pam_gnome_keyring.so`) ships in `gnome-keyring`; there
+  is no separate PAM package. Source synchronization must reconcile the keyring
+  package even without Quickshell installed, while keeping desktop-only update
+  dependencies gated on Quickshell. Dependency diagnostics must report a
+  missing package or PAM module and offer the installer repair path. Automatic
+  keyring unlock at password login also requires the login PAM stack to load
+  `pam_gnome_keyring.so` and matching account/keyring passwords. Arch's
+  packaged `/etc/pam.d/lightdm` already loads it. For `startx`, users may add
+  the module to `/etc/pam.d/login` by hand as documented; the installer never
+  edits PAM files. Autologin does not supply a password to this PAM path.
 - Recommended desktop: Alacritty, Quickshell, Picom, Feh, Dex, a polkit agent,
   notification tools, audio controls, screenshot tooling, Nerd/emoji fonts,
-  Flatpak with its GTK portal, the Phase 6 system-management runtime
-  (`PackageKit`, `PackageKit-glib`, `python3-gobject`, `python3-rpm`,
-  `accountsservice`, `cups`, and `system-config-printer`), and Gear Lever from a
-  user-scoped Flathub remote. Existing installations add that runtime by
-  rerunning the installer with the `recommended` or `full` profile; source-sync
-  does not infer an install profile from independently installed programs.
-- Dedicated image defaults (Phase 8 target): Starship with a theme matching the
-  desktop, stable Brave Origin as the fresh account browser, checksum-verified
-  Herdr available offline, and sxiv as the supported image-format default with
-  Settings discovery. Feh remains available for wallpapers. Factory capture
-  must fail if required image defaults are missing. Existing user preferences
-  are preserved; Herdr activation and existing-system installation remain opt-in.
-- Optional: the Herdr terminal workspace, file manager, network tray, theme
-  utilities, display-manager greeter customization, wallpapers, and
-  hardware-specific helpers.
+  Flatpak with its GTK portal, the system-management runtime (`pyalpm`,
+  `pacman-contrib`, `python-gobject`, `accountsservice`, `cups`, and
+  `system-config-printer`), and Gear Lever from a user-scoped Flathub remote.
+  Existing installations add that runtime by rerunning the installer with the
+  `recommended` or `full` profile; source-sync does not infer an install
+  profile from independently installed programs.
+- Full: the recommended desktop plus the Dolphin file manager, wallpaper, and
+  LightDM display-manager integration.
+- Optional: the Herdr terminal workspace (opt-in with `--install-herdr`),
+  network tray, theme utilities, display-manager greeter customization, the
+  `aur-optional` packages, and hardware-specific helpers.
 
 ### 5.9 System Health Dashboard
 
@@ -495,17 +558,38 @@ requiring a reboot. The application must use a hybrid integration model:
 - Small project helpers may expose stable, machine-readable state and narrowly
   scoped user-session changes.
 - Privileged or high-risk administration is performed only through allowlisted,
-  installed helpers or delegated to trusted Fedora tools.
-- Providers and delegated administration tools target Fedora. Missing Fedora
-  capabilities must expose a clean unavailable or unsupported state rather
-  than failing the entire application.
+  installed helpers or delegated to trusted platform tools.
+- Providers and delegated administration tools target Arch Linux. Missing
+  capabilities, and code paths not yet ported from Fedora, must expose a clean
+  unavailable or unsupported state rather than failing the entire application.
 
-The panel Update Center delegates confirmed Fedora updates to the installed,
-root-owned DNF5 through sudo in a terminal. It must preserve DNF's native output
-and transaction confirmation, reuse existing authorization where possible, and
-never supply automatic consent. PackageKit remains the read-only discovery API
-and handles recovery of its existing operations; native DNF retries must not
-acknowledge unrelated PackageKit work or claim an interrupted attempt succeeded.
+System package updates follow the native pacman contract in Section 5.11. The
+target design (plan Phases 5-8, not yet implemented) is:
+
+- Discovery is read-only and unprivileged through pyalpm. It downloads sync
+  databases into a private temporary directory, reads the real local database
+  without modifying it, honors each repository's `SigLevel` and
+  `IgnorePkg`/`IgnoreGroup`, and never refreshes or writes
+  `/var/lib/pacman/sync`.
+- A pacman `PostTransaction` hook signals package-state changes so the UI can
+  react without polling.
+- Confirmed updates run as an interactive `sudo pacman -Syu` in a terminal. The
+  terminal preserves pacman's native output and prompts (replacements,
+  conflicts, provider choices, `.pacnew` notices), reuses existing
+  authorization where possible, and never supplies `--noconfirm` or other
+  automatic consent. Settings "Install all" opens the same terminal flow
+  instead of mutating packages in place.
+- The Update Center's distribution provider is named `system` and takes its
+  label from `os-release` `NAME`.
+- PackageKit is not used. Its ALPM backend refreshes the real sync databases
+  during discovery and simulation without authorization, which produces the
+  partial-upgrade state described in Section 5.11.
+
+Until that work lands, the Update Center distribution provider, Settings >
+System package updates, the desktop-update dependency install, and the
+first-boot initial update remain Fedora-only code. On Arch they must report an
+unsupported state (or, for the first-boot update, remain inactive) and must
+not attempt a package operation.
 
 The Settings platform must distinguish:
 
@@ -592,13 +676,14 @@ specification defines a narrow safe interface.
 
 #### Desktop source updates
 
-Desktop source updates appear first in Settings > System, above Fedora package
-updates. Opening System performs a bounded check against the official repository's
-`main` branch, cached for five minutes; Check again bypasses the cache. Checking
-does not install files. Installation receipts record the source revision and
-managed file hashes so both newer source and installed-file drift are detected,
-including image installs without Git metadata. Unknown or unreadable state must
-never be reported as current.
+Desktop source updates appear first in Settings > System, above system package
+updates. Opening System performs a bounded check against the `main` branch of
+this fork (`github.com/moheladwy/dwm-titus-archlinux`), never the upstream
+Fedora repository, cached for five minutes; Check again bypasses the cache.
+Checking does not install files. Installation receipts record the source
+revision and managed file hashes so both newer source and installed-file drift
+are detected, including installs without Git metadata. Unknown or unreadable
+state must never be reported as current.
 
 Confirmed desktop updates download a fixed revision, build as the desktop user,
 stage the complete system installation through the Makefile, back up managed
@@ -625,10 +710,15 @@ its prepared archive digest and confirmed revision; substitutions during
 authorization are rejected.
 It never executes a staged Makefile or repository helper as root. Changes to
 installation roots still require the source installer. Changes to the release's
-build/source-update package list are handled within the reserved transaction:
-only validated RPM names are passed to DNF, and the resulting manifest must
-match that prepared list. DNF owns package recovery; desktop rollback does not
-uninstall packages. After explicit update or recovery confirmation, authorization
+build/source-update package list are handled within the reserved transaction.
+The Arch target (plan Phase 7, not yet implemented; see Section 5.10) is: the
+helper first verifies that no package updates are pending (`pacman -Qu` is
+empty) and that the pacman database lock is not held, and otherwise blocks
+with "Update system packages first". It then passes only validated official
+repository package names to `/usr/bin/pacman -S --needed`, and the resulting
+manifest must match that prepared list. The root helper never installs AUR
+packages. pacman owns package recovery; desktop rollback does not uninstall
+packages. After explicit update or recovery confirmation, authorization
 reuses an existing non-interactive sudo grant when available. Otherwise it uses
 polkit for one visible approval. The updater must not create passwordless sudo
 rules, store passwords, or change configured credential timeouts. A root-owned helper
@@ -688,46 +778,45 @@ synchronization defaults respect explicit configuration. Stopped Picom stays
 stopped during opacity edits or theme application. File watches end when
 Settings closes; no recurring compositor-state poll is required.
 
-### 5.11 Fedora Image Contract
+### 5.11 Arch Package Management Contract
 
-Fresh standard and NVIDIA images must include fastfetch and DNF5 defaults that
-make interactive update/upgrade confirmation default to Yes without enabling
-blanket `assumeyes`. Existing administrator configuration retains precedence.
+Arch Linux supports only full system upgrades. Every package operation in the
+installer, helpers, and Settings must preserve that rule:
 
-The first package update is offered after real repository access becomes
-available, preserving offline installation and a usable offline desktop. It
-requires visible authorization and DNF transaction confirmation, reports
-progress/failure, and records completion only after success. Failure, denied
-authorization, package-manager contention and interrupted connectivity permit
-retry. Completion persists across logins; reboot is never automatic.
+- Never run `pacman -Sy` (a database refresh without an upgrade) on its own,
+  and never trigger a component that does so, such as a PackageKit client.
+- Never run `pacman -S <package>` while updates are pending, that is while
+  `pacman -Qu` is non-empty, unless the same transaction is the full upgrade.
+- Never delete the pacman database lock (`/var/lib/pacman/db.lck`). Report
+  lock contention and let the user resolve it.
+- Ship no `pacman.conf` changes. pacman's own defaults (a `[Y/n]` prompt and
+  parallel downloads) are used as configured by the administrator.
 
-Before that update, bounded mirror measurements must consider throughput and
-connection time on the installed user's network. Select only mirrors from the
-configured repository service, preserve signature verification and fallback
-mirrors, and retain defaults for unsupported or failed measurements. Never
-capture builder-specific mirror selections. See [INITIAL-UPDATE.md](docs/INITIAL-UPDATE.md).
+The installer runs one visible `sudo pacman -Syu` before any package
+installation. That step:
 
-Released Fedora images must be based on the Fedora Server Network Install ISO,
-not a Live ISO. The image builder embeds this repository and the selected
-Kickstart while preserving the upstream Anaconda installation environment.
+- appears in the `--dry-run` plan;
+- uses pacman's own confirmation prompt;
+- adds `--noconfirm` only when the user passes `--non-interactive`;
+- aborts the installation if it fails or is declined.
 
-The standard image must not include NVIDIA-only packages or kernel arguments.
-The NVIDIA image is an explicit opt-in variant and may install the documented
-RPM Fusion NVIDIA packages, blacklist Nouveau, and configure NVIDIA DRM
-modesetting. Both variants may enable the documented third-party repositories
-needed by the selected desktop package set; choosing the dedicated image is
-the user's consent to that image policy.
+Package installation after that step uses
+`sudo pacman -S --needed -- <names>`, again adding `--noconfirm` only for
+`--non-interactive` runs.
 
-The Fedora image currently sets SELinux to disabled. This is an explicit image
-policy and a known reduction from Fedora's default security posture. The
-existing-system installer must not change host SELinux state. Changing the
-image policy requires updated requirements, migration guidance, and real image
-validation.
+The AUR policy is:
 
-Kickstart syntax and static ISO construction checks are necessary but not
-sufficient. A released image must record its Fedora source image and checksum,
-architecture, firmware mode, variant, package-resolution result, completed
-Anaconda install, first boot, and hardware limitations.
+- AUR use is opt-in through `--enable-aur`. It is never required, and no
+  required install profile contains an AUR package.
+- Only an AUR helper that is already installed (`paru` or `yay`) is used. The
+  project never bootstraps, builds, or installs an AUR helper.
+- The AUR helper runs as the invoking user, never under `sudo`, `pkexec`, or
+  root. It installs with `"$helper" -S --needed --`.
+- Official repository packages never go through the AUR helper; they are
+  always installed with pacman.
+- Root-owned and pkexec helpers never call an AUR helper or `makepkg`.
+- AUR-only packages are listed only in the `aur-optional` profile (Section
+  5.8). Without an AUR helper or without opt-in, they are reported as skipped.
 
 ## 6. Filesystem and Installation Contract
 
@@ -750,7 +839,7 @@ System paths must be overridable for packaging and staged installs. User data
 must not be written during a package build using `DESTDIR`.
 
 User-scoped installation runs as the target user. Any default XDG parent
-directory created by the Fedora image or installer must be owned by that user
+directory created by the installer must be owned by that user
 and their primary group. Existing XDG parent permissions must be preserved,
 and installation must not recursively change ownership outside project-managed
 directories.
@@ -808,32 +897,52 @@ configuration and unrelated application configuration by default.
 
 ## 9. Validation and Acceptance Criteria
 
-A release is Fedora-ready only when all of the following pass. A Fedora desktop
-image additionally requires the image checks below.
+A release is Arch-ready only when all of the following pass and a
+rolling-release validation record (Section 9.4) has been written.
 
 Automated validation must run through `scripts/run-tests`, which creates a
 unique workspace under `${DWM_TEST_TMP_ROOT:-$HOME/tmp}` and removes that exact
-workspace on success, failure, or interruption.
+workspace on success, failure, or interruption. Tests that install packages,
+run the real installer, or change system state must run in an isolated
+container or virtual machine, never on a developer's host system.
 
 ### 9.1 Static Validation
 
 - Clean C build with warnings enabled.
 - Shell syntax checks for every changed shell script.
 - ShellCheck and shfmt checks, with documented justified exceptions.
+- Configured Qt 6 QML lint for changed Quickshell files (Section 5.7).
 - No generated build artifacts unintentionally included in the change.
 
-### 9.2 Fedora Validation
+### 9.2 Arch Validation
 
-On the supported Fedora release:
+The reproducible Arch gate is the test container defined by
+`tests/containers/arch/Containerfile`. Its base image is pinned by digest, and
+its mirrorlist is pinned to one dated Arch Linux Archive snapshot
+(`https://archive.archlinux.org/repos/YYYY/MM/DD/`), which is the official
+archive and not project-hosted infrastructure. The snapshot date and image
+digest are bumped together. `scripts/run-tests-podman` builds and runs it as
+`localhost/dwm-titus-tests:arch`. Docker may be used locally to run the same
+container when Podman is unavailable.
 
-- Distribution detection accepts Fedora and rejects non-Fedora systems before
-  mutation.
-- Required package mapping resolves to installable packages.
+In that container, or on a disposable Arch system:
+
+- Distribution detection accepts `ID=arch` and rejects every other identity
+  before mutation, including `ID=endeavouros`, `ID=cachyos`, and `ID=manjaro`
+  with `ID_LIKE=arch`, and an `os-release` file without `VERSION_ID` is
+  accepted for `ID=arch`.
+- Every official package name in the dependency map resolves with pacman.
+  `aur-optional` names are checked against the AUR when the network is
+  available, and that check is optional.
 - A clean checkout builds successfully.
 - `make install DESTDIR=<staging-dir>` installs the expected system files
   without writing to the test user's home.
+- `./install.sh --dry-run` lists the up-front `pacman -Syu`, and a real
+  `--profile core` run completes in a clean Arch container.
 - The real installer preserves pre-existing user configuration.
 - Dependency checks report both missing and satisfied capabilities correctly.
+- A `--profile recommended` installation with LightDM completes in a virtual
+  machine with a fresh Arch installation.
 
 ### 9.3 Runtime Validation
 
@@ -864,63 +973,70 @@ In a real or nested X11 session:
   through `maim`.
 - Recommended and full installs expose Gear Lever in the application launcher,
   and it opens a visible window in the supported X11 session.
+- On a fresh account of a full install, `Super+E` opens Dolphin, its "Open
+  With" menu is populated outside Plasma, and it follows the active Qt palette.
 
-### 9.4 Fedora Image Validation
+### 9.4 Rolling-Release Validation Record
 
-- Both Kickstarts pass `ksvalidator` and repository-owned invariant tests.
-- The ISO builder embeds the checkout and selected Kickstart without dropping
-  the upstream boot behavior.
-- The documented Fedora Server Network Install source checksum is verified.
-- Compressed-image installation completes without Internet access or package
-  selection. Required desktop packages, screenshot/clipboard tools, fonts,
-  themes and Gear Lever runtimes are present in the captured filesystem.
-- Capture removes factory accounts, temporary authorization, machine identity
-  and storage state, and retains the boot files needed by both firmware paths.
-- At least the standard image completes Anaconda installation in a VM, reboots,
-  reaches LightDM and a usable dwm session, and starts the managed Quickshell
-  shell.
-- NVIDIA image behavior is not described as hardware-verified unless tested on
-  representative NVIDIA hardware.
-- The validation record states firmware mode, architecture, image variant,
-  Fedora release, and any untested paths.
-- Phase 8 targets: select the regular install boot entry by default, retaining
-  the optional media check and all published/payload checksums. Remove network
-  startup waits only in the offline installer path with supported configuration;
-  do not disable networking in the installed system.
-- Adopt tar.zst only after the pinned Anaconda runtime is proven to extract it;
-  preserve tar.xz input compatibility, metadata and manifest/checksum validation.
-  Report measured installation stages, archive size, RAM and hardware rather
-  than equating decompression throughput with end-to-end installation time.
-- Fresh-account qualification must exercise the actual themed prompt, Brave
-  Origin, Herdr, sxiv MIME/default discovery and a confirmed signed PackageKit
-  update, not only command presence or update discovery. The PackageKit security
-  floor and unprivileged Settings boundary remain mandatory.
+Arch has no release number, so every validation record must state:
+
+- the test date and, for container runs, the Arch Linux Archive snapshot date
+  and base image digest;
+- the versions of pacman, Quickshell, Qt, and the kernel that were tested;
+- the architecture, whether the run used a container, a virtual machine, or
+  hardware, and the display path (nested Xvfb/Xephyr, LightDM, or `startx`);
+- every path that was not tested.
+
+A record against the pinned snapshot does not prove behavior against current
+repositories. Drift against current repositories is caught separately and
+reported as such.
 
 ## 10. Current Gap
 
-Phases 1-7 and compressed-image delivery through PR #299 are complete, with
-qualification evidence in `docs/P7-QUALIFICATION.md` and
-`docs/COMPRESSED-QUALIFICATION.md`. Previous roadmap detail is archived in
-`docs/COMPLETED-ROADMAP-20260911.md`. Physical NVIDIA, Secure Boot and suspend
-limitations remain explicit; completion does not establish untested hardware.
+The project is being ported from Fedora to Arch Linux following
+`.github/plans/arch-linux-port.md`. Fedora feature history (Phases 1-8 and the
+0.7.2 work) is archived in `docs/COMPLETED-ROADMAP-20260911.md`, the
+`docs/P*-*.md` evidence files, and `CHANGELOG.md`; it is not a claim about
+Arch behavior.
 
-Phase 8 addresses observed fresh-install gaps: missing shell prompt/theming,
-Brave Origin and Herdr provisioning, image-viewer defaults, and the PackageKit
-backport identity error that blocks update actions despite readable discovery.
-It also measures and reduces offline installer media-check/startup/extraction
-cost. Requirements marked Phase 8 are planned acceptance targets, not claims
-about the already published ISO. Fedora 44 and X11 remain the supported scope.
+Plan Phases 0-4 deliver this contract, fork endpoints, the Arch platform
+identity and package map, the pinned Arch test container and Qt 6 QML lint,
+and the existing-system installer and runtime integrations, including Dolphin
+and the LightDM defaults.
+
+The following remain open and are not yet implemented on Arch:
+
+- Phases 5-6: the pyalpm discovery backend, the pacman hook, and terminal-only
+  `sudo pacman -Syu` updates. Until then the Update Center distribution
+  provider and Settings > System package updates are Fedora-only code (DNF and
+  PackageKit) that reports unsupported on Arch.
+- Phase 7: desktop-update dependency installation through pacman and the
+  optional user-scope AUR provider. Until then desktop source updates that
+  require new packages report unsupported on Arch.
+- Phase 8: shared platform identity in system management, the regional
+  actions, delegates, and security information rows. The first-boot initial
+  update is image-only, is never armed on Arch, and is retired in Phase 10.
+- Phase 9: the documentation site and reference docs still describe Fedora in
+  places.
+- Phase 10: Fedora-only code, Kickstarts, image tooling, and Fedora tests are
+  still in the tree.
+
+Physical hardware, NVIDIA, Secure Boot, and suspend behavior on Arch are
+untested until a validation record says otherwise. Arch Linux x86_64 and X11
+are the supported scope.
 
 ## 11. Definition of Done
 
 A roadmap feature is complete when:
 
 - Its behavior meets the active roadmap phase and task acceptance criteria.
-- Fedora behavior is implemented and runtime validated, or the change is
+- Arch behavior is implemented and runtime validated, or the change is
   explicitly scoped as preparatory work.
-- Installation attempts without `ID=fedora` fail clearly before making
-  changes.
-- Relevant automated and manual validation is recorded.
+- Installation attempts without `ID=arch` fail clearly before making changes.
+- No code path runs `pacman -Sy` without a full upgrade, installs packages
+  while updates are pending, or runs an AUR helper as root.
+- Relevant automated and manual validation is recorded, including a
+  rolling-release validation record (Section 9.4) for runtime claims.
 - On a development machine running dwm-titus, the checkout has been
   synchronized to the local live installation with
   `scripts/dev-sync-install.sh`, including the post-relogin check when one is

@@ -2,11 +2,14 @@
 
 ## Purpose
 
-This repository is a Fedora-only X11 desktop environment built around a
-heavily patched fork of suckless dwm and a managed Quickshell shell. The
-product is a complete Fedora desktop installed from Fedora Server Network
-Install media or onto an existing Fedora installation. Fedora is the sole
-supported distribution.
+This repository is an Arch Linux-only X11 desktop environment built around a
+heavily patched fork of suckless dwm and a managed Quickshell shell. It is a
+fork of `ChrisTitusTech/dwm-titus` that replaces Fedora with Arch Linux. The
+product is a complete desktop installed onto an existing Arch Linux system with
+`./install.sh`. Arch Linux is the sole supported distribution.
+
+The approved port plan is `.github/plans/arch-linux-port.md`. Its decisions
+D1-D14 are final unless the owner changes them.
 
 Read `SPEC.md` before making product, platform, installer, dependency, or
 packaging changes. Treat `SPEC.md` as the source of truth for project scope and
@@ -16,20 +19,24 @@ acceptance criteria.
 
 1. Preserve dwm stability and existing user workflows.
 2. Keep the C window-manager core small, understandable, and dependency-light.
-3. Build a cohesive Fedora desktop without moving desktop policy into the C
-   event loop.
-4. Preserve the Fedora install, image, and session contract.
+3. Build a cohesive Arch Linux desktop without moving desktop policy into the
+   C event loop.
+4. Preserve the Arch install and session contract, and never leave the system
+   in a partial-upgrade state.
 5. Keep installation and settings changes safe, repeatable, reversible, and
    explicit.
 6. Prefer focused changes that can be reviewed and tested independently.
 
-## Fedora Support Contract
+## Arch Linux Support Contract
 
-The sole supported platform is Fedora Linux. The current documented Fedora Server
-Network Install release is the image base, with separate standard and NVIDIA
-variants. The existing-system installer also supports Fedora. Every other
-operating-system identity must fail clearly instead of entering an untested
-package or installation path.
+The sole supported platform is Arch Linux x86_64. Only `ID=arch` from
+`/etc/os-release` is accepted; `ID_LIKE` is ignored. Every derivative
+(EndeavourOS, CachyOS, Manjaro, Arch Linux ARM) and every other
+operating-system identity must fail clearly before any package installation or
+system change, with no override flag. Users install Arch Linux themselves from
+the official ISO or `archinstall`, then run `./install.sh`. The project ships
+no installer images, hosts no package repository or download server, and holds
+no signing keys. Fedora is not supported by this fork.
 
 ## Repository Map
 
@@ -41,14 +48,21 @@ package or installation path.
 - `config/`: application configuration and default TOML runtime settings.
 - `scripts/`: session startup, dependency checks, desktop helpers, and
   operational scripts.
-- `install.sh`: supported existing-system installer for Fedora.
-- `dwm-fedora.ks`, `dwm-fedora-nvidia.ks`: Fedora image installation profiles.
+- `install.sh`: supported installer for an existing Arch Linux system.
+- `scripts/dwm-packages.sh`: the single package capability map
+  (`dwm_packages arch <profile>`).
+- `tests/containers/arch/`: the pinned Arch test container.
+- `dwm-fedora.ks`, `dwm-fedora-nvidia.ks`, `scripts/build-dwm-fedora-*`,
+  `scripts/image/`, and remaining `fedora:*` map entries: legacy Fedora code.
+  It is not part of the product and remains in the tree only until a later
+  port phase removes it. Do not extend it.
 - `dwm.desktop`: display-manager X session entry.
 - `AGENTS.md`: durable engineering and agent-execution rules.
 - `SPEC.md`: product scope, interfaces, and acceptance criteria.
 - `ROADMAP.md`: ordered desktop-environment outcomes.
 - `TASKS.md`: implementation work for the active roadmap phase only.
 - `docs/`: user, contributor, and release documentation.
+- `.github/plans/`: approved multi-phase plans, such as the Arch port.
 
 ## Planning Workflow
 
@@ -122,21 +136,31 @@ package or installation path.
 - Open ready pull requests by default, not drafts. Never merge, release,
   deploy, or send external announcements without explicit user authorization.
 
-## Fedora Image Rules
+## Arch Package Management Rules
 
-- Base released images on the Fedora Server Network Install ISO documented in
-  `SPEC.md` and `docs/RELEASING.md`, not on a Fedora Live image.
-- Preserve separate standard and NVIDIA Kickstarts. Proprietary NVIDIA changes
-  belong only to the explicitly selected NVIDIA image.
-- Keep Kickstart package capabilities aligned with the shared dependency map.
-- Run `make check-kickstart` for Kickstart or ISO-builder changes, then validate
-  a real or virtual install before claiming the image boots or reaches a usable
-  desktop.
-- Record the Fedora release, source image checksum, architecture, firmware
-  mode, image variant, and untested hardware in release evidence.
-- The dedicated Fedora images currently set SELinux disabled by explicit
-  product policy. Existing-system installs must not change host SELinux state.
-  Any change to this policy requires a specification and migration update.
+- Arch supports only full upgrades. Never run `pacman -Sy` on its own, and
+  never use a component that refreshes the sync databases behind the user's
+  back (for example a PackageKit client).
+- Never run `pacman -S <package>` while `pacman -Qu` is non-empty. Install
+  packages only after a full upgrade, or block with "Update system packages
+  first".
+- The installer runs one visible `sudo pacman -Syu` before any package step.
+  It is listed in `--dry-run`, uses pacman's own prompt, adds `--noconfirm`
+  only for `--non-interactive`, and aborts the install if it fails.
+- Install official packages with `pacman -S --needed --`. Validate package
+  names before passing them to pacman, and never delete the pacman lock.
+- Ship no `pacman.conf` changes and do not enable `multilib` or third-party
+  repositories.
+- AUR use is opt-in through `--enable-aur`. Use only an AUR helper that is
+  already installed (`paru` or `yay`); never bootstrap one. Run it as the
+  invoking user, never as root. Official packages never go through it.
+- Root-owned and pkexec helpers never call an AUR helper or `makepkg`.
+- AUR-only packages belong only in the `aur-optional` profile and must never
+  be required. Features that use them must degrade cleanly without them.
+- Do not add installer images, project package repositories, signing keys, or
+  gaming integrations. They are out of scope (plan D10, D11).
+- Arch configures no LSM by default. The installer must never change host
+  SELinux, AppArmor, or other LSM state.
 
 ## Desktop Settings Rules
 
@@ -156,12 +180,15 @@ package or installation path.
 - Unsupported hardware capabilities must be hidden or explained without
   breaking the rest of Settings.
 
-## Fedora Platform Rules
+## Arch Platform Rules
 
-- Detect Fedora through `/etc/os-release` and reject every other identity
-  before package installation or system changes.
-- Keep Fedora package capability names in the shared dependency map. Do not
+- Detect Arch through `/etc/os-release` with an exact `ID=arch` match, ignore
+  `ID_LIKE`, and reject every other identity before package installation or
+  system changes. Do not require `VERSION_ID`; Arch does not set it.
+- Keep Arch package capability names in the shared dependency map. Do not
   scatter package-name lists across multiple scripts.
+- Query packages through pacman's machine interfaces (`pacman -T`, `-Q`,
+  `-Si`, `-Sp --print-format`) or pyalpm rather than parsing human output.
 - Use `pkg-config` for X11 and library discovery where available. Avoid legacy
   hardcoded paths such as `/usr/X11R6`.
 - Respect `CC`, `CFLAGS`, `CPPFLAGS`, `LDFLAGS`, `PREFIX`, `DESTDIR`,
@@ -207,12 +234,13 @@ package or installation path.
   in a real or nested X11 session and confirm the Quickshell process is near
   idle when the launcher is closed.
 - For Quickshell QML linting, stock `qmllint` must be given explicit Qt and
-  Quickshell QML import roots, such as `/usr/lib64/qt6/qml` or
-  `/usr/lib/qt6/qml`, and a lint-only `qs.core/qmldir` module map when checking
+  Quickshell QML import roots (on Arch, `/usr/lib/qt6/qml`) and a lint-only `qs.core/qmldir` module map when checking
   files that import this repository's `qs.core` helpers. `QMLLS_BUILD_DIRS`
   and `QML_IMPORT_PATH` should mirror those roots for language-server tooling.
   Do not treat plain `qmllint` import failures as runtime failures until the
-  configured import paths have been verified.
+  configured import paths have been verified. Use the Qt 6 linter
+  (`/usr/lib/qt6/bin/qmllint`); on Arch `/usr/bin/qmllint` may be the Qt 5
+  tool and must be rejected.
 - Keep existing keybindings, window rules, EWMH behavior, multi-monitor
   behavior, and autostart behavior unless the task explicitly changes them.
 - When changing defaults, update the relevant documentation and migration
@@ -230,7 +258,7 @@ package or installation path.
 - Installation must be idempotent. Re-running it must not duplicate services,
   corrupt configuration, or reset user choices.
 - Package installation and service enablement must be visible to the user.
-  Do not silently alter bootloader, display-manager, firewall, SELinux, or
+  Do not silently alter bootloader, display-manager, firewall, PAM, LSM, or
   security policy settings.
 - Network downloads must be optional, clearly reported, and failure-tolerant
   unless the downloaded artifact is explicitly required.
@@ -240,8 +268,8 @@ package or installation path.
 
 - Keep the existing C99 style and compile with warnings enabled.
 - Avoid adding a new library dependency unless it materially improves a
-  required feature. Required dependencies must be available on supported
-  Fedora releases.
+  required feature. Required dependencies must be available in the official
+  Arch repositories.
 - Check allocation, file, Xlib/XCB, parser, and process-launch failures.
 - Do not introduce blocking work into the X event loop.
 - Keep Linux-specific functionality, such as inotify, explicit and documented.
@@ -265,25 +293,43 @@ shellcheck install.sh scripts/*.sh tests/*.sh
 shfmt -d install.sh scripts/*.sh tests/*.sh
 ```
 
-For Quickshell QML changes, run `qmllint` with the explicit Qt/Quickshell QML
-module roots documented in `SPEC.md`, and validate the managed shell in a real
+For Quickshell QML changes, run `scripts/quickshell-qmllint --root config/quickshell`
+(or `scripts/run-tests make check-quickshell-qml`) with the explicit Qt 6 QML
+module root documented in `SPEC.md`, and validate the managed shell in a real
 or nested X11 session before declaring runtime behavior verified.
 
-For installer or packaging changes, validate in a clean container or virtual
-machine using the supported Fedora release.
+For platform, package-map, installer, or packaging changes, also run the
+pinned Arch container and the platform and package checks:
+
+```sh
+scripts/run-tests-podman make clean all
+scripts/run-tests-podman
+scripts/run-tests make check-arch-platform check-arch-packages
+```
+
+`scripts/run-tests-podman` builds `localhost/dwm-titus-tests:arch` from
+`tests/containers/arch/Containerfile`, pinned to an Arch Linux Archive
+snapshot. Docker may run the same container when Podman is unavailable.
+Installer changes additionally need a real installer run in a clean Arch
+container or a virtual machine with a fresh Arch installation.
+
+Tests that install packages, run the real installer, or change system state
+must run in an isolated container or virtual machine, never on a developer's
+host system. This includes real `install.sh` runs, `pacman` transactions, and
+privileged helper tests.
 
 At minimum, verify dependency resolution, a clean build, staged installation
 with `DESTDIR`, installed file paths, and script syntax. A real X11 session or
 nested X server is required before declaring runtime behavior fully validated.
 
 Use `${DWM_TEST_TMP_ROOT:-$HOME/tmp}` for test workspaces and clear the exact
-run directory after success, failure, or interruption. If a required Fedora
-path cannot be tested, state exactly what was not tested.
+run directory after success, failure, or interruption. If a required Arch path
+cannot be tested, state exactly what was not tested.
 
-For Fedora image changes, follow the complete validation contract in
-[SPEC.md Section 9.4](SPEC.md#94-fedora-image-validation). Static validation
-alone does not prove package resolution, `%post` behavior, first boot, or
-hardware support.
+Arch is a rolling release. Runtime evidence must include the rolling-release
+record from [SPEC.md Section 9.4](SPEC.md#94-rolling-release-validation-record):
+the test date, the archive snapshot for container runs, and the pacman,
+Quickshell, Qt, and kernel versions.
 
 ## Change Discipline
 
@@ -292,7 +338,7 @@ hardware support.
 - Keep commits and patches narrowly scoped.
 - Update `SPEC.md` only when requirements intentionally change.
 - Update README and user-facing docs when commands, dependencies, defaults, or
-  supported Fedora versions and architectures change.
+  the supported platform or architectures change.
 - Do not perform destructive Git or filesystem operations without explicit
   authorization.
 - Never expose credentials, tokens, private keys, or secret file contents.
