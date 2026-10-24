@@ -34,6 +34,14 @@ ShellRoot {
             throw new Error(detail);
         }
     }
+    // A `var` signal argument may arrive as a QVariantMap copy (Qt 6.12 sorts
+    // its keys), so compare flat objects by exact key set and values, not order.
+    function sameFields(actual, expected) {
+        if (actual === null || typeof actual !== "object") return false;
+        const keys = Object.keys(expected).sort();
+        return JSON.stringify(Object.keys(actual).sort()) === JSON.stringify(keys)
+            && keys.every(key => actual[key] === expected[key]);
+    }
     function scheduleAdvance() {
         if (!startedTest || starting || advancing || done || model.current !== null) return;
         advancing = true;
@@ -138,7 +146,7 @@ ShellRoot {
                         ? ["America/Chicago", "Etc/UTC"] : ["C", "en_US.utf8"]), "Exact catalog retained across collector reuse");
                 else if (outcome.command === "regional-preview")
                     root.check(outcome.preview.detail === "Full fixture detail", "Complete preview retained");
-                else root.check(JSON.stringify(outcome.observation) === JSON.stringify(outcome.command === "time-status"
+                else root.check(root.sameFields(outcome.observation, outcome.command === "time-status"
                     ? { timezone: "Etc/UTC", canNtp: true, ntpEnabled: false, synchronized: true }
                     : { canNtp: true, synchronized: false }), "Exact observation retained across collector reuse");
             } else {
