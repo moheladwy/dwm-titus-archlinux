@@ -103,7 +103,7 @@ def snapshot():
                     return
                 row("system-management-protocol", "1", "1" if SNAPSHOT_MODE == "snapshot-core" else "2")
                 row("snapshot-generation", f"{count:064x}")
-                row("provider", "updates", "available", "delegated", "PackageKit", "Fixture updates")
+                row("provider", "updates", "available", "delegated", "pacman", "Fixture updates")
                 row("provider", "recovery", "available", "user-session", "Journal", "Empty private journal")
                 for owner in ("regional", "accounts", "printers", "sources"):
                     row("provider", owner, "available", "delegated", "Fixture", "Readable " + owner)
@@ -112,15 +112,16 @@ def snapshot():
                         ("ntp-enabled", "yes"), ("ntp-synchronized", "no"),
                         ("locale", "en_US.UTF-8"), ("accounts-count", "1"), ("cups-service", "running")):
                     row("state", identifier, "available", value, "Readable " + identifier)
-                for action, owner in (("updates-refresh", "updates"), ("updates-install-all", "updates"),
-                        ("updates-cancel", "updates"), ("timezone-set", "regional"), ("ntp-set", "regional"),
+                row("action", "updates-open", "unavailable", "user-session", "updates", "Open system update",
+                    "Read-only fixture")
+                for action, owner in (("timezone-set", "regional"), ("ntp-set", "regional"),
                         ("locale-set", "regional"), ("accounts-open", "accounts"), ("password-open", "accounts"),
                         ("printers-open", "printers"), ("sources-open", "sources")):
                     row("action", action, "unavailable", "delegated", owner, action, "Read-only fixture")
-                row("update", "alpha;1;x86_64;updates", "normal", "installable", "alpha", "1", "Fixture")
-                row("package-change", "alpha;1;x86_64;updates", "update", "alpha", "1", "Fixture")
+                row("update", "alpha;1-1;x86_64;core", "unknown", "installable", "alpha", "1-1", "Fixture")
+                row("package-change", "alpha;1-1;x86_64;core", "update", "alpha", "1-1", "Fixture")
                 row("account", "/opaque/current", "current", "Fixture User", "fixture")
-                row("repository", "fedora", "enabled", "Fixture repository")
+                row("repository", "core", "enabled", "Fixture repository")
                 if SNAPSHOT_MODE != "snapshot-core":
                     for owner in ("information", "storage", "security", "diagnostics"):
                         row("provider", owner, "partial" if owner == "information" or (owner == "storage" and SNAPSHOT_MODE == "snapshot-without-storage") else "available", "user-session" if owner == "diagnostics" else "read-only", "Fixture", "Read only")

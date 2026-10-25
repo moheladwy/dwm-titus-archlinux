@@ -36,7 +36,8 @@ grep -Fq "error_file=\$(mktemp" "$commands"
 grep -Fq "2>\"\$error_file\" &" "$commands"
 grep -Fq "head -c 512 \"\$error_file\" >&2" "$commands"
 grep -Fq 'command: Commands.terminatingCheckedCommand(' "$model"
-[ "$(grep -Fc 'Process {' "$model")" -eq 1 ]
+[ "$(grep -Fc 'Process {' "$model")" -eq 2 ]
+grep -Fq 'command: Commands.systemManagementCommand("updates-open", [])' "$model"
 [ "$(grep -Fc 'SystemProviderDiscovery {' "$model")" -eq 6 ]
 regional=$repo/config/quickshell/systemmanagement/SystemRegionalSettingsModel.qml
 regional_ui=$repo/config/quickshell/settings/SystemRegionalControls.qml
@@ -90,10 +91,17 @@ grep -Fq 'changeRecordCount > 4096' "$model"
 grep -Fq 'changeBytes + recordBytes > 3 * 1024 * 1024' "$model"
 grep -Fq 'errorRecordCount > 4096 || errorBytes + recordBytes > 1024 * 1024' "$model"
 
-for identifier in updates recovery update-summary update-last-refresh update-restart \
-	updates-refresh updates-install-all updates-cancel; do
+for identifier in updates recovery update-summary update-last-refresh update-restart updates-open; do
 	grep -Fq "$identifier" "$model"
 done
+operation_model=$repo/config/quickshell/systemmanagement/SystemOperationModel.qml
+operation_protocol=$repo/config/quickshell/systemmanagement/SystemOperationProtocol.js
+# Settings never mutates packages in place: no refresh, install, or cancel origin.
+if grep -Eq 'updates-(refresh|install-all|cancel)|startUpdate|requestCancel|prepareUpdate|confirmUpdate' \
+	"$model" "$operation_model" "$operation_protocol" "$pane" "$repo/config/quickshell/settings/SystemUpdateControls.qml"; then
+	printf 'Settings must not offer in-place package mutation.\n' >&2
+	exit 1
+fi
 for tracker in seenProviders seenStates seenActions seenUpdates seenChanges; do
 	grep -Fq "const $tracker = {};" "$model"
 done
@@ -104,12 +112,10 @@ grep -Fq "requestedUpdates[\"\$\" + update.packageId] = false;" "$model"
 grep -Fq 'change.action !== "update" && change.action !== "install"' "$model"
 grep -Fq 'else if (change.action === "update") planInvalid = true;' "$model"
 grep -Fq '!summaryAvailable && parsedUpdates.length > 0' "$model"
-grep -Fq 'cancelAvailable !== canCancelActive' "$model"
 grep -Fq 'let planRequiresUnsupportedFlags = false;' "$model"
 grep -Fq 'planUnsupported = planRequiresUnsupportedFlags;' "$model"
 grep -Fq 'if (planUnsupported) {' "$model"
 grep -Fq '} else if (planInvalid) {' "$model"
-grep -Fq '"availability": "unavailable"' "$model"
 grep -Fq 'root.packageChanges = [];' "$model"
 grep -Fq 'root.packageChanges = parsedChanges;' "$model"
 grep -Fq 'root.recoveryProvider = recoveryInvalid' "$model"
@@ -118,8 +124,7 @@ grep -Fq '"providerClass": "user-session"' "$model"
 grep -Fq "Number(states[\"\$update-summary\"].value) !== parsedUpdates.length" "$model"
 grep -Fq 'parsedActive !== null || parsedHandoff !== null' "$model"
 [ "$(grep -Fc 'root.operationActionKind(fields[2]).length === 0' "$model")" -eq 2 ]
-grep -Fq 'root.updateActionKind(fields[2]).length === 0' "$model"
-grep -Fq '(fields[6] !== "no" || fields[4] === "cancel-requested")' "$model"
+grep -Fq 'fields[6] !== "no" || fields[4] === "cancel-requested"' "$model"
 grep -Fq 'if ((identifier === "health-open" || journalAdmitted) && !nativeInvalid[root.nativeActionOwner(identifier)])' "$model"
 grep -Fq 'responseGeneration !== root.requestGeneration' "$model"
 grep -Fq 'if (root.snapshotOwned)' "$model"
@@ -147,7 +152,8 @@ grep -Fq 'model: root.systemManagementModel.updates' "$pane"
 grep -Fq 'model: root.systemManagementModel.packageChanges' "$pane"
 grep -Fq 'model: root.systemManagementModel.errors' "$pane"
 grep -Fq 'errorRow.modelData.provider.toUpperCase()' "$pane"
-grep -Fq 'Metadata refresh and update installation require visible confirmation.' "$pane"
+grep -Fq 'Open system update runs the full upgrade in a terminal' "$pane"
+grep -Fq 'SectionLabel { label: "System updates" }' "$pane"
 grep -Fq 'SystemUpdateControls {' "$pane"
 grep -Fq 'SystemDelegateControls {' "$pane"
 delegate_controls=$repo/config/quickshell/settings/SystemDelegateControls.qml
@@ -163,15 +169,10 @@ if grep -Eq 'Quickshell\.Io|\bProcess\b|\bCommands\.' "$delegate_controls"; then
 fi
 grep -Fq 'onRevealRequested: target => root.reveal(target)' "$pane"
 controls=$repo/config/quickshell/settings/SystemUpdateControls.qml
-grep -Fq 'root.model.prepareUpdate("updates-refresh")' "$controls"
-grep -Fq 'root.model.prepareUpdate("updates-install-all")' "$controls"
-grep -Fq 'root.model.confirmUpdate()' "$controls"
-grep -Fq 'root.model.operation.requestCancel()' "$controls"
-grep -Fq 'root.confirmation.changes' "$controls"
-grep -Fq 'change.modelData.packageId' "$controls"
+grep -Fq 'onActivated: root.model.openSystemUpdate()' "$controls"
+grep -Fq 'model.updateActionReason("updates-open")' "$controls"
+grep -Fq 'sudo pacman -Syu' "$controls"
 grep -Fq 'textFormat: Text.PlainText' "$controls"
-grep -Fq 'pending.generation !== root.generation' "$model"
-grep -Fq 'pending.epoch !== discoveryModel.cycle.epoch' "$model"
 if grep -Eq 'Quickshell\.Io|\bProcess\b|\bCommands\.' "$controls"; then
 	printf 'Update controls must not construct or run commands.\n' >&2
 	exit 1

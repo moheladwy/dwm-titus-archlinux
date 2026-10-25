@@ -72,13 +72,8 @@ ShellRoot {
             model.actions = actions.map(item => item.id === action ? Object.assign({}, item, {availability: "unavailable", detail: ""}) : item);
             check(!model.prepareDelegate(action), "Unavailable offer blocks without requiring detail");
             model.actions = actions;
-            model.updateConfirmation = {actionId: "updates-refresh"};
-            check(!model.prepareDelegate(action), "Update prompt blocks delegated preparation");
-            model.updateConfirmation = null;
             check(model.prepareDelegate(action), "Fixed action prepares without dispatch");
-            check(!model.prepareDelegate(action) && !model.prepareUpdate("updates-refresh"), "Prompt rejects replacement and update overlap");
-            check(model.confirmationMessage === "Finish or dismiss the current confirmation first.",
-                "Visible prompt conflict does not ask to reopen Settings");
+            check(!model.prepareDelegate(action), "Prompt rejects replacement");
             check(model.operation.result === null && !model.operation.busy, "Preparation is passive");
             model.discardDelegate();
             check(!model.confirmDelegate(), "Discarded prompt cannot dispatch");
@@ -123,7 +118,7 @@ ShellRoot {
             if (nativeConfirmation !== null || !root.dispatchProbe) return;
             root.dispatchProbe = false;
             root.check(dispatchingNative && !model.prepareDelegate(root.action)
-                && !model.prepareUpdate("updates-refresh") && !model.confirmDelegate(), "Reentrant callback cannot overlap dispatch");
+                && !model.confirmDelegate(), "Reentrant callback cannot overlap dispatch");
             if (root.scenario === "close-dispatch") model.closeSettings();
         }
     }

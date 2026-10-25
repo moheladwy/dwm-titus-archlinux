@@ -38,7 +38,7 @@ def row(*fields):
             return
     if fields[:2] == ("provider", "recovery"):
         fields = (*fields[:2], "partial", *fields[3:])
-    elif fields[0] == "action" and fields[1] != "updates-cancel":
+    elif fields[0] == "action" and fields[1] != "updates-open":
         fields = (*fields[:2], "available", *fields[3:-1], "Fixed private action")
     elif fields == ("complete", "snapshot"):
         if (operation.DIRECTORY / operation.ACTION).exists() and not (operation.DIRECTORY / "ack-operation").exists():

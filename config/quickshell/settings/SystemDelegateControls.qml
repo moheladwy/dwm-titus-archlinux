@@ -12,13 +12,15 @@ ColumnLayout {
     property string preparedAction: ""
     readonly property var tools: [
         {id: "accounts-open", owner: "accounts", label: "Manage accounts", target: "LXQt User Settings (lxqt-admin-user)",
-            detail: "Review and administer user accounts in the trusted Fedora tool."},
+            detail: "Review and administer user accounts in the trusted LXQt administration tool."},
         {id: "password-open", owner: "accounts", label: "Change my password", target: "passwd in your configured supported terminal",
             detail: "Enter passwords only in the terminal prompt. Settings never reads your password."},
         {id: "printers-open", owner: "printers", label: "Manage printers", target: "Print Settings (system-config-printer)",
-            detail: "Configure printers and queues in the trusted Fedora tool."},
-        {id: "sources-open", owner: "sources", label: "Manage software sources", target: "DNFDragora (dnfdragora)",
-            detail: "Review repositories in the trusted Fedora tool. Source changes can affect future updates."}
+            detail: "Configure printers and queues in the trusted CUPS printer tool."},
+        // Arch has no graphical source manager; the provider reports this
+        // action as unsupported with its explanation.
+        {id: "sources-open", owner: "sources", label: "Manage software sources", target: "No graphical tool on Arch Linux",
+            detail: "Repositories come from /etc/pacman.conf and its mirrorlist, edited as root outside Settings. They are listed read-only below."}
     ]
     Layout.fillWidth: true
     spacing: Theme.spacingMd
@@ -206,7 +208,7 @@ ColumnLayout {
     }
     PlainText { visible: root.model.accounts.length === 0; text: "No account rows reported."; color: Theme.menuMutedText }
     SectionLabel { label: "Reported software sources" }
-    PlainText { text: "Enabled and disabled sources are read-only here."; color: Theme.menuMutedText }
+    PlainText { text: "Repositories configured in pacman.conf, read-only here."; color: Theme.menuMutedText }
     Inventory {
         objectName: "nativeRepositories"
         model: root.model.repositories

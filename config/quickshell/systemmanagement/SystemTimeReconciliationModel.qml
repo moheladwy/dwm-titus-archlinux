@@ -3,7 +3,7 @@ import Quickshell
 import "SystemDiscoveryCycle.js" as Cycle
 
 // Owner arrival is uncertainty, not proof that time configuration changed.
-// This owner never reads PackageKit or accepts journal recovery evidence.
+// This owner never reads package state or accepts journal recovery evidence.
 Scope {
     id: root
     required property var model
@@ -52,7 +52,7 @@ Scope {
     function availableContext() {
         const monitor = model.timeDiscovery;
         return model.settingsVisible && !model.snapshotOwned && !model.snapshotPending && !model.requiredPending
-            && !model.discoveryBatch && !model.dispatchingNative && !model.dispatchingUpdate
+            && !model.discoveryBatch && !model.dispatchingNative
             && model.validGeneration(model.generation)
             && monitor.visible && monitor.ready && !monitor.failed && monitor.cycle.enabled
             && monitor.cycle.phase === "idle" && !monitor.cycle.unresolved

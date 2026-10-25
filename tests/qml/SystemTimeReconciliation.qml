@@ -90,7 +90,7 @@ ShellRoot {
             model.closeSettings();
         } else if (stage === 3 && quiet()) {
             check(model.timeReconciliation.reader.serial === serial + 1, "One scoped reconciliation read");
-            check(model.requestGeneration === generation, "Unchanged owner does not reread PackageKit snapshot");
+            check(model.requestGeneration === generation, "Unchanged owner does not reread the system snapshot");
             check(model.regional.catalogs.timezone === catalog, "Unchanged owner retains catalog identity");
             check(model.regional.confirmation === (scenario === "owner-preview" ? null : prompt),
                 "Only a matching preview retains its identity");

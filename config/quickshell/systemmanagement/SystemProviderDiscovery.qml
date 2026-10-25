@@ -282,7 +282,7 @@ Scope {
         Process {
             id: process
             stdout: SplitParser { onRead: line => owner.callbacks.line(line) }
-            // Fedora Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
+            // Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
             onExited: owner.callbacks.finish() // qmllint disable signal-handler-parameters
             onRunningChanged: { if (!running) owner.callbacks.finish(); }
         }

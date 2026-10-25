@@ -76,8 +76,7 @@ Scope {
     }
 
     function actionReason(action) {
-        if (ownsPreparation() || model.dispatchingUpdate || model.dispatchingNative
-                || model.updateConfirmation !== null || model.nativeConfirmation !== null)
+        if (ownsPreparation() || model.dispatchingNative || model.nativeConfirmation !== null)
             return "Finish or dismiss the current preparation first.";
         return contextReason(action, true);
     }
@@ -114,8 +113,8 @@ Scope {
     }
 
     function start(command, action, selection, argument) {
-        if (ownsPreparation() || confirmation !== null || model.dispatchingUpdate || model.dispatchingNative
-                || model.updateConfirmation !== null || model.nativeConfirmation !== null) return false;
+        if (ownsPreparation() || confirmation !== null || model.dispatchingNative
+                || model.nativeConfirmation !== null) return false;
         const reason = contextReason(action, command === "regional-preview");
         if (reason !== "") { message = reason; return false; }
         const ticket = Object.assign(identity(action), { command: command, selection: selection,
@@ -194,7 +193,7 @@ Scope {
 
     function confirm() {
         const pending = confirmation;
-        if (pending === null || ownsPreparation() || model.dispatchingUpdate || model.dispatchingNative) return false;
+        if (pending === null || ownsPreparation() || model.dispatchingNative) return false;
         if (model.timeReconciliation.sampleClaim.ticket !== null || model.timeReconciliation.sampling) return false;
         if (matches(pending.ticket) && discovery(pending.ticket.action) === model.timeDiscovery
                 && model.timeReconciliation.blocksAdmission()) return false;
@@ -206,7 +205,7 @@ Scope {
         confirmation = null;
         // UI callbacks may close Settings or retire discovery while dismissing.
         const current = matches(pending.ticket) && contextReason(pending.ticket.action, true) === ""
-            && model.updateConfirmation === null && model.nativeConfirmation === null && !ownsPreparation();
+            && model.nativeConfirmation === null && !ownsPreparation();
         const started = current && model.operation.startNative(pending.ticket.action,
             pending.ticket.argument, pending.preview.generation);
         message = started ? "" : "Regional state changed. Review a fresh preview and confirm again.";

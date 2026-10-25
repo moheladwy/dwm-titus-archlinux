@@ -43,11 +43,13 @@ Scope {
     property bool discoveryBatch: false
     property string snapshotErrorDetail: ""
     property int requestGeneration: 0
-    property var updateConfirmation: null
+    // Settings never mutates packages in place. "Open system update" asks the
+    // Update Center to open its terminal flow (news check, then sudo pacman -Syu).
+    property bool updateLaunching: false
+    property string updateLaunchMessage: ""
+    property bool updateLaunchFailed: false
     property bool desktopUpdateBusy: false
     property bool desktopUpdateInterrupted: false
-    property string confirmationMessage: ""
-    property bool dispatchingUpdate: false
     property var nativeConfirmation: null
     property string nativeConfirmationMessage: ""
     property bool dispatchingNative: false
@@ -91,8 +93,7 @@ Scope {
         else if (action === "locale-set") localeDiscoveryModel.invalidate();
         else if (action === "accounts-open" || action === "password-open") accountDiscoveryModel.invalidate();
         else if (action === "printers-open") printerDiscoveryModel.invalidate();
-        else if (action === "sources-open" || action === "updates-refresh" || action === "updates-install-all")
-            discoveryModel.invalidate();
+        else if (action === "sources-open") discoveryModel.invalidate();
     }
 
     function stateDiscovery(identifier) {
@@ -129,73 +130,54 @@ Scope {
     function updateActionReason(actionId) {
         if (root.desktopUpdateInterrupted) return "An interrupted desktop update blocks updates. Complete desktop update recovery first.";
         if (root.desktopUpdateBusy) return "A desktop update is active. Wait for it to finish.";
-        if (actionId !== "updates-refresh" && actionId !== "updates-install-all")
-            return "This update action is not supported.";
-        if (!root.settingsVisible)
-            return "Open System Settings to prepare an update action.";
-        if (root.dispatchingUpdate || root.dispatchingNative || root.nativeConfirmation !== null
-                || regionalModel.ownsPreparation() || regionalModel.confirmation !== null)
-            return "Finish or dismiss the current confirmation first.";
-        if (root.snapshotOwned || root.snapshotPending || root.requiredPending || !discoveryModel.fresh)
+        if (actionId !== "updates-open") return "This update action is not supported.";
+        if (!root.settingsVisible) return "Open System Settings to open the system update.";
+        if (root.updateLaunching) return "The system update is already opening.";
+        if (root.snapshotOwned || root.snapshotPending || root.requiredPending)
             return "Wait for fresh update discovery, or reload status to retry.";
-        if (!root.validGeneration(root.generation) || root.recoveryProvider.status !== "available")
-            return "Complete recovery evidence is required. Reload status to retry.";
-        if (!operationModel.canStart)
-            return "An operation or its recovery still owns the update workflow.";
         const action = root.actions.find(item => item.id === actionId);
         if (!action || action.availability !== "available")
             return action && action.detail.length > 0 ? action.detail : "The provider did not offer this action.";
-        if (actionId === "updates-install-all" && root.packageChanges.length === 0)
-            return "No complete installable package-change preview is available.";
         return "";
     }
 
-    function prepareUpdate(actionId) {
-        const reason = root.updateActionReason(actionId);
+    // The Update Center reserves the operation and owns the terminal. This
+    // launch is a user-session request; pacman asks for authorization itself.
+    function openSystemUpdate() {
+        const reason = root.updateActionReason("updates-open");
         if (reason.length > 0) {
-            root.confirmationMessage = reason;
+            root.updateLaunchFailed = true;
+            root.updateLaunchMessage = reason;
             return false;
         }
-        root.confirmationMessage = "";
-        root.updateConfirmation = {
-            actionId: actionId, generation: root.generation,
-            requestGeneration: root.requestGeneration, epoch: discoveryModel.cycle.epoch,
-            changes: actionId === "updates-install-all"
-                ? JSON.parse(JSON.stringify(root.packageChanges)) : []
-        };
+        root.updateLaunching = true;
+        root.updateLaunchFailed = false;
+        root.updateLaunchMessage = "Opening the system update...";
+        updateLaunchProcess.hasOutput = false;
+        updateLaunchProcess.running = true;
         return true;
     }
 
-    function discardUpdate() {
-        root.updateConfirmation = null;
-        root.confirmationMessage = "";
-    }
-
-    function confirmUpdate() {
-        const pending = root.updateConfirmation;
-        if (pending === null || root.dispatchingUpdate) return false;
-        const reason = root.updateActionReason(pending.actionId);
-        if (reason.length > 0 || pending.generation !== root.generation
-                || pending.requestGeneration !== root.requestGeneration
-                || pending.epoch !== discoveryModel.cycle.epoch) {
-            root.confirmationInvalidated();
-            return false;
+    function finishSystemUpdateLaunch(exitCode, normalExit) {
+        if (!root.updateLaunching) return;
+        const text = updateLaunchProcess.hasOutput ? updateLaunchOutput.text : "";
+        const lines = root.utf8Bytes(text) > 4096 ? [] : text.split("\n").filter(line => line.length > 0);
+        const fields = lines.length === 3 ? lines[1].split("\t") : [];
+        const framed = lines.length === 3 && lines[0] === "system-management-protocol\t1\t0"
+            && lines[2] === "complete\tupdate-launch";
+        if (normalExit && exitCode === 0 && framed && fields.length === 4 && fields[0] === "update-launch") {
+            root.updateLaunchFailed = false;
+            root.updateLaunchMessage = "The system update opened in a terminal. Read any Arch news there, then answer pacman's prompts.";
+        } else {
+            root.updateLaunchFailed = true;
+            root.updateLaunchMessage = framed && fields.length >= 4 && fields[0] === "error" && fields[1] === "updates"
+                && root.validErrorCode(fields[2]) && root.utf8Bytes(fields[3]) <= 512
+                ? fields[3] : "The system update could not be opened. Open the Update Center to retry.";
         }
-        // Capture the fixed arguments and claim dispatch before clearing the
-        // prompt: reentrant UI callbacks must not dispatch another origin.
-        root.dispatchingUpdate = true;
-        root.updateConfirmation = null;
-        const started = operationModel.startUpdate(pending.actionId,
-            pending.actionId === "updates-install-all" ? pending.generation : "");
-        root.confirmationMessage = started ? "" : "Update state changed. Reload status and confirm again.";
-        root.dispatchingUpdate = false;
-        return started;
+        root.updateLaunching = false;
     }
 
     onConfirmationInvalidated: {
-        if (root.updateConfirmation !== null)
-            root.confirmationMessage = "Update state changed. Review a fresh preview and confirm again.";
-        root.updateConfirmation = null;
         root.invalidateNativeConfirmation("");
         regionalModel.invalidate("");
     }
@@ -224,8 +206,7 @@ Scope {
     }
 
     function delegateActionReason(actionId) {
-        if (root.dispatchingUpdate || root.dispatchingNative || root.updateConfirmation !== null
-                || regionalModel.ownsPreparation() || regionalModel.confirmation !== null)
+        if (root.dispatchingNative || regionalModel.ownsPreparation() || regionalModel.confirmation !== null)
             return "Finish or dismiss the current confirmation first.";
         return root.delegateContextReason(actionId);
     }
@@ -266,7 +247,7 @@ Scope {
 
     function confirmDelegate() {
         const pending = root.nativeConfirmation;
-        if (pending === null || root.dispatchingUpdate || root.dispatchingNative) return false;
+        if (pending === null || root.dispatchingNative) return false;
         if (root.delegateActionReason(pending.actionId) !== "") {
             root.invalidateNativeConfirmation("");
             return false;
@@ -370,15 +351,7 @@ Scope {
         return true;
     }
 
-    function updateActionKind(actionId) {
-        if (actionId === "updates-refresh") return "refresh";
-        if (actionId === "updates-install-all") return "update";
-        return "";
-    }
-
     function operationActionKind(actionId) {
-        const updateKind = root.updateActionKind(actionId);
-        if (updateKind.length > 0) return updateKind;
         if (actionId === "timezone-set") return "timezone";
         if (actionId === "ntp-set") return "ntp";
         if (actionId === "locale-set") return "locale";
@@ -656,9 +629,7 @@ Scope {
                         owner: fields[4], label: fields[5], detail: fields[6] };
                     continue;
                 }
-                if (fields.length < 2 || (fields[1] !== "updates-refresh"
-                        && fields[1] !== "updates-install-all"
-                        && fields[1] !== "updates-cancel")) {
+                if (fields.length < 2 || fields[1] !== "updates-open") {
                     fatal = "System management provider returned an unknown action owner";
                     break;
                 }
@@ -669,7 +640,7 @@ Scope {
                 seenActions["$" + fields[1]] = true;
                 if (!root.fieldsFit(fields, 7)
                         || (fields[2] !== "available" && fields[2] !== "unavailable")
-                        || fields[3] !== "delegated" || fields[4] !== "updates") {
+                        || fields[3] !== "user-session" || fields[4] !== "updates") {
                     updatesInvalid = true;
                     continue;
                 }
@@ -804,9 +775,7 @@ Scope {
                         || root.operationActionKind(fields[2]) !== fields[3]
                         || !root.validOperationState(fields[4])
                         || !root.validPercent(fields[5])
-                        || (fields[6] !== "yes" && fields[6] !== "no")
-                        || (root.updateActionKind(fields[2]).length === 0
-                            && (fields[6] !== "no" || fields[4] === "cancel-requested"))) {
+                        || fields[6] !== "no" || fields[4] === "cancel-requested") {
                     fatal = "System management provider returned an invalid active operation";
                     break;
                 }
@@ -843,9 +812,7 @@ Scope {
         if (parsedUpdateProvider === null || states["$update-summary"] === undefined
                 || states["$update-last-refresh"] === undefined
                 || states["$update-restart"] === undefined
-                || parsedActions["$updates-refresh"] === undefined
-                || parsedActions["$updates-install-all"] === undefined
-                || parsedActions["$updates-cancel"] === undefined) updatesInvalid = true;
+                || parsedActions["$updates-open"] === undefined) updatesInvalid = true;
         if (parsedRecoveryProvider === null) recoveryInvalid = true;
         if (minor >= 1) {
             for (const owner of nativeOwners) {
@@ -879,11 +846,6 @@ Scope {
                 && parsedActions["$" + identifier].availability === "available");
         const journalAdmitted = !recoveryInvalid && (parsedActive !== null || parsedHandoff !== null
             || parsedRecoveryProvider.status === "available" || nativeAdmission);
-        if (!updatesInvalid) {
-            const cancelAvailable = parsedActions["$updates-cancel"].availability === "available";
-            const canCancelActive = parsedActive !== null && parsedActive.cancelable;
-            if (cancelAvailable !== canCancelActive) updatesInvalid = true;
-        }
         if (!updatesInvalid) {
             const summaryAvailable = states["$update-summary"].status === "available";
             if ((summaryAvailable
@@ -924,12 +886,9 @@ Scope {
                 }
             }
             planUnsupported = planRequiresUnsupportedFlags;
-            if (!planInvalid && ((requestedCount === 0 && parsedChanges.length > 0)
-                    || (requestedCount > 0 && parsedChanges.length === 0
-                        && parsedActions["$updates-install-all"].availability === "available")
-                    || (parsedActions["$updates-install-all"].availability === "available"
-                        && requestedCount === 0)))
-                planInvalid = true;
+            // A preview may be unavailable (its error is reported separately),
+            // but changes without any installable update are inconsistent.
+            if (!planInvalid && requestedCount === 0 && parsedChanges.length > 0) planInvalid = true;
         }
 
         root.generation = parsedGeneration;
@@ -940,7 +899,7 @@ Scope {
         if (updatesInvalid) {
             const detail = "System management provider returned malformed update state";
             root.updateProvider = { "status": "partial", "providerClass": "delegated",
-                "owner": "PackageKit", "detail": detail };
+                "owner": "pacman", "detail": detail };
             root.updateSummary = { "status": "partial", "value": "unknown", "detail": detail };
             root.updateLastRefresh = { "status": "partial", "value": "unknown", "detail": detail };
             root.updateRestart = { "status": "partial", "value": "unknown", "detail": detail };
@@ -949,28 +908,21 @@ Scope {
             root.packageChanges = [];
         } else if (planInvalid) {
             const detail = "System management provider returned a malformed update plan";
-            const installAction = parsedActions["$updates-install-all"];
             root.updateProvider = { "status": "partial", "providerClass": "delegated",
                 "owner": parsedUpdateProvider.owner, "detail": detail };
             root.updateSummary = states["$update-summary"];
             root.updateLastRefresh = states["$update-last-refresh"];
             root.updateRestart = states["$update-restart"];
-            root.actions = [parsedActions["$updates-refresh"], {
-                "id": installAction.id, "availability": "unavailable",
-                "actionClass": installAction.actionClass, "owner": installAction.owner,
-                "label": installAction.label, "detail": detail
-            }, parsedActions["$updates-cancel"]];
+            root.actions = [parsedActions["$updates-open"]];
             root.updates = parsedUpdates;
             root.packageChanges = [];
             parsedErrors.push({ "provider": "updates", "code": "malformed",
                 "detail": detail });
         } else {
-            let installAction = parsedActions["$updates-install-all"];
             if (planUnsupported) {
-                const detail = "This update plan requires unsupported reinstall or downgrade flags";
-                installAction = { "id": installAction.id, "availability": "unavailable",
-                    "actionClass": installAction.actionClass, "owner": installAction.owner,
-                    "label": installAction.label, "detail": detail };
+                // pacman resolves the real transaction interactively; the
+                // preview is informational and keeps the terminal flow open.
+                const detail = "The upgrade preview contains an unexpected reinstall or downgrade";
                 let unsupportedErrorSeen = false;
                 for (const error of parsedErrors) {
                     if (error.provider === "updates" && error.code === "unsupported") {
@@ -986,8 +938,7 @@ Scope {
             root.updateSummary = states["$update-summary"];
             root.updateLastRefresh = states["$update-last-refresh"];
             root.updateRestart = states["$update-restart"];
-            root.actions = [parsedActions["$updates-refresh"], installAction,
-                parsedActions["$updates-cancel"]];
+            root.actions = [parsedActions["$updates-open"]];
             root.updates = parsedUpdates;
             root.packageChanges = parsedChanges;
         }
@@ -1273,6 +1224,22 @@ Scope {
     }
 
     Process {
+        id: updateLaunchProcess
+        property bool hasOutput: false
+        // The result record carries the failure detail, so this command is
+        // not wrapped by the checked runner; the parser checks the exit code.
+        command: Commands.systemManagementCommand("updates-open", [])
+        running: false
+        stdout: StdioCollector {
+            id: updateLaunchOutput
+            onStreamFinished: { if (root.updateLaunching) updateLaunchProcess.hasOutput = true; }
+        }
+        // Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
+        onExited: (exitCode, exitStatus) => root.finishSystemUpdateLaunch(exitCode, exitStatus === 0) // qmllint disable signal-handler-parameters
+        onRunningChanged: { if (!running && root.updateLaunching) root.finishSystemUpdateLaunch(-1, false); }
+    }
+
+    Process {
         id: snapshotProcess
         property int generation: 0
         property bool core: false
@@ -1295,7 +1262,7 @@ Scope {
                 }
             }
         }
-        // Fedora Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
+        // Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
         onExited: (exitCode, exitStatus) => root.finishSnapshot(exitCode, exitStatus === 0) // qmllint disable signal-handler-parameters
         onRunningChanged: {
             if (!running && root.snapshotOwned) root.finishSnapshot(-1, false);

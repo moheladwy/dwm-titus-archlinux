@@ -90,9 +90,8 @@ ShellRoot {
                 return;
             }
             click("confirmDelegate");
-            check(!find("cancelUpdate").visible && !model.operation.canCancel,
+            check(item("cancelUpdate", window.contentItem) === null && model.operation["canCancel"] === undefined,
                 "Native launch never exposes update cancellation");
-            check(find("operationOwnerNote").text.indexOf("PackageKit") < 0, "Native busy copy does not misidentify owner");
             model.closeSettings();
             check(model.operation.streamOwned, "Closing preserves operation ownership");
             stage = 3;

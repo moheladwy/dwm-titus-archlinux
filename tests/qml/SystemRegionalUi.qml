@@ -236,7 +236,8 @@ ShellRoot {
             }
             checkMessageFocus(["discardRegional", "confirmRegional"], 0, function() {
                 root.click("confirmRegional");
-                root.check(model.operation.streamOwned && !model.operation.canCancel && !root.find("cancelUpdate").visible,
+                root.check(model.operation.streamOwned && model.operation["canCancel"] === undefined
+                    && root.item("cancelUpdate", window.contentItem) === null,
                     "Only fixed native origin owns sent action; no update cancellation");
                 if (root.scenario === "success" || root.scenario === "disable") root.stage = 70;
                 else if (root.scenario === "denied") {

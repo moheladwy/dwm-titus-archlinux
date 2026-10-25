@@ -44,8 +44,8 @@ ShellRoot {
         root.sawVerifying = false;
         root.emptyReplay = false;
         root.target = { id: "op-" + root.scenario.toString(16).padStart(32, "0"),
-            actionId: root.scenario === 2 ? "timezone-set" : "updates-refresh",
-            kind: root.scenario === 2 ? "timezone" : "refresh" };
+            actionId: root.scenario === 2 ? "timezone-set" : "sources-open",
+            kind: root.scenario === 2 ? "timezone" : "delegate" };
         model.resetRecovery();
         model.result = null;
         model.acceptSnapshot(root.scenario === 6 ? root.target : null,
@@ -88,7 +88,7 @@ ShellRoot {
         }
         onAcknowledged: operationId => {
             root.check(root.discoveryInvalidations > 0,
-                "Native and PackageKit results invalidate their provider without a global signal");
+                "Regional and delegated results invalidate their provider without a global signal");
             root.check(operationId === root.target.id, "Acknowledgment must name exact validated identity");
             root.check(root.sawProgress && root.sawVerifying, "Stream progress must arrive before exit");
             root.check(result.state === (root.scenario === 2 ? "permission-denied" : "succeeded"),
@@ -112,7 +112,7 @@ ShellRoot {
 
     function finishFailure() {
         if (root.completed || (root.failedStart && !root.integrated.operation.blocked)) return;
-        root.check(root.discoveryInvalidations > 0, "Uncertain PackageKit observer exit invalidates discovery");
+        root.check(root.discoveryInvalidations > 0, "Uncertain observer exit invalidates discovery");
         root.check(model.blocked && !model.busy, "Exhausted recovery must stop all automatic work");
         root.check(root.snapshotRequests === 3 && model.retries === 3, "Exactly three bounded recovery reads");
         if (root.failedStart) {

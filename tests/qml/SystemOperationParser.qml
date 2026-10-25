@@ -17,19 +17,19 @@ ShellRoot {
     }
 
     function operation(state, action, detail) {
-        action = action || "updates-refresh";
+        action = action || "timezone-set";
         return ["operation", root.operationId, action, Protocol.actionKind(action), state,
             "unknown", "no", detail || "Fixture"].join("\t") + "\n";
     }
 
     function audit(state, action) {
-        action = action || "updates-refresh";
+        action = action || "timezone-set";
         return ["audit", root.operationId, action, Protocol.actionKind(action), state,
             "2026-09-05T12:00:00Z", "2026-09-04T12:00:00Z", "Clock rollback is valid"].join("\t") + "\n";
     }
 
     function fixture(state, action) {
-        action = action || "updates-refresh";
+        action = action || "timezone-set";
         let text = root.header + root.operation("pending", action);
         if (state === "succeeded") text += root.operation("running", action);
         if (state === "permission-denied") text += root.operation("authorizing", action);
@@ -50,7 +50,7 @@ ShellRoot {
     }
 
     function unitTests() {
-        for (const action of ["updates-refresh", "updates-install-all", "timezone-set", "ntp-set",
+        for (const action of ["timezone-set", "ntp-set",
                 "locale-set", "accounts-open", "password-open", "printers-open", "sources-open"]) {
             for (const state of ["succeeded", "permission-denied", "failed", "interrupted", "canceled"]) {
                 root.check(root.parse(root.fixture(state, action), state === "succeeded" ? 0 : 1), action + ": " + state);
@@ -58,20 +58,15 @@ ShellRoot {
             }
         }
         const good = root.fixture("succeeded");
-        const itemPrefix = root.header + root.operation("pending", "updates-install-all")
-            + root.operation("running", "updates-install-all");
-        const itemRecord = "package-progress\t" + root.operationId + "\texample\tdownloading\t42\n";
-        const itemParser = Protocol.create(root.operationId, "updates-install-all");
-        root.check(Protocol.consume(itemParser, root.bytes(itemPrefix + itemRecord)), "Accept item progress");
-        root.check(itemParser.item.name === "example" && itemParser.item.percent === "42"
-            && itemParser.operation.percent === "unknown" && itemParser.records.length === 2,
-            "Item progress is distinct from overall progress and log");
-        for (const invalidItem of [itemRecord.replace("42", "101"), itemRecord.replace("downloading", "invented"),
-                itemRecord.replace(root.operationId, "op-" + "2".repeat(32))]) {
-            root.check(!Protocol.consume(Protocol.create(), root.bytes(itemPrefix + invalidItem)), "Reject invalid item");
+        // Package operations are not journaled any more: their action IDs and
+        // per-package progress records are rejected in every stream.
+        for (const legacy of ["updates-refresh", "updates-install-all", "updates-cancel"]) {
+            root.check(Protocol.actionKind(legacy) === "" && Protocol.owner(legacy) === "", legacy + " has no operation kind");
+            root.check(!Protocol.consume(Protocol.create("", legacy), root.bytes(good)), legacy + " cannot be expected");
         }
-        root.check(!Protocol.consume(Protocol.create(), root.bytes(root.header
-            + root.operation("pending", "updates-install-all") + itemRecord)), "Reject item before running");
+        const itemRecord = "package-progress\t" + root.operationId + "\texample\tdownloading\t42\n";
+        root.check(!Protocol.consume(Protocol.create(), root.bytes(root.header + root.operation("pending")
+            + root.operation("running") + itemRecord)), "Reject package progress in a native stream");
         for (const action of ["timezone-set", "ntp-set", "locale-set", "accounts-open",
                 "password-open", "printers-open", "sources-open"]) {
             const canceled = root.fixture("succeeded", action).replace(root.operation("succeeded", action),
@@ -99,11 +94,13 @@ ShellRoot {
             good.replace("\tunknown\tno", "\t01\tno"),
             good.replace("\tunknown\tno", "\tunknown\ttrue"),
             good.replace("\tpending\t", "\tinvented\t"),
-            good.replace(pending, pending.replace("updates-refresh", "updates-install-all")),
+            good.replace(pending, pending.replace("\ttimezone-set\t", "\tntp-set\t")),
             good.replace(pending, pending.replace(root.operationId, "op-22222222222222222222222222222222")),
             good.replace(pending, pending.replace(root.operationId, "op-ABC")),
-            good.replace(pending, pending.replace("updates-refresh", "updates-cancel")),
-            good.replace(pending, pending.replace("\trefresh\t", "\tdelegate\t")),
+            good.replace(pending, pending.replace("timezone-set\ttimezone", "updates-refresh\trefresh")),
+            good.replace(pending, pending.replace("timezone-set\ttimezone", "updates-install-all\tupdate")),
+            good.replace(pending, pending.replace("\ttimezone\t", "\tdelegate\t")),
+            good.replace(running, running + root.operation("cancel-requested")),
             good.replace("Fixture", "x".repeat(513)),
             good.replace("Fixture", "\u20ac".repeat(171)),
             good.replace("Fixture", "\u0000"), good.replace("Fixture", "\r"),
@@ -119,11 +116,11 @@ ShellRoot {
             good.replace("2026-09-04T12:00:00Z", "2026-09-04T12:00:00+00:00"),
             good.replace(running, root.audit("succeeded") + running),
             good.replace("complete\toperation", running + "complete\toperation"),
-            failed.replace("error\tupdates\tconflict\tFixture failure\n", ""),
-            failed.replace("error\tupdates", "error\trecovery"),
-            failed.replace("error\tupdates", "error\tregional"),
+            failed.replace("error\tregional\tconflict\tFixture failure\n", ""),
+            failed.replace("error\tregional", "error\trecovery"),
+            failed.replace("error\tregional", "error\tupdates"),
             failed.replace("\tconflict\t", "\tDBus.Error\t"),
-            failed.replace("error\tupdates\tconflict\tFixture failure\n", "error\tupdates\tconflict\tX\nerror\tupdates\tconflict\tY\n")
+            failed.replace("error\tregional\tconflict\tFixture failure\n", "error\tregional\tconflict\tX\nerror\tregional\tconflict\tY\n")
         ];
         for (const type of ["snapshot-generation", "provider", "state", "update", "package-change",
                 "repository", "account", "filesystem", "action", "active-operation", "terminal-handoff"])
@@ -138,14 +135,13 @@ ShellRoot {
         root.check(!root.parse(failed, 0), "Failed origin with successful exit");
         root.check(!root.parse(failed, 1, true), "Failed replay with failed exit");
         const progress = good.replace(running, pending + root.operation("authorizing")
-            + root.operation("authorizing") + running + running + root.operation("cancel-requested")
-            + root.operation("cancel-requested"));
-        root.check(root.parse(progress, 0), "Same-state progress and completion/cancel race");
+            + root.operation("authorizing") + running + running);
+        root.check(root.parse(progress, 0), "Same-state progress before completion");
         root.check(root.parse(good.replace(running, running.repeat(255)), 0), "256 nonterminal records");
         root.check(!root.parse(good.replace(running, running.repeat(256)), 0), "257 nonterminal records");
 
         const unicode = root.bytes(good.replace("Fixture", "split \u00a2\u20ac\ud83d\ude00"));
-        const parser = Protocol.create(root.operationId, "updates-refresh");
+        const parser = Protocol.create(root.operationId, "timezone-set");
         for (let i = 0; i <= unicode.byteLength; i++)
             root.check(Protocol.consume(parser, unicode.slice(0, i)), "Byte boundary " + i);
         root.check(Protocol.finish(parser, 0, true, false), "Split Unicode completion");
@@ -165,7 +161,7 @@ ShellRoot {
         root.check(!Protocol.consume(replaced, new ArrayBuffer(0)), "Shrinking collector");
         root.check(!Protocol.consume(Protocol.create("bad"), root.bytes(good)), "Invalid expected ID");
         root.check(!Protocol.consume(Protocol.create("", "health-open"), root.bytes(good)), "Invalid expected action");
-        root.check(!Protocol.consume(Protocol.create("", "updates-install-all"), root.bytes(good)), "Mismatched expected action");
+        root.check(!Protocol.consume(Protocol.create("", "ntp-set"), root.bytes(good)), "Mismatched expected action");
         const crashed = Protocol.create();
         Protocol.consume(crashed, root.bytes(good));
         root.check(!Protocol.finish(crashed, 0, false, false), "Crash is not success");
@@ -174,7 +170,7 @@ ShellRoot {
     Component.onCompleted: {
         try {
             root.unitTests();
-            root.streamParser = Protocol.create(root.operationId, "updates-refresh");
+            root.streamParser = Protocol.create(root.operationId, "timezone-set");
             // Deliberately split a multibyte field across separate native pipe
             // reads, and leave pending visible before a valid failed exit.
             const payload = root.fixture("failed").replace("Fixture", "split \u20ac\ud83d\ude00");

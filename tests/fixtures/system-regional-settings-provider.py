@@ -43,7 +43,7 @@ def exclusive(name):
 def row(*fields):
     if fields[:2] == ("provider", "recovery"):
         fields = (*fields[:2], "partial", *fields[3:])
-    elif fields[0] == "action" and fields[1] != "updates-cancel":
+    elif fields[0] == "action" and fields[1] != "updates-open":
         fields = (*fields[:2], "available", *fields[3:-1], "Fixed private action")
         count = int((directory / "count").read_text())
         if ((operation.SCENARIO == "owner-gain" and fields[1] == "ntp-set" and count <= 2)

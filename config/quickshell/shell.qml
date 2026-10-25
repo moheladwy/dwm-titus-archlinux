@@ -248,7 +248,7 @@ ShellRoot {
         onAuthorizationRequested: settingsModel.close()
         settingsVisible: settingsModel.visible && settingsModel.selectedSectionId === "system"
         systemBusy: systemManagementModel.operation.busy || systemManagementModel.activeOperation !== null
-            || systemManagementModel.updateConfirmation !== null
+            || systemManagementModel.updateLaunching
     }
 
     UpdateCenterModel {
@@ -605,7 +605,7 @@ ShellRoot {
 
         function systemManagementInstallAvailability(): string {
             const action = systemManagementModel.actions.find(function(item) {
-                return item.id === "updates-install-all";
+                return item.id === "updates-open";
             });
             return action === undefined ? "missing" : action.availability;
         }
