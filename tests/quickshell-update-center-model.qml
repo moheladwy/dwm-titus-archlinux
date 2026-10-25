@@ -68,7 +68,7 @@ ShellRoot {
                 if (test.step === 0 && test.ticks > 10 && model.initialCacheLoaded
                         && initiallyFullModel.initialCacheLoaded && model.savedRefreshSeconds === 900) {
                     test.require(!model.savedFloating, "legacy preferences default to tiled");
-                    const operationEnvelope = "update-center-action-protocol\t1\t0\noperation\top-00000000000000000000000000000000\tfedora\trecover\t";
+                    const operationEnvelope = "update-center-action-protocol\t1\t0\noperation\top-00000000000000000000000000000000\tsystem\trecover\t";
                     for (const phase of ["failed", "closed"])
                         test.require(Protocol.parseAction(operationEnvelope + phase + "\tunknown\ncomplete\taction\n") !== null,
                             "reconciled unknown outcomes must remain representable without claiming success");
@@ -123,17 +123,25 @@ ShellRoot {
                     test.require(model.loadSettings("update-center-settings-protocol\t1\t0\nstate\tavailable\tReady\npreference\trefreshSeconds\t900\npreference\talwaysShow\tenabled\nbaseline\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\ncomplete\tstatus\n")
                             && model.settingsWritable, "safe preferences must restore editing");
                     const prior = model.providers;
-                    const valid = "update-center-protocol\t1\t0\nprovider\tfedora\tFedora\tavailable\t1\t1\tfresh\t10\tyes\t\tReady\nitem\tfedora\tupdate\tPackage\t1\t2\tpkg\tsystem\thttps://example.test/release\ncomplete\tsnapshot\n";
+                    const valid = "update-center-protocol\t1\t0\nprovider\tsystem\tArch Linux\tavailable\t1\t1\tfresh\t10\tyes\t\tReady\nitem\tsystem\tupdate\tPackage\t1\t2\tpkg\tsystem\thttps://example.test/release\ncomplete\tsnapshot\n";
                     const invalid = [
                         valid.replace("protocol\t1\t0", "protocol\t2\t0"),
                         valid.replace("complete\tsnapshot\n", ""),
-                        valid.replace("item\tfedora", "unknown\tfedora"),
+                        valid.replace("item\tsystem", "unknown\tsystem"),
+                        valid.split("\tsystem\t").join("\tfedora\t"),
                         valid.replace("\t1\t1\tfresh", "\t2\t1\tfresh"),
                         valid.replace("https://example.test", "http://example.test"),
-                        valid.replace("complete\tsnapshot\n", "provider\tfedora\tFedora\tavailable\t0\t0\tfresh\t10\tno\t\tDuplicate\ncomplete\tsnapshot\n"),
+                        valid.replace("complete\tsnapshot\n", "provider\tsystem\tArch Linux\tavailable\t0\t0\tfresh\t10\tno\t\tDuplicate\ncomplete\tsnapshot\n"),
                         "update-center-protocol\t1\t0\n" + Array(16385).fill("unknown\tx").join("\n") + "\ncomplete\tsnapshot\n"
                     ];
                     for (const payload of invalid) test.require(!model.acceptSnapshot(payload), "invalid protocol must fail closed");
+                    const ordered = Protocol.parseSnapshot("update-center-protocol\t1\t0\n"
+                        + "provider\tsystem\tArch Linux\tavailable\t0\t1\tfresh\t10\tno\t\tReady\n"
+                        + "provider\taur\tAUR\tavailable\t1\t3\tfresh\t10\tyes\t\tReady\n"
+                        + "item\taur\tupdate\tpaccache-hook\t1-1\t2-1\tpaccache-hook\tuser\thttps://aur.archlinux.org/packages/paccache-hook\n"
+                        + "provider\tdwm-titus\tDWM-Titus\tavailable\t0\t1\tfresh\t10\tno\t\tReady\ncomplete\tsnapshot\n");
+                    test.require(ordered !== null && ordered.providers.map(provider => provider.id).join(",") === "system,aur,dwm-titus"
+                        && ordered.totalUpdates === 1, "system and the optional AUR provider must parse in registry order");
                     test.require(model.providers === prior, "invalid protocol must not partially replace prior state");
                     test.require(!model.periodicRefreshRunning, "periodic timer must remain stopped while initially offline");
                     model.showSettings();
@@ -200,7 +208,7 @@ ShellRoot {
                 } else if (test.step === 6 && model.message.indexOf("fixture scan failure") >= 0) {
                     test.require(model.providers === test.retainedProviders && model.providers[0].detail === "force-4",
                         "failed refresh must preserve prior providers and items");
-                    test.require(model.launch("fedora"), "normal provider launch must dispatch");
+                    test.require(model.launch("system"), "normal provider launch must dispatch");
                     test.step = 7;
                 } else if (test.step === 7 && !model.busy && model.providers[0].detail === "force-6") {
                     test.require(model.launch("dwm-titus"), "failed terminal fixture must dispatch");

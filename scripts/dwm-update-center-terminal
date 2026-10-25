@@ -67,7 +67,8 @@ def set_terminal_identity(environment=None, output=None):
 
 
 PROVIDER_TITLES = {
-    "fedora": ("Update system packages", "Recover system packages"),
+    "system": ("Update system packages", "Recover system packages"),
+    "aur": ("Update AUR packages", "Recover AUR packages"),
     "flatpak": ("Update Flatpak packages", "Recover Flatpak packages"),
     "dwm-titus": ("Update DWM-Titus", "Recover DWM-Titus"),
     "mise": ("Update mise tools", "Recover mise tools"),
@@ -116,109 +117,15 @@ def trusted_desktop_helper():
     return helper
 
 
-class ProgressTracker:
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.pending_pkg = None
-        self.current_percent = None
-
-    @staticmethod
-    def format_package(phase, name, pct=None):
-        pct_str = f" \033[32m[{pct:>3}%]\033[0m" if pct is not None else ""
-        return f"\033[1;34m->\033[0m \033[1m{phase}:\033[0m {name}{pct_str}"
-
-    def flush_pending(self, pct=None):
-        if self.pending_pkg is None:
-            return None
-        name, phase, item_pct = self.pending_pkg
-        self.pending_pkg = None
-        effective_pct = pct if pct is not None else item_pct if item_pct is not None else self.current_percent
-        return self.format_package(phase, name, effective_pct)
-
-    def handle_package_progress(self, name, phase, percent_str):
-        if not name:
-            return self.flush_pending()
-        flushed = self.flush_pending()
-        item_pct = int(percent_str) if percent_str.isdigit() and 0 <= int(percent_str) <= 100 else None
-        self.pending_pkg = (name, phase.capitalize(), item_pct)
-        return flushed
-
-    def handle_operation(self, state, progress_str, detail):
-        if progress_str.isdigit() and 0 <= int(progress_str) <= 100:
-            self.current_percent = int(progress_str)
-        is_telemetry = detail.startswith("Observed signals:") or detail == "unknown"
-        if is_telemetry:
-            if self.pending_pkg is not None:
-                return self.flush_pending(self.current_percent)
-            if self.current_percent is not None:
-                return f"\033[32m[{self.current_percent:>3}%]\033[0m PackageKit {state}"
-            return f"PackageKit {state}"
-        lines = []
-        flushed = self.flush_pending()
-        if flushed:
-            lines.append(flushed)
-        if progress_str.isdigit() and 0 <= int(progress_str) <= 100:
-            lines.append(f"\033[32m[{int(progress_str):>3}%]\033[0m {detail}")
-        else:
-            status_color = "\033[32m" if state == "succeeded" else "\033[31m" if state == "failed" else "\033[33m"
-            status = "OK" if state == "succeeded" else "FAIL" if state == "failed" else state.upper()
-            lines.append(f"{status_color}[{status}]\033[0m {detail}")
-        return "\n".join(lines)
-
-    def handle_audit(self, state, detail):
-        lines = []
-        flushed = self.flush_pending()
-        if flushed:
-            lines.append(flushed)
-        status_color = "\033[32m" if state == "succeeded" else "\033[31m" if state == "failed" else "\033[33m"
-        status = "OK" if state == "succeeded" else "FAIL" if state == "failed" else state.upper()
-        lines.append(f"{status_color}[{status}]\033[0m {detail}")
-        self.reset()
-        return "\n".join(lines)
+def format_progress_record(line):
+    """Render tab-separated helper output readably; plain text passes through."""
+    return "  |  ".join(line.rstrip("\n").split("\t"))
 
 
-DEFAULT_PROGRESS_TRACKER = ProgressTracker()
-
-
-def format_progress_record(line, tracker=None):
-    if tracker is None:
-        tracker = DEFAULT_PROGRESS_TRACKER
-    fields = line.rstrip("\n").split("\t")
-    record_type = fields[0]
-    if record_type == "system-management-protocol":
-        tracker.reset()
-        return None
-    if record_type == "complete":
-        return tracker.flush_pending()
-    if record_type == "operation" and len(fields) >= 8:
-        state, progress, detail = fields[4], fields[5], fields[7]
-        return tracker.handle_operation(state, progress, detail)
-    if record_type == "package-progress" and len(fields) >= 5:
-        name, phase, percent = fields[2], fields[3], fields[4]
-        return tracker.handle_package_progress(name, phase, percent)
-    if record_type == "package" and len(fields) >= 3:
-        flushed = tracker.flush_pending()
-        action = fields[1].capitalize()
-        pkg_name = fields[2].split(";")[0] if ";" in fields[2] else fields[2]
-        summary = f" - {fields[3]}" if len(fields) >= 4 and fields[3] else ""
-        pkg_line = f"\033[1;34m->\033[0m \033[1m{action}:\033[0m {pkg_name}{summary}"
-        return f"{flushed}\n{pkg_line}" if flushed else pkg_line
-    if record_type == "audit" and len(fields) >= 8:
-        state, detail = fields[4], fields[7]
-        return tracker.handle_audit(state, detail)
-    if record_type == "error" and len(fields) >= 4:
-        flushed = tracker.flush_pending()
-        err_line = f"\033[1;31m[ERROR]\033[0m {fields[3]}"
-        return f"{flushed}\n{err_line}" if flushed else err_line
-    return "  |  ".join(fields)
-
-
-def print_terminal_line(line, *, output=None, width=None, tracker=None):
+def print_terminal_line(line, *, output=None, width=None):
     """Render machine fields readably without changing the retained payload."""
     destination = sys.stdout if output is None else output
-    formatted = format_progress_record(line, tracker=tracker)
+    formatted = format_progress_record(line)
     if not formatted:
         return
     columns = shutil.get_terminal_size((102, 24)).columns - 2 if width is None else width
@@ -277,7 +184,6 @@ def stream_process(argv, *, cwd=None, env=None, timeout=DEFAULT_TIMEOUT, stream=
     with bounded_process(argv, cwd=cwd, env=env) as process:
         output, size = [], 0
         buffer = ""
-        tracker = ProgressTracker()
         decoder = codecs.getincrementaldecoder("utf-8")(errors="strict")
         deadline = time.monotonic() + timeout
         with selectors.DefaultSelector() as selector:
@@ -307,12 +213,12 @@ def stream_process(argv, *, cwd=None, env=None, timeout=DEFAULT_TIMEOUT, stream=
                         line_with_nl = line + "\n"
                         output.append(line_with_nl)
                         if stream:
-                            print_terminal_line(line_with_nl, tracker=tracker)
+                            print_terminal_line(line_with_nl)
             buffer += decoder.decode(b"", final=True)
             if buffer:
                 output.append(buffer)
                 if stream:
-                    print_terminal_line(buffer, tracker=tracker)
+                    print_terminal_line(buffer)
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("command timed out")
@@ -331,119 +237,14 @@ def run_command(argv, *, cwd=None, env=None, timeout=DEFAULT_TIMEOUT, stream=Tru
     return payload
 
 
-def run_protocol_command(argv, *, timeout=DEFAULT_TIMEOUT):
-    """Stream stdout exactly; a nonzero status may still carry a valid terminal bundle."""
-    status, payload = stream_process(argv, timeout=timeout)
-    if status not in {0, 1} or not payload:
-        raise subprocess.CalledProcessError(status, argv, payload)
-    return payload
-
-
 def result(outcome, phase, detail, restart="none", hold=True):
     detail = detail.encode("utf-8")[:8192].decode("utf-8", errors="ignore")
     return {"outcome": outcome, "phase": phase, "detail": detail, "restart": restart, "hold": hold}
 
 
-def records(payload, kind):
-    return [line.split("\t") for line in payload.splitlines() if line.startswith(kind + "\t")]
-
-
-def parse_operation_stream(payload, action):
-    lines = CENTER["bounded_lines"](payload)
-    if not lines or lines[0] not in {"system-management-protocol\t1\t0",
-                                     "system-management-protocol\t1\t1",
-                                     "system-management-protocol\t1\t2"} or lines[-1] != "complete\toperation":
-        raise ValueError("invalid PackageKit operation protocol")
-    operation_rows, audits = [], []
-    for line in lines[1:-1]:
-        fields = line.split("\t")
-        if fields[0] == "operation" and len(fields) == 8:
-            operation_rows.append(fields)
-        elif fields[0] == "package-progress" and len(fields) == 5:
-            pass
-        elif fields[0] == "error" and len(fields) == 4:
-            pass
-        elif fields[0] == "audit" and len(fields) == 8:
-            audits.append(fields)
-        else:
-            raise ValueError("unknown PackageKit operation record")
-        for field in fields:
-            CENTER["escape"](field)
-    terminal_states = {"succeeded", "failed", "permission-denied", "canceled", "interrupted"}
-    kind = "update" if action == "updates-install-all" else "refresh" if action == "updates-refresh" else ""
-    allowed = {
-        "pending": {"pending", "authorizing", "running", "canceled", "failed", "interrupted"},
-        "authorizing": {"authorizing", "running", "permission-denied", "canceled", "failed", "interrupted"},
-        "running": {"running", "cancel-requested", *terminal_states},
-        "cancel-requested": {"cancel-requested", *terminal_states},
-    }
-    if (not operation_rows or len(audits) != 1 or operation_rows[0][4] != "pending"
-            or not kind or any(row[2:4] != [action, kind] or not OPERATION_PATTERN.fullmatch(row[1])
-                   for row in operation_rows)
-            or any(row[1] != operation_rows[0][1] for row in operation_rows)
-            or any(row[5] != "unknown" and (not row[5].isdigit() or not 0 <= int(row[5]) <= 100)
-                   or row[6] not in {"yes", "no"} for row in operation_rows)
-            or any(following[4] not in allowed.get(current[4], set())
-                   for current, following in zip(operation_rows, operation_rows[1:]))
-            or operation_rows[-1][4] not in terminal_states
-            or audits[0][1:5] != [operation_rows[0][1], action, kind, operation_rows[-1][4]]):
-        raise ValueError("inconsistent PackageKit operation stream")
-    return {"operation": operation_rows[0][1], "state": operation_rows[-1][4],
-            "detail": audits[0][7]}
-
-
-def fedora_restart(payload):
-    CENTER["parse_fedora_snapshot"](payload)
-    rows = [row for row in records(payload, "state") if len(row) == 5 and row[1] == "update-restart"]
-    if len(rows) != 1:
-        raise ValueError("PackageKit restart state unavailable")
-    return rows[0][3] if rows[0][2] == "available" else "unknown"
-
-
-def recover_packagekit(operation):
-    """Reconcile retained PackageKit work without starting a new transaction."""
-    helper = str(CENTER_PATH.with_name("dwm-system-management"))
-    checkpoint(operation, "preparing", "Preparing authoritative PackageKit state")
-    initial = run_command([helper, "snapshot-updates"], stream=False, timeout=60)
-    # Snapshot performs journal reconciliation; attach to its exact retained
-    # owner when work is still observable instead of starting a mutation.
-    operations = records(initial, "active-operation") or records(initial, "terminal-handoff")
-    checkpoint(operation, "recovering", "Reconciling retained PackageKit operation")
-    terminal = run_protocol_command([helper, "watch-operation", operations[0][1]]) if operations else initial
-    protocol_action = operations[0][2] if operations else "updates-install-all"
-    terminal_state = parse_operation_stream(terminal, protocol_action) if records(terminal, "operation") else None
-    reconciled = run_command([helper, "snapshot-updates"], stream=False)
-    unresolved = records(reconciled, "active-operation") or records(reconciled, "terminal-handoff")
-    state = terminal_state["state"] if terminal_state else "interrupted" if unresolved else "succeeded"
-    restart = fedora_restart(reconciled)
-    if state == "interrupted" and terminal_state is not None:
-        expected = [terminal_state["operation"], protocol_action,
-                    "update" if protocol_action == "updates-install-all" else "refresh"]
-        handoffs = records(reconciled, "terminal-handoff")
-        if not records(reconciled, "active-operation") and len(handoffs) == 1 and handoffs[0][1:] == expected:
-            # Acknowledge the retained result only after authoritative reconciliation.
-            # Its audit remains in PackageKit's journal; this is not success evidence.
-            run_command([helper, "ack-operation", terminal_state["operation"]], stream=False)
-            acknowledged = run_command([helper, "snapshot-updates"], stream=False)
-            restart = fedora_restart(acknowledged)
-            if not records(acknowledged, "active-operation") and not records(acknowledged, "terminal-handoff"):
-                return result("unknown", "failed", "PackageKit state refreshed and interrupted result acknowledged; "
-                              "the previous update outcome remains unknown. " + terminal_state["detail"], restart)
-    if terminal_state is None and not records(reconciled, "active-operation") \
-            and not records(reconciled, "terminal-handoff"):
-        return result("unknown", "failed", "PackageKit state refreshed; the previous update outcome remains unknown.", restart)
-    if terminal_state is not None and state != "interrupted":
-        run_command([helper, "ack-operation", terminal_state["operation"]], stream=False)
-    if state != "succeeded":
-        return result("unknown" if state == "interrupted" else "failed",
-                      "interrupted" if state == "interrupted" else "failed",
-                      terminal_state["detail"] if terminal_state else "PackageKit reconciliation requires review", restart)
-    return result("succeeded", "completed", terminal_state["detail"] if terminal_state else "PackageKit state reconciled", restart)
-
-
 def trusted_native_command(path):
     """Validate every directory and symlink hop of a fixed system executable."""
-    if path not in {"/usr/bin/dnf5", "/usr/bin/sudo"}:
+    if path not in {"/usr/bin/pacman", "/usr/bin/sudo"}:
         raise PermissionError("Native command is not allowlisted")
     root = os.lstat("/")
     if root.st_uid != 0 or root.st_mode & 0o022 or not stat.S_ISDIR(root.st_mode):
@@ -483,48 +284,197 @@ def trusted_native_command(path):
     return str(current)
 
 
-def execute_fedora(operation, action):
-    if action == "recover":
-        receipt = CENTER["active_operation"]()
-        if receipt is None or receipt["operation"] != operation:
-            raise ValueError("Fedora recovery does not own the active reservation")
-        if receipt["recovery_provider_phase"] != "fedora-dnf":
-            return recover_packagekit(operation)
-        # Recover is an explicit retry, with DNF's native lock and fresh
-        # interactive plan/confirmation. It never claims rollback or that the
-        # previous transaction succeeded.
-        print_step("Previous DNF outcome is unknown; retrying with a fresh native transaction plan")
-        CENTER["update_operation"](operation, phase="preparing", provider_phase="fedora-dnf",
-                                   detail="Checking PackageKit before explicit native DNF retry")
-    else:
-        checkpoint(operation, "preparing", "Checking for unfinished PackageKit work before DNF")
-    helper = str(CENTER_PATH.with_name("dwm-system-management"))
-    initial = run_command([helper, "snapshot-updates"], stream=False, timeout=60)
-    CENTER["parse_fedora_snapshot"](initial)
-    if records(initial, "active-operation") or records(initial, "terminal-handoff"):
-        return result("unknown", "interrupted",
-                      "An existing PackageKit operation requires recovery before native DNF can start. "
-                      "Open Settings > System > Fedora updates to finish or acknowledge that operation, then retry here.", "unknown")
-    recovery = [row for row in records(initial, "provider") if row[1] == "recovery"]
-    if len(recovery) != 1 or recovery[0][2] != "available":
-        raise ValueError("Authoritative PackageKit recovery state is unavailable")
-    dnf = trusted_native_command("/usr/bin/dnf5")
-    sudo = trusted_native_command("/usr/bin/sudo")
-    print_step("Starting native DNF; review its transaction and confirmation below")
-    CENTER["update_operation"](operation, phase="fedora-executing", provider_phase="fedora-dnf",
-                               detail="Native DNF owns the terminal")
-    # Inherit all three terminal descriptors: preserve native progress, scripts,
-    # interactive authorization and transaction confirmation without output caps
-    # or a timeout that could kill a frontend while privileged work continues.
-    status = subprocess.call([sudo, "--", dnf, "--setopt=exit_on_lock=True", "--setopt=assumeyes=False",
-                              "--setopt=assumeno=False", "--refresh", "upgrade"], cwd="/")
+PACMAN_LOCK = Path("/var/lib/pacman/db.lck")
+LOCK_GUIDANCE = ("The pacman database is locked (" + str(PACMAN_LOCK) + "): another package manager is "
+                 "running. Wait for it to finish, then retry. To see which process holds the lock, run "
+                 "'sudo fuser -v " + str(PACMAN_LOCK) + "'. Update Center never deletes the lock.")
+NEWS_URL = "https://archlinux.org/feeds/news/"
+NEWS_PAGE = "https://archlinux.org/news/"
+NEWS_BYTES = 1024 * 1024
+NEWS_TIMEOUT = 15
+NEWS_ITEMS = 50
+
+
+def pacman_lock_held():
+    return os.path.lexists(PACMAN_LOCK)
+
+
+def terminal_text(value, limit=240):
+    """Strip control characters so remote text cannot drive the terminal."""
+    text = " ".join("".join(char if ord(char) >= 32 and not 127 <= ord(char) <= 159 else " "
+                            for char in value).split())
+    return text[:limit]
+
+
+def confirm(prompt, *, input_stream=None, output=None):
+    """Explicit opt-in: only y or yes continues; EOF and anything else decline."""
+    stream = sys.stdin if input_stream is None else input_stream
+    destination = sys.stdout if output is None else output
+    destination.write(prompt)
+    destination.flush()
+    try:
+        if input_stream is None and stream.isatty():
+            # Read the TTY line directly so Python's stdin buffer cannot hold
+            # type-ahead that pacman's own prompts should receive.
+            answer = os.read(stream.fileno(), 4096).decode("utf-8", errors="replace")
+        else:
+            answer = stream.readline()
+    except (OSError, ValueError):
+        answer = ""
+    if not answer.endswith("\n"):
+        destination.write("\n")
+        destination.flush()
+    return answer.strip().lower() in {"y", "yes"}
+
+
+def fetch_news():
+    return CENTER["fetch_https"](NEWS_URL, limit=NEWS_BYTES, timeout=NEWS_TIMEOUT)
+
+
+def parse_news(payload):
+    """Parse the Arch news RSS feed; DTDs and entities are rejected outright."""
+    import email.utils
+    import xml.etree.ElementTree as ElementTree
+    if not isinstance(payload, bytes) or len(payload) > NEWS_BYTES:
+        raise ValueError("news feed exceeded its size limit")
+    # Decode first so another encoding cannot hide a declaration from the check.
+    text = payload.decode("utf-8")
+    lowered = text.lower()
+    if "<!doctype" in lowered or "<!entity" in lowered:
+        raise ValueError("news feed declares a DTD or entity")
+    root = ElementTree.fromstring(text)
+    channel = root.find("channel") if root.tag == "rss" else None
+    if channel is None:
+        raise ValueError("news feed is not RSS")
+    items = []
+    for entry in channel.findall("item")[:NEWS_ITEMS]:
+        title = terminal_text(entry.findtext("title") or "")
+        link = terminal_text(entry.findtext("link") or "", 512)
+        try:
+            published = email.utils.parsedate_to_datetime(entry.findtext("pubDate") or "")
+            stamp = int(published.timestamp())
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not title or not 0 < stamp <= (1 << 53):
+            continue
+        if not link.startswith("https://archlinux.org/"):
+            link = NEWS_PAGE
+        items.append((stamp, title, link))
+    return sorted(items, reverse=True)
+
+
+def news_preflight(*, input_stream=None, output=None):
+    """D9: show unacknowledged Arch news and require an explicit Continue."""
+    destination = sys.stdout if output is None else output
+    print_step("Checking Arch Linux news before upgrading", output=destination)
+    acknowledged = CENTER["read_news_ack"]()
+    try:
+        items = parse_news(fetch_news())
+    except Exception as error:  # Any parser or network fault degrades to unavailable.
+        destination.write("Arch Linux news is unavailable (" + terminal_text(str(error), 160) + "). "
+                          "Read " + NEWS_PAGE + " before continuing.\n")
+        return confirm("Continue with the system upgrade? [y/N] ", input_stream=input_stream, output=destination)
+    unread = [item for item in items if item[0] > acknowledged]
+    if not unread:
+        destination.write("No unread Arch Linux news.\n")
+        destination.flush()
+        return True
+    destination.write("\n\033[1;33mUnread Arch Linux news\033[0m (some items require manual action "
+                      "before or after upgrading):\n")
+    for stamp, title, link in unread:
+        day = time.strftime("%Y-%m-%d", time.gmtime(stamp))
+        destination.write(f"  {day}  {title}\n            {link}\n")
+    destination.write("\n")
+    if not confirm("Continue with the system upgrade? [y/N] ", input_stream=input_stream, output=destination):
+        return False
+    try:
+        CENTER["write_news_ack"](max(acknowledged, unread[0][0]))
+    except (OSError, ValueError) as error:
+        destination.write("Warning: the news acknowledgement could not be saved: " + terminal_text(str(error)) + "\n")
+    return True
+
+
+def previous_result(operation):
+    receipt = CENTER["active_operation"]()
+    if receipt is None or receipt["operation"] != operation:
+        raise ValueError("recovery does not own the active reservation")
+    return terminal_text(receipt["detail"], 1024)
+
+
+def review_recovery(operation, program, command, *, input_stream=None, output=None):
+    destination = sys.stdout if output is None else output
+    destination.write(previous_result(operation) + "\n")
+    destination.write("The previous outcome is unknown. " + program + " never rolls back a transaction; "
+                      "review /var/log/pacman.log for what was applied.\n")
+    return confirm("Start a fresh interactive '" + command + "' now? [y/N] ",
+                   input_stream=input_stream, output=destination)
+
+
+def execute_system(operation, action, *, input_stream=None, output=None):
+    """Run the interactive native upgrade; pacman owns every prompt."""
+    destination = sys.stdout if output is None else output
+    if action == "recover" and not review_recovery(operation, "pacman", "sudo pacman -Syu",
+                                                   input_stream=input_stream, output=destination):
+        return result("unknown", "failed", "Recovery reviewed; no new upgrade was started. "
+                      "The previous system update outcome remains unknown.", "unknown")
+    checkpoint(operation, "preparing", "Checking the pacman database lock", output=destination)
+    if pacman_lock_held():
+        return result("failed", "failed", LOCK_GUIDANCE, "unknown")
+    if not news_preflight(input_stream=input_stream, output=destination):
+        return result("failed", "failed", "System upgrade canceled before pacman started; no packages were changed.",
+                      "unknown")
+    try:
+        sudo = trusted_native_command("/usr/bin/sudo")
+        pacman = trusted_native_command("/usr/bin/pacman")
+    except FileNotFoundError as error:
+        return result("failed", "failed", "Required command is missing (" + str(error.filename or error) +
+                      "). Install sudo and configure it for your user, then retry.", "unknown")
+    print_step("Starting pacman; review its transaction and prompts below", output=destination)
+    CENTER["update_operation"](operation, phase="system-executing", provider_phase="system-native",
+                               detail="pacman owns the terminal")
+    # Inherit all three terminal descriptors: pacman keeps its native output,
+    # replacement/conflict/provider prompts, and confirmation. No output cap or
+    # timeout may kill the frontend while privileged work continues.
+    status = subprocess.call([sudo, "--", pacman, "-Syu"], cwd="/")
     if status < 0:
-        return result("unknown", "interrupted", "Native DNF was interrupted; review its transaction before retrying.", "unknown")
+        return result("unknown", "interrupted", "pacman was interrupted; review its output and "
+                      "/var/log/pacman.log before retrying.", "unknown")
     if status:
-        return result("unknown", "failed", "Native DNF exited with status " + str(status) +
-                      "; review its output. Closing this terminal releases the reservation; "
-                      "no successful transaction is claimed.", "unknown")
-    return result("succeeded", "completed", "Native DNF completed successfully; review its output for restart guidance.", "unknown")
+        detail = ("pacman exited with status " + str(status) + "; review its output. Closing this terminal "
+                  "releases the reservation; no successful transaction is claimed.")
+        if pacman_lock_held():
+            detail += " " + LOCK_GUIDANCE
+        return result("unknown", "failed", detail, "unknown")
+    return result("succeeded", "completed", "pacman completed the system upgrade; review its output for "
+                  ".pacnew files and restart guidance.", "unknown")
+
+
+AUR_ROOT_REFUSAL = "AUR helpers never run as root, under sudo, or under pkexec; run Update Center as your user"
+
+
+def execute_aur(operation, action, *, input_stream=None, output=None):
+    """Run the existing AUR helper as the invoking user, never as root."""
+    destination = sys.stdout if output is None else output
+    if os.geteuid() == 0:
+        raise PermissionError(AUR_ROOT_REFUSAL)
+    helper = CENTER["aur_helper"]()
+    if helper is None:
+        raise FileNotFoundError("No AUR helper (paru or yay) is installed; dwm-titus never installs one")
+    name = Path(helper).name
+    if action == "recover" and not review_recovery(operation, name, name + " -Sua",
+                                                   input_stream=input_stream, output=destination):
+        return result("unknown", "failed", "Recovery reviewed; no new AUR upgrade was started. "
+                      "The previous AUR update outcome remains unknown.")
+    print_step("Starting " + name + " -Sua as your user; review its prompts below", output=destination)
+    CENTER["update_operation"](operation, phase="aur-executing", provider_phase="aur-helper",
+                               detail=name + " owns the terminal")
+    status = subprocess.call([helper, "-Sua"], cwd=str(Path.home()))
+    if status < 0:
+        return result("unknown", "interrupted", name + " was interrupted; review its output before retrying.")
+    if status:
+        return result("unknown", "failed", name + " exited with status " + str(status) +
+                      "; review its output. No successful AUR upgrade is claimed.")
+    return result("succeeded", "completed", name + " completed the AUR upgrade; review its output.")
 
 
 def desktop_value(payload):
@@ -692,11 +642,13 @@ def execute_mise(operation, action):
 def execute_provider(operation, provider, action):
     if not OPERATION_PATTERN.fullmatch(operation) or provider not in PROVIDERS or action not in {"update", "recover"}:
         raise ValueError("invalid terminal operation")
-    # Fedora has its own visible, bounded authoritative preflight below.
-    # Repeating discovery here hides a full scan before the first progress line.
-    if provider != "fedora":
+    # The launcher already ran full system discovery before reserving. pacman
+    # computes its own fresh plan, so repeating discovery would only delay it.
+    if provider == "aur" and os.geteuid() == 0:
+        return result("failed", "failed", AUR_ROOT_REFUSAL)
+    if provider != "system":
         validate_provider_action(provider, action)
-    return {"fedora": execute_fedora, "dwm-titus": execute_desktop,
+    return {"system": execute_system, "aur": execute_aur, "dwm-titus": execute_desktop,
             "flatpak": execute_flatpak, "mise": execute_mise}[provider](operation, action)
 
 
@@ -766,7 +718,9 @@ def run_terminal(argv=None):
         active = CENTER["active_operation"]()
         if active is None or (active["operation"], active["provider"], active["action"]) != tuple(args):
             raise ValueError("terminal operation does not own the active reservation")
-        CENTER["update_operation"](operation, phase="running", detail="Provider operation running")
+        # A recovery keeps the reserved last-known-result detail to report it.
+        CENTER["update_operation"](operation, phase="running",
+                                   **({} if action == "recover" else {"detail": "Provider operation running"}))
         print_provider_header(provider, action)
         try:
             value = execute_provider(operation, provider, action)

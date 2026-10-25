@@ -50,15 +50,23 @@ class ProviderMetadata:
 
 
 REGISTRY = (
-    ProviderMetadata("fedora", "Fedora", True, "scan_fedora", can_recover=True),
+    # The distribution provider's label comes from os-release NAME at render time.
+    ProviderMetadata("system", "System", True, "scan_system", can_recover=True),
+    # Optional user-scope AUR provider: active only when paru or yay already exists.
+    ProviderMetadata("aur", "AUR", False, "scan_aur", can_recover=True),
     ProviderMetadata("dwm-titus", "DWM-Titus", True, "scan_desktop", can_recover=True),
     # Optional-provider recovery means supported recheck/retry, never rollback.
     ProviderMetadata("flatpak", "Flatpak", False, "scan_flatpak", can_recover=True),
     ProviderMetadata("mise", "Mise", False, "scan_mise", can_recover=True),
 )
 
+# Persisted state written before the Arch port used the Fedora provider id.
+LEGACY_PROVIDERS = {"fedora": "system"}
+LEGACY_PHASES = {"fedora-executing": "system-executing", "fedora-dnf": "system-native"}
+
 OPERATION_PATTERN = re.compile(r"op-[0-9a-f]{32}")
-OPERATION_PHASES = {"reserved", "launched", "running", "preparing", "fedora-executing", "fedora-dnf",
+OPERATION_PHASES = {"reserved", "launched", "running", "preparing", "system-executing", "system-native",
+                    "aur-executing", "aur-helper",
                     "desktop-starting", "flatpak-system", "flatpak-system-complete", "flatpak-user",
                     "flatpak-user-complete", "mise-inventory", "mise-update", "mise-recheck",
                     "recovering", "completed", "failed",
@@ -98,7 +106,8 @@ def validate_operation(value):
     if isinstance(value, dict) and set(value) == OPERATION_FIELDS - {"launcher_pid", "launcher_identity"}:
         value = {**value, "launcher_pid": 0, "launcher_identity": ""}
     providers = {meta.identifier for meta in REGISTRY}
-    phase_provider = {"fedora-executing": "fedora", "fedora-dnf": "fedora", "desktop-starting": "dwm-titus",
+    phase_provider = {"system-executing": "system", "system-native": "system",
+                      "aur-executing": "aur", "aur-helper": "aur", "desktop-starting": "dwm-titus",
                       "flatpak-system": "flatpak", "flatpak-system-complete": "flatpak",
                       "flatpak-user": "flatpak", "flatpak-user-complete": "flatpak",
                       "mise-inventory": "mise", "mise-update": "mise", "mise-recheck": "mise"}
@@ -141,6 +150,21 @@ def validate_operation(value):
     return value
 
 
+def migrate_operation(value):
+    """Convert a pre-port Fedora receipt to the system provider it now names.
+
+    Only the identifiers change. The receipt keeps its recorded phase, outcome,
+    and terminal identity, so an unknown result stays unknown and recovery can
+    only offer a fresh interactive upgrade."""
+    if not isinstance(value, dict) or value.get("provider") not in LEGACY_PROVIDERS:
+        return value
+    value = {**value, "provider": LEGACY_PROVIDERS[value["provider"]]}
+    for field in ("phase", "provider_phase", "recovery_provider_phase"):
+        if isinstance(value.get(field), str):
+            value[field] = LEGACY_PHASES.get(value[field], value[field])
+    return value
+
+
 def read_operation():
     path = operation_path()
     try:
@@ -148,7 +172,9 @@ def read_operation():
             if fd is None:
                 return None
             _, data = cache_data(fd, path.name)
-        return validate_operation(machine_json(data.decode("utf-8"))) if data is not None else None
+        if data is None:
+            return None
+        return validate_operation(migrate_operation(machine_json(data.decode("utf-8"))))
     except (OSError, ValueError, UnicodeError):
         return None
 
@@ -171,6 +197,51 @@ def write_operation(value):
             if current != baseline:
                 raise ValueError("operation state changed")
             os.replace(temporary, path.name, src_dir_fd=fd, dst_dir_fd=fd)
+            os.fsync(fd)
+        finally:
+            try:
+                os.unlink(temporary, dir_fd=fd)
+            except FileNotFoundError:
+                pass
+
+
+NEWS_ACK_NAME = "news-ack.json"
+
+
+def read_news_ack():
+    """Newest acknowledged Arch news timestamp; 0 when absent or unreadable."""
+    try:
+        with cache_directory(coordination_path()) as fd:
+            if fd is None:
+                return 0
+            _, data = cache_data(fd, NEWS_ACK_NAME)
+        if data is None:
+            return 0
+        value = machine_json(data.decode("utf-8"))
+        if (isinstance(value, dict) and set(value) == {"schema", "acknowledged"} and value["schema"] == 1
+                and type(value["acknowledged"]) is int and 0 <= value["acknowledged"] <= (1 << 53)):
+            return value["acknowledged"]
+    except (OSError, ValueError, UnicodeError):
+        pass
+    return 0
+
+
+def write_news_ack(timestamp):
+    if type(timestamp) is not int or not 0 <= timestamp <= (1 << 53):
+        raise ValueError("invalid news acknowledgement")
+    data = json.dumps({"schema": 1, "acknowledged": timestamp}, sort_keys=True,
+                      separators=(",", ":")).encode()
+    with cache_directory(coordination_path(), create=True) as fd:
+        cache_data(fd, NEWS_ACK_NAME)  # Rejects an unsafe existing target.
+        temporary = ".news-ack-" + secrets.token_hex(16)
+        target = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                         0o600, dir_fd=fd)
+        try:
+            with os.fdopen(target, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, NEWS_ACK_NAME, src_dir_fd=fd, dst_dir_fd=fd)
             os.fsync(fd)
         finally:
             try:
@@ -207,9 +278,19 @@ def reserve_operation(provider, action, now=None):
             # Older recovery attempts replaced their scope checkpoint with a
             # generic phase. Keep the inherited evidence until work advances.
             recovery_provider_phase = existing["recovery_provider_phase"]
-        if (action == "recover" and provider == "fedora" and existing is not None
-                and "fedora-dnf" in {existing["provider_phase"], existing["recovery_provider_phase"]}):
-            recovery_provider_phase = "fedora-dnf"
+        if (action == "recover" and provider == "system" and existing is not None
+                and "system-native" in {existing["provider_phase"], existing["recovery_provider_phase"]}):
+            recovery_provider_phase = "system-native"
+        if (action == "recover" and provider == "aur" and existing is not None
+                and "aur-helper" in {existing["provider_phase"], existing["recovery_provider_phase"]}):
+            recovery_provider_phase = "aur-helper"
+        detail = "Operation reserved"
+        if action == "recover" and existing is not None:
+            # Recovery reports the last known result; it never claims rollback.
+            prefix = "Recovery reserved; last known result: "
+            previous = existing["detail"].removeprefix(prefix)
+            previous = previous.encode("utf-8")[:4096].decode("utf-8", errors="ignore")
+            detail = prefix + (previous or existing["phase"])
         value = {"schema": 1, "operation": "op-" + secrets.token_hex(16), "provider": provider,
                  "action": action, "phase": "reserved",
                  "provider_phase": recovery_provider_phase,
@@ -219,7 +300,7 @@ def reserve_operation(provider, action, now=None):
                  "recovery_of": existing["operation"] if action == "recover" and existing is not None else "",
                  "recovery_phase": existing["phase"] if action == "recover" and existing is not None else "",
                  "recovery_provider_phase": recovery_provider_phase,
-                 "detail": "Operation reserved"}
+                 "detail": detail}
         write_operation(value)
         return value
 
@@ -407,24 +488,56 @@ def escape(value):
     return value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r")
 
 
-def require_fedora(path=Path("/etc/os-release")):
-    try:
-        with open(path, "rb") as stream:
-            data = stream.read(65537)
+OS_RELEASE_PATHS = (Path("/etc/os-release"), Path("/usr/lib/os-release"))
+
+
+def os_release(path=None):
+    """Strictly parse os-release; /usr/lib/os-release is the standard fallback."""
+    candidates = (Path(path),) if path is not None else OS_RELEASE_PATHS
+    for index, candidate in enumerate(candidates):
+        try:
+            with open(candidate, "rb") as stream:
+                data = stream.read(65537)
+        except FileNotFoundError:
+            if index + 1 < len(candidates):
+                continue
+            raise
         if len(data) > 65536:
-            raise ValueError()
+            raise ValueError("os-release is too large")
         values = {}
         for line in data.decode("utf-8").splitlines():
             if not line or line.startswith("#"):
                 continue
-            match = re.fullmatch(r'([A-Z_]+)=(?:"([^"\\]*)"|\x27([^\x27\\]*)\x27|([A-Za-z0-9._ /-]*))', line)
+            match = re.fullmatch(r'([A-Z][A-Z0-9_]*)=(?:"([^"\\]*)"|\x27([^\x27\\]*)\x27|([A-Za-z0-9._ /:+-]*))', line)
             if not match or match[1] in values:
-                raise ValueError()
+                raise ValueError("malformed os-release")
             values[match[1]] = next(value for value in match.groups()[1:] if value is not None)
-        if values.get("ID") != "fedora":
+        return values
+    raise FileNotFoundError("os-release is unavailable")
+
+
+def require_arch(path=None):
+    """Only plain Arch Linux is supported: exact ID=arch, ID_LIKE ignored."""
+    try:
+        if os_release(path).get("ID") != "arch":
             raise ValueError()
     except (OSError, UnicodeError, ValueError) as error:
-        raise ValueError("Fedora identity is required") from error
+        raise ValueError("Arch Linux identity (ID=arch) is required") from error
+
+
+def system_label(path=None):
+    """Display label for the distribution provider, from os-release NAME."""
+    try:
+        name = " ".join(os_release(path).get("NAME", "").split())
+    except (OSError, UnicodeError, ValueError):
+        return "System"
+    if not name or len(name) > 64 or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in name):
+        return "System"
+    return name
+
+
+def provider_label(meta):
+    return system_label() if meta.identifier == "system" else meta.name
 
 
 def bounded_lines(payload):
@@ -440,90 +553,100 @@ def bounded_lines(payload):
     return lines
 
 
-def parse_fedora_snapshot(payload):
-    """Strictly consume the existing 1.0-1.2 machine protocol, never CLI text."""
+def parse_system_snapshot(payload):
+    """Strictly consume the system-management machine protocol, never CLI text.
+
+    Eligibility comes from the updates-open action (or the pre-port
+    updates-install-all). updates-refresh and updates-cancel are ignored, and
+    without any action record eligibility follows the installable rows."""
     def normalize_restart(status, value):
         if status not in STATUSES:
-            raise ValueError("invalid Fedora restart state")
+            raise ValueError("invalid system restart state")
         if value in {"none", "unknown"}:
             return "none"
         if value in {"system", "security-system"}:
             return "system"
         if value in {"session", "security-session", "application"}:
             return "session"
-        raise ValueError("invalid Fedora restart state")
+        raise ValueError("invalid system restart state")
 
     lines = bounded_lines(payload)
-    if not lines or lines[0] not in {f"system-management-protocol\t1\t{minor}" for minor in range(3)}:
-        raise ValueError("invalid Fedora protocol")
+    if not lines or lines[0] not in {f"system-management-protocol\t1\t{minor}" for minor in range(10)}:
+        raise ValueError("invalid system protocol")
     if lines[-1] != "complete\tsnapshot":
-        raise ValueError("incomplete Fedora snapshot")
+        raise ValueError("incomplete system snapshot")
     sizes = {"snapshot-generation": 2, "provider": 6, "state": 5, "action": 7,
              "update": 7, "package-change": 6, "error": 4, "account": 5,
              "repository": 4, "filesystem": 10, "active-operation": 8,
              "terminal-handoff": 4}
     rows, plans, seen, summary, provider, update_available = [], {}, set(), None, None, False
     restart = "none"
-    discovery_failure, failures, provider_detail, active = False, [], "", False
+    discovery_failure, failures, provider_detail, active, installable = False, [], "", False, 0
     for line in lines[1:-1]:
         fields = line.split("\t")
         kind = fields[0]
         if kind not in sizes or len(fields) != sizes[kind]:
-            raise ValueError("unknown Fedora record or fields")
+            raise ValueError("unknown system record or fields")
         # Existing provider sanitizes tabs/newlines, but does not use escaping.
         if any("\r" in field for field in fields):
-            raise ValueError("invalid Fedora field")
+            raise ValueError("invalid system field")
         for field in fields:
             escape(field)
         if kind == "provider" and fields[1] == "updates":
             if provider is not None or fields[2] not in STATUSES:
-                raise ValueError("invalid Fedora provider")
+                raise ValueError("invalid system provider")
             provider = fields[2]
             provider_detail = fields[5]
         elif kind == "state" and fields[1] == "update-summary":
             if summary is not None or fields[2] not in STATUSES:
-                raise ValueError("invalid Fedora count")
+                raise ValueError("invalid system count")
             if fields[2] != "available":
                 if fields[3] != "unknown":
-                    raise ValueError("invalid Fedora count")
+                    raise ValueError("invalid system count")
                 discovery_failure, summary = True, -1
             else:
                 if not re.fullmatch(r"0|[1-9][0-9]{0,4}", fields[3]) or int(fields[3]) > MAX_ITEMS:
-                    raise ValueError("invalid Fedora count")
+                    raise ValueError("invalid system count")
                 summary = int(fields[3])
         elif kind == "state" and fields[1] == "update-restart":
             if "restart-state" in seen:
-                raise ValueError("invalid Fedora restart state")
+                raise ValueError("invalid system restart state")
             seen.add("restart-state")
             restart = normalize_restart(fields[2], fields[3])
-        elif kind == "action" and fields[1] == "updates-install-all":
+        elif kind == "action" and fields[1] in {"updates-open", "updates-install-all"}:
+            # updates-open opens this terminal flow; updates-install-all is the
+            # pre-port in-place action. Either one states eligibility.
             if "install-action" in seen or fields[2] not in STATUSES:
-                raise ValueError("invalid Fedora action")
+                raise ValueError("invalid system action")
             seen.add("install-action")
             update_available = fields[2] == "available"
         elif kind == "update":
             identity = fields[1]
             if identity in seen or len(identity.split(";")) != 4 or any(not part for part in identity.split(";")):
-                raise ValueError("invalid Fedora package identity")
+                raise ValueError("invalid system package identity")
             if fields[3] not in {"installable", "blocked"} or not fields[4] or not fields[5]:
-                raise ValueError("invalid Fedora item")
+                raise ValueError("invalid system item")
             seen.add(identity)
+            installable += fields[3] == "installable"
             rows.append(ItemResult("update", fields[4], "unknown", fields[5], identity))
         elif kind == "package-change":
             if fields[1] in plans or fields[2] not in {"install", "update", "remove", "reinstall", "downgrade", "obsolete"}:
-                raise ValueError("invalid Fedora plan")
+                raise ValueError("invalid system plan")
             plans[fields[1]] = fields[2]
         elif kind == "error" and fields[1] == "updates":
             failures.append(ScanFailure(fields[2], fields[3]))
         elif kind in {"active-operation", "terminal-handoff"}:
             active = True
     if discovery_failure:
-        raise failures[0] if failures else ScanFailure("scan-failed", "Fedora discovery unavailable")
-    if provider is None or summary is None or "install-action" not in seen or summary != len(rows):
-        raise ValueError("inconsistent Fedora snapshot")
+        raise failures[0] if failures else ScanFailure("scan-failed", "system discovery unavailable")
+    if provider is None or summary is None or summary != len(rows):
+        raise ValueError("inconsistent system snapshot")
+    if "install-action" not in seen:
+        # Updates held by IgnorePkg/IgnoreGroup are listed but not installable.
+        update_available = provider in {"available", "partial"} and installable > 0
     items = tuple(replace(row, action=plans.get(row.package_id, row.action))
                   for row in sorted(rows, key=lambda item: item.package_id.encode("utf-8")))
-    return ProviderResult("fedora", provider, summary, update_available=update_available and not active,
+    return ProviderResult("system", provider, summary, update_available=update_available and not active,
                           detail=provider_detail, restart=restart, items=items)
 
 
@@ -537,7 +660,7 @@ def render_snapshot(results):
             continue
         result = indexed[meta.identifier]
         validate_result(result)
-        fields = ("provider", meta.identifier, meta.name, result.status, str(result.pending),
+        fields = ("provider", meta.identifier, provider_label(meta), result.status, str(result.pending),
                   "unknown" if result.managed is None else str(result.managed), result.freshness,
                   str(result.last_success), "yes" if result.update_available else "no", result.error_code, result.detail)
         lines.append("\t".join(escape(field) for field in fields))
@@ -671,13 +794,18 @@ def decode_cache(data):
     value = json.loads(data, object_pairs_hook=unique)
     if not isinstance(value, dict) or set(value) != {"schema", "providers"} or type(value["schema"]) is not int or value["schema"] != 1:
         raise ValueError("unsupported cache schema")
-    if not isinstance(value["providers"], list) or not 1 <= len(value["providers"]) <= len(REGISTRY):
+    if (not isinstance(value["providers"], list)
+            or not 1 <= len(value["providers"]) <= len(REGISTRY) + len(LEGACY_PROVIDERS)):
         raise ValueError("invalid cache providers")
     results, seen = [], set()
     for entry in value["providers"]:
         provider_fields = set(ProviderResult.__dataclass_fields__)
         if not isinstance(entry, dict):
             raise ValueError("invalid cache fields")
+        if entry.get("identifier") in LEGACY_PROVIDERS:
+            # Pre-port Fedora package data must never be attributed to this
+            # system. Drop it; the missing core provider forces a fresh scan.
+            continue
         if set(entry) == provider_fields - {"restart"}:
             entry = {**entry, "restart": "none"}
         elif set(entry) != provider_fields:
@@ -694,6 +822,8 @@ def decode_cache(data):
             raise ValueError("duplicate cache provider")
         seen.add(result.identifier)
         results.append(result)
+    if not results:
+        raise ValueError("cache holds only retired providers")
     render_snapshot(results)
     return results
 
@@ -764,8 +894,9 @@ def active_cache_results(results, active):
     owner = operation["provider"] if operation is not None else None
     retained = []
     def missing_owner(result):
+        tool = "AUR helper (paru or yay)" if result.identifier == "aur" else result.identifier + " executable"
         return replace(unavailable_optional_result(result, "missing-provider"), error_code="missing-provider",
-            detail="Restore the missing " + result.identifier + " executable, then refresh Update Center. "
+            detail="Restore the missing " + tool + ", then refresh Update Center. "
                    "If recovery is required, close its terminal and choose Recover.")
     for result in results:
         if result.identifier in active:
@@ -895,8 +1026,11 @@ def cache_commit_lock(path):
             os.close(lock_fd)
 
 
-def run_bounded(argv, *, timeout=180, env=None, cwd=None):
-    """Drain both pipes concurrently; kill the whole child group on timeout/fault."""
+def run_bounded(argv, *, timeout=180, env=None, cwd=None, empty_status=()):
+    """Drain both pipes concurrently; kill the whole child group on timeout/fault.
+
+    A status listed in empty_status is accepted only with empty stdout, for
+    query commands such as pacman -Qqm that report "no matches" that way."""
     if not argv or type(timeout) not in {int, float} or not 0 < timeout <= 300:
         raise ValueError("invalid scan command")
     process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -928,7 +1062,7 @@ def run_bounded(argv, *, timeout=180, env=None, cwd=None):
                 status = process.wait(timeout=remaining)
             except subprocess.TimeoutExpired as error:
                 raise TimeoutError("provider scan timed out") from error
-        if status:
+        if status and not (status in empty_status and not any(output)):
             raise OSError("provider scan failed")
         try:
             return b"".join(output).decode("utf-8", errors="strict")
@@ -945,35 +1079,238 @@ def run_bounded(argv, *, timeout=180, env=None, cwd=None):
         process.stderr.close()
 
 
-def fedora_package_count():
+PACMAN_ROOT = "/"
+PACMAN_DB_PATH = "/var/lib/pacman"
+
+
+def load_pyalpm():
+    import pyalpm
+    return pyalpm
+
+
+def system_package_count():
+    """Installed package count from the local pacman database, read-only."""
     try:
-        import sqlite3
-    except ImportError:
-        sqlite3 = None
-    if sqlite3 is not None:
-        for db_path in ("/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite"):
-            try:
-                with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as con:
-                    row = con.execute("SELECT count(*) FROM Packages").fetchone()
-                    if row and isinstance(row[0], int) and 0 <= row[0] <= 10000000:
-                        return row[0]
-            except (OSError, ValueError, sqlite3.Error):
-                continue
+        handle = load_pyalpm().Handle(PACMAN_ROOT, PACMAN_DB_PATH)
+        count = len(handle.get_localdb().pkgcache)
+        if 0 <= count <= 10000000:
+            return count
+    except Exception:  # pyalpm raises its own error type; fall back below.
+        pass
     try:
-        import rpm
-        return sum(1 for _ in rpm.TransactionSet().dbMatch())
-    except (ImportError, Exception):
+        count = 0
+        with os.scandir(os.path.join(PACMAN_DB_PATH, "local")) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    count += 1
+                    if count > 10000000:
+                        return None
+        return count
+    except OSError:
         return None
 
 
-def scan_fedora():
-    require_fedora()
+def scan_system():
+    require_arch()
     helper = Path(__file__).resolve().with_name("dwm-system-management")
-    result = parse_fedora_snapshot(run_bounded([str(helper), "snapshot-updates"], timeout=180))
-    count = fedora_package_count()
+    result = parse_system_snapshot(run_bounded([str(helper), "snapshot-updates"], timeout=180))
+    count = system_package_count()
     if count is not None:
         result = replace(result, managed=count)
     return result
+
+
+DOWNLOAD_HOSTS = {"archlinux.org", "aur.archlinux.org"}
+
+
+def fetch_https(url, *, limit, timeout):
+    """Bounded, failure-tolerant HTTPS GET for fixed Arch Linux endpoints only."""
+    import http.client
+    import socket
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    def trusted(target):
+        parts = urllib.parse.urlsplit(target)
+        return (parts.scheme == "https" and parts.hostname in DOWNLOAD_HOSTS
+                and parts.username is None and parts.password is None and parts.port in {None, 443})
+
+    if not trusted(url) or type(limit) is not int or not 0 < limit <= MAX_BYTES \
+            or type(timeout) not in {int, float} or not 0 < timeout <= 120:
+        raise ValueError("untrusted or unbounded download request")
+
+    class Redirects(urllib.request.HTTPRedirectHandler):
+        max_redirections = 3
+
+        def redirect_request(self, request, stream, code, message, headers, target):
+            if not trusted(target):
+                raise urllib.error.URLError("redirect left the trusted Arch Linux endpoint")
+            return super().redirect_request(request, stream, code, message, headers, target)
+
+    opener = urllib.request.build_opener(Redirects)
+    request = urllib.request.Request(url, headers={"User-Agent": "dwm-titus-update-center/1",
+                                                   "Accept-Encoding": "identity"})
+    deadline = time.monotonic() + timeout
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            declared = response.headers.get("Content-Length", "")
+            if declared.isdigit() and int(declared) > limit:
+                raise ScanFailure("malformed", "Download exceeded its size limit")
+            chunks, size = [], 0
+            while True:
+                if time.monotonic() >= deadline:
+                    raise ScanFailure("timeout", "Download timed out")
+                chunk = response.read(min(65536, limit + 1 - size))
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > limit:
+                    raise ScanFailure("malformed", "Download exceeded its size limit")
+                chunks.append(chunk)
+            return b"".join(chunks)
+    except ScanFailure:
+        raise
+    except (socket.timeout, TimeoutError) as error:
+        raise ScanFailure("timeout", "Download timed out") from error
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as error:
+        reason = getattr(error, "reason", None) or error
+        raise ScanFailure("network", "Network request failed: " + str(reason)[:200]) from error
+
+
+AUR_RPC_URL = "https://aur.archlinux.org/rpc/v5/info"
+AUR_PACKAGE_URL = "https://aur.archlinux.org/packages/"
+AUR_HELPERS = ("paru", "yay")
+AUR_BATCH = 100
+AUR_URL_BYTES = 4000
+AUR_RESPONSE_BYTES = 4 * 1024 * 1024
+AUR_DEADLINE = 60
+AUR_VCS_SUFFIXES = ("-git", "-svn", "-hg", "-bzr")
+PACKAGE_NAME = re.compile(r"[a-z0-9@_+][a-z0-9@._+-]{0,127}")
+PACKAGE_VERSION = re.compile(r"(?:[0-9]{1,10}:)?[A-Za-z0-9._+~]{1,128}(?:-[A-Za-z0-9._+~]{1,32})?")
+
+
+def aur_helper():
+    """An already installed AUR helper (paru, then yay). Never bootstrapped."""
+    for name in AUR_HELPERS:
+        path = optional_executable(name)
+        if path is not None:
+            return path
+    return None
+
+
+def refuse_root_aur():
+    if os.geteuid() == 0:
+        raise ScanFailure("unsupported", "The AUR provider never runs as root, under sudo, or under pkexec; "
+                          "open Update Center as your own user")
+
+
+def foreign_packages(payload):
+    names = []
+    for line in bounded_lines(payload):
+        if not PACKAGE_NAME.fullmatch(line) or line in names or len(names) >= MAX_ITEMS:
+            raise ValueError("invalid foreign package list")
+        names.append(line)
+    return sorted(names)
+
+
+def local_versions(names):
+    """Installed versions of the named foreign packages from the local DB."""
+    localdb = load_pyalpm().Handle(PACMAN_ROOT, PACMAN_DB_PATH).get_localdb()
+    versions = {}
+    for name in names:
+        package = localdb.get_pkg(name)
+        if package is None or not isinstance(package.version, str) \
+                or not PACKAGE_VERSION.fullmatch(package.version):
+            raise ValueError("installed foreign package version unavailable")
+        versions[name] = package.version
+    return versions
+
+
+def aur_batches(names):
+    import urllib.parse
+    batch = []
+    for name in names:
+        candidate = batch + [name]
+        query = urllib.parse.urlencode([("arg[]", entry) for entry in candidate])
+        if batch and (len(candidate) > AUR_BATCH or len(AUR_RPC_URL) + 1 + len(query) > AUR_URL_BYTES):
+            yield batch
+            candidate = [name]
+        batch = candidate
+    if batch:
+        yield batch
+
+
+def aur_info(names, *, fetch=None):
+    """AUR RPC v5 multi-info: bounded batches, response size, and deadline."""
+    import urllib.parse
+    fetch = fetch or fetch_https
+    deadline = time.monotonic() + AUR_DEADLINE
+    versions = {}
+    for batch in aur_batches(names):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ScanFailure("timeout", "AUR query timed out")
+        url = AUR_RPC_URL + "?" + urllib.parse.urlencode([("arg[]", name) for name in batch])
+        payload = fetch(url, limit=AUR_RESPONSE_BYTES, timeout=min(20, remaining))
+        try:
+            value = machine_json(payload.decode("utf-8"))
+        except (UnicodeError, ValueError, RecursionError) as error:
+            raise ScanFailure("malformed", "AUR returned an invalid response") from error
+        if isinstance(value, dict) and value.get("type") == "error":
+            message = value.get("error") if isinstance(value.get("error"), str) else "unknown error"
+            raise ScanFailure("repository", "AUR query failed: " + message[:200])
+        if (not isinstance(value, dict) or value.get("version") != 5 or value.get("type") != "multiinfo"
+                or not isinstance(value.get("results"), list) or len(value["results"]) > len(batch)):
+            raise ScanFailure("malformed", "AUR returned an incompatible response")
+        for entry in value["results"]:
+            if (not isinstance(entry, dict) or entry.get("Name") not in batch or entry["Name"] in versions
+                    or not isinstance(entry.get("Version"), str)
+                    or not PACKAGE_VERSION.fullmatch(entry["Version"])):
+                raise ScanFailure("malformed", "AUR returned an invalid package record")
+            versions[entry["Name"]] = entry["Version"]
+    return versions
+
+
+def summarize_names(label, names):
+    shown = ", ".join(names[:8]) + (", ..." if len(names) > 8 else "")
+    return f"{len(names)} {label} ({shown})"
+
+
+def scan_aur():
+    refuse_root_aur()
+    if aur_helper() is None:
+        return ProviderResult("aur", "unavailable", error_code="missing-provider",
+                              detail="No AUR helper is installed. Install paru or yay yourself to see AUR "
+                                     "updates; dwm-titus never installs one.")
+    try:
+        pyalpm = load_pyalpm()
+    except ImportError as error:
+        raise ScanFailure("unsupported", "pyalpm is required to compare AUR package versions") from error
+    names = foreign_packages(run_bounded(["/usr/bin/pacman", "-Qqm"], timeout=20, cwd="/", empty_status=(1,)))
+    try:
+        installed = local_versions(names)
+    except ValueError:
+        raise
+    except Exception as error:  # pyalpm.error is not an OSError or ValueError.
+        raise ScanFailure("scan-failed", "The local pacman database is unreadable") from error
+    vcs = [name for name in names if name.endswith(AUR_VCS_SUFFIXES)]
+    tracked = [name for name in names if name not in vcs]
+    remote = aur_info(tracked) if tracked else {}
+    items, missing = [], []
+    for name in tracked:
+        if name not in remote:
+            missing.append(name)
+        elif pyalpm.vercmp(remote[name], installed[name]) > 0:
+            items.append(ItemResult("update", name, installed[name], remote[name], name, "user",
+                                    AUR_PACKAGE_URL + name))
+    notes = []
+    if vcs:
+        notes.append(summarize_names("VCS packages report version unknown and are not counted", vcs))
+    if missing:
+        notes.append(summarize_names("foreign packages were not found in the AUR", missing))
+    return validate_result(ProviderResult("aur", pending=len(items), managed=len(names),
+                           update_available=bool(items), detail="; ".join(notes), items=tuple(items)))
 
 
 def trusted_desktop_helper():
@@ -1190,8 +1527,16 @@ def discover_scanners():
     for meta in REGISTRY:
         if meta.can_update and not meta.can_recover:
             raise ValueError("mutable provider requires recovery eligibility")
-    return {meta.identifier: meta.discover for meta in REGISTRY
-            if meta.core or optional_executable(meta.identifier) is not None}
+    return {meta.identifier: meta.discover for meta in REGISTRY if provider_present(meta)}
+
+
+def provider_present(meta):
+    """Core providers always report; optional ones only when their tool exists."""
+    if meta.core:
+        return True
+    if meta.identifier == "aur":
+        return aur_helper() is not None
+    return optional_executable(meta.identifier) is not None
 
 
 def connectivity_state(state):
@@ -1388,7 +1733,7 @@ def main(argv=None):
               "terminal-closed OPERATION_ID | recover PROVIDER | watch-connectivity | watch-operation", file=sys.stderr)
         return 2
     try:
-        require_fedora()
+        require_arch()
         if args == ["watch-connectivity"]:
             watch_connectivity()
             return 0

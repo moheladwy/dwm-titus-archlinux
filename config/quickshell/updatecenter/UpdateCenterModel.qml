@@ -144,7 +144,7 @@ Scope {
         const recoverable = root.activeOperation !== null && root.activeOperation.providerId === providerId
             && ["interrupted", "system-failed", "system-complete/user-failed"].indexOf(root.activeOperation.phase) >= 0;
         if ((root.busy && (action !== "recover" || !recoverable)) || operationProcess.running
-                || ["fedora", "dwm-titus", "flatpak", "mise"].indexOf(providerId) < 0)
+                || ["system", "aur", "dwm-titus", "flatpak", "mise"].indexOf(providerId) < 0)
             return false;
         operationProcess.command = Commands.updateCenterCommand(action, [providerId]);
         operationProcess.requestKind = action;
