@@ -247,7 +247,8 @@ DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION=0.3.0 \
 DWM_TEST_MODE=1 DWM_TEST_QUICKSHELL_VERSION='Quickshell 0.4.0' \
 	"$repo/scripts/dwm-quickshell-version-check" 2>"$work/quickshell-newer.err"
 grep -Fq 'newer than the tested 0.3 series' "$work/quickshell-newer.err"
-# Fedora's 0.2.1 git snapshot is no longer a supported build.
+# Pre-0.3 git snapshot builds, with or without a distribution suffix, are
+# not supported.
 for unsupported_snapshot in \
 	0.2.1^git20260209.dacfa9d-3.fc44 \
 	'0.2.1, revision dacfa9de829ac7cb173825f593236bf2c21f637e' \
@@ -268,8 +269,8 @@ grep -Fq 'unsupported Quickshell version: 0.2.1' "$work/quickshell-version.err"
 
 outdated_health=$(DWM_TEST_QUICKSHELL_VERSION=0.2.1 run_helper health)
 printf '%s\n' "$outdated_health" | grep -Fqx 'error	Quickshell	Outdated'
-fedora_health=$(DWM_TEST_QUICKSHELL_VERSION=0.2.1^git20260209.dacfa9d-3.fc44 run_helper health)
-printf '%s\n' "$fedora_health" | grep -Fqx 'error	Quickshell	Outdated'
+snapshot_health=$(DWM_TEST_QUICKSHELL_VERSION=0.2.1^git20260209.dacfa9d-3.fc44 run_helper health)
+printf '%s\n' "$snapshot_health" | grep -Fqx 'error	Quickshell	Outdated'
 
 sed -i 's/^\[active\]$/  [active] # retained header comment/' \
 	"$work/config/dwm-titus/themes.toml"

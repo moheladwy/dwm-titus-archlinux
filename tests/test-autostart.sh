@@ -104,9 +104,6 @@ make_mock_command() {
 	cat >"$work/bin/$name" <<'EOF'
 #!/bin/sh
 name=$(basename "$0")
-if [ "$name" = dwm-initial-update ]; then
-    [ "$*" = --watch ] || exit 2
-fi
 # The wallpaper helper probes a candidate before applying it. Probes are not
 # launches and must return the loadable filename like real feh does.
 if [ "$name" = feh ] && [ "${1:-}" = --loadable ]; then
@@ -259,7 +256,7 @@ exec /usr/bin/chmod "$@"
 EOF
 /usr/bin/chmod +x "$work/bin/chmod"
 
-for name in feh picom dwm-status dwm-lock-watch dwm-initial-update dwm-migrate-update-center-window-rule light-locker dex dex-autostart; do
+for name in feh picom dwm-status dwm-lock-watch dwm-migrate-update-center-window-rule light-locker dex dex-autostart; do
 	make_mock_command "$name"
 done
 
@@ -552,7 +549,6 @@ EOF
 		# Each startup applies wallpaper asynchronously, unlike resident services.
 		wait_for_count "$state/feh.count" "$iteration"
 		test ! -e "$state/unexpected-randr-probe"
-		wait_for_count "$state/dwm-initial-update.count" "$iteration"
 		wait_for_count "$state/dwm-migrate-update-center-window-rule.count" "$iteration"
 		wait_for_marker "$state/picom.running"
 		wait_for_marker "$state/dwm-status.running"

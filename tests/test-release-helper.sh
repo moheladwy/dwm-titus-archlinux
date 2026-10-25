@@ -13,14 +13,12 @@ cat >"$work/bin/gh" <<'EOF'
 exit 0
 EOF
 chmod +x "$work/bin/gh"
-: >"$work/dwm-titus.iso"
 
 output=$(
 	PATH="$work/bin:$PATH" "$helper" \
 		--dry-run \
 		--skip-checks \
-		--no-bump \
-		--iso "$work/dwm-titus.iso"
+		--no-bump
 )
 
 printf '%s\n' "$output" | grep -Fq '+ make release'
@@ -34,11 +32,29 @@ if [ "$build_line" -ge "$tag_line" ]; then
 fi
 
 if PATH="$work/bin:$PATH" "$helper" \
-	--dry-run --skip-checks --no-bump --iso "$work/dwm-titus.iso" \
-	--version 99.0.0 >"$work/mismatch.out" 2>"$work/mismatch.err"; then
+	--dry-run --skip-checks --no-bump --version 99.0.0 >"$work/mismatch.out" 2>"$work/mismatch.err"; then
 	printf '%s\n' 'release helper accepted a version not committed in config.mk' >&2
 	exit 1
 fi
 grep -Fq 'does not match committed config.mk VERSION' "$work/mismatch.err"
+
+# Releases publish only the source archive and its checksums; the project ships
+# no installer images.
+checksum_line=$(printf '%s\n' "$output" | grep -F '+ sha256sum')
+case $checksum_line in
+*.iso*)
+	printf '%s\n' 'release helper still checksums an installer image' >&2
+	exit 1
+	;;
+esac
+printf '%s\n' "$checksum_line" | grep -Eq 'release/dwm-titus-[0-9.]+[.]tar[.]gz '
+: >"$work/dwm-titus.iso"
+if PATH="$work/bin:$PATH" "$helper" \
+	--dry-run --skip-checks --no-bump --iso "$work/dwm-titus.iso" \
+	>"$work/iso.out" 2>"$work/iso.err"; then
+	printf '%s\n' 'release helper accepted the removed --iso option' >&2
+	exit 1
+fi
+grep -Fq 'unknown argument: --iso' "$work/iso.err"
 
 printf '%s\n' 'Release helper preflight and remote-write ordering: PASS'

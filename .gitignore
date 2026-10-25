@@ -13,9 +13,6 @@ config.h
 .env
 nohup.out
 .DS_STORE
-livemedia.log
-program.log
-*.iso
 
 # Local editor settings that may contain machine-specific absolute paths
 .zed/settings.json
@@ -25,9 +22,6 @@ program.log
 
 # Local Vicinae AppImage extraction/staging tree
 /vicinae/
-
-# Local CI validation virtualenv
-/.ci-pykickstart/
 
 # Generated Astro documentation output and local dependencies.
 /docs/.astro/

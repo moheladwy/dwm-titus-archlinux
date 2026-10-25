@@ -34,7 +34,6 @@ INSTALL_COMMANDS = \
 	scripts/dwm-diagnostics \
 	scripts/dwm-display-profile \
 	scripts/dwm-display-setup \
-	scripts/dwm-initial-update \
 	scripts/dwm-keybinds \
 	scripts/dwm-lock \
 	scripts/dwm-lock-watch \
@@ -81,7 +80,6 @@ INSTALL_COMMANDS = \
 	scripts/nvidia-temp \
 	scripts/pkg-scan.py \
 	scripts/power-management.sh \
-	scripts/protonrestart \
 	scripts/theme-apply.sh \
 	scripts/dwm-cursor-reload \
 	scripts/webapp-create \
@@ -89,8 +87,12 @@ INSTALL_COMMANDS = \
 	scripts/xdg-enable-autostart.sh \
 	scripts/xscreensaver-setup.sh
 INSTALL_COMMAND_NAMES = $(notdir ${INSTALL_COMMANDS})
-PRIVILEGED_HELPERS = scripts/dwm-settings-display-root scripts/dwm-desktop-update-root scripts/dwm-initial-update-root
+PRIVILEGED_HELPERS = scripts/dwm-settings-display-root scripts/dwm-desktop-update-root
 PRIVILEGED_HELPER_DIR = ${PREFIX}/libexec/dwm-titus
+# Fixed names that earlier releases installed and this tree no longer ships.
+# install-system-files and uninstall-files remove exactly these paths.
+RETIRED_COMMANDS = protonrestart dwm-initial-update
+RETIRED_PRIVILEGED_HELPERS = dwm-initial-update-root dwm-dnf-defaults
 
 RELEASE_NAME = dwm-titus-${VERSION}
 RELEASE_ARCHIVE = release/${RELEASE_NAME}.tar.gz
@@ -204,6 +206,13 @@ install-system-files:
 	sed "s/VERSION/${VERSION}/g" dwm.1 | install -Dm644 /dev/stdin "${DESTDIR}${MANPREFIX}/man1/dwm.1"
 	sed "s|@PREFIX@|${PREFIX}|g" dwm.desktop | \
 		install -Dm644 /dev/stdin "${DESTDIR}${XSESSIONSDIR}/dwm.desktop"
+	@echo "==> Removing retired commands..."
+	for name in ${RETIRED_COMMANDS}; do \
+		rm -f "${DESTDIR}${PREFIX}/bin/$$name"; \
+	done
+	for name in ${RETIRED_PRIVILEGED_HELPERS}; do \
+		rm -f "${DESTDIR}${PRIVILEGED_HELPER_DIR}/$$name"; \
+	done
 	@echo "==> Installing scripts to PATH..."
 	for f in ${INSTALL_COMMANDS}; do \
 		install -Dm755 "$$f" "${DESTDIR}${PREFIX}/bin/$$(basename "$$f")"; \
@@ -284,7 +293,7 @@ install-user-files:
 	fi
 	for dir in config/*/; do \
 		b=$$(basename "$$dir"); \
-		if [ "$$b" = quickshell ] || [ "$$b" = dnf ]; then \
+		if [ "$$b" = quickshell ]; then \
 			continue; \
 		fi; \
 		dst=${CFG_DIR}/$$b; \
@@ -366,16 +375,10 @@ install-user-files:
 	@echo "  Log out and select 'dwm', or start with: startx"
 	@echo ""
 
-print-dnf-defaults-helper:
-	@printf '%s\n' "${PRIVILEGED_HELPER_DIR}/dwm-dnf-defaults"
-
 uninstall:
 	/usr/bin/python3 -I scripts/dwm-desktop-update guard-system-install --destdir "${DESTDIR}" -- $(MAKE) uninstall-files
 
 uninstall-files:
-	if [ -f "${DESTDIR}${PRIVILEGED_HELPER_DIR}/dwm-dnf-defaults" ]; then \
-		/usr/bin/python3 -I "${DESTDIR}${PRIVILEGED_HELPER_DIR}/dwm-dnf-defaults" uninstall --destdir "${DESTDIR}"; \
-	fi
 	rm -rf "${DESTDIR}${DATADIR}/themes/"Dwm-*
 	rm -f "${DESTDIR}${DATADIR}/qt5ct/colors/"Dwm-*.conf "${DESTDIR}${DATADIR}/qt6ct/colors/"Dwm-*.conf
 	rm -f "${DESTDIR}${PREFIX}/bin/dwm" \
@@ -390,8 +393,12 @@ uninstall-files:
 	done
 	rm -f "${DESTDIR}${PRIVILEGED_HELPER_DIR}/dwm-settings-display-root"
 	rm -f "${DESTDIR}${PRIVILEGED_HELPER_DIR}/dwm-desktop-update-root"
-	rm -f "${DESTDIR}${PRIVILEGED_HELPER_DIR}/dwm-initial-update-root"
-	rm -f "${DESTDIR}${PRIVILEGED_HELPER_DIR}/dwm-dnf-defaults"
+	for name in ${RETIRED_COMMANDS}; do \
+		rm -f "${DESTDIR}${PREFIX}/bin/$$name"; \
+	done
+	for name in ${RETIRED_PRIVILEGED_HELPERS}; do \
+		rm -f "${DESTDIR}${PRIVILEGED_HELPER_DIR}/$$name"; \
+	done
 	rm -f "${DESTDIR}${PREFIX}/share/dwm-titus/desktop-install.json"
 
 release: dwm
@@ -443,7 +450,6 @@ check-dev-sync-install:
 	tests/test-dev-sync-install.sh
 
 check-terminal:
-	tests/test-image-user-defaults.sh
 	tests/test-dwm-terminal.sh
 
 check-gearlever-install:
@@ -457,6 +463,7 @@ check-lock:
 
 check-default-apps:
 	tests/test-dwm-default-apps.sh
+	tests/test-default-apps-seed.sh
 
 check-xdg-autostart:
 	tests/test-dwm-xdg-autostart.sh
@@ -620,25 +627,6 @@ check-quickshell-settings-xvfb: all
 check-lightdm-config:
 	tests/test-lightdm-config.sh
 
-check-kickstart:
-	for ks in dwm-fedora.ks dwm-fedora-nvidia.ks; do \
-		ksvalidator "$$ks"; \
-		awk 'BEGIN { bad = 0 } \
-			/^[[:space:]]*#/ { next } \
-			/(^user[[:space:]]|^rootpw[[:space:]]|--hostname=|\/home\/titus|America\/Chicago|^initial-setup$$|^firstboot[[:space:]]+--enable)/ { \
-				print "Personal kickstart default remains in '"$$ks"': " $$0 > "/dev/stderr"; \
-				bad = 1; \
-			} \
-			END { exit bad }' "$$ks"; \
-		grep -Fqx 'firstboot --disable' "$$ks"; \
-	done
-	tests/test-kickstart-variants.sh
-	$(MAKE) check-fedora-iso-builder
-
-check-fedora-iso-builder:
-	/usr/bin/python3 tests/test-image-packagekit.py
-	tests/test-fedora-iso-builder.sh
-
 check-arch-platform:
 	@$(call run_managed_test,tests/test-arch-platform.sh)
 
@@ -658,6 +646,37 @@ check-install-manifest: all
 	trap 'rm -rf "$$stage" "$$before" "$$after" "$$actual" "$$expected"' EXIT; \
 	install -Dm644 /dev/null "$$stage/pre-existing"; \
 	find "$$stage" \( -type f -o -type l \) -printf '%P\n' | sort > "$$before"; \
+	for name in ${RETIRED_COMMANDS}; do \
+		case " ${INSTALL_COMMAND_NAMES} " in \
+		*" $$name "*) echo "Retired command is still installed: $$name" >&2; exit 1 ;; \
+		esac; \
+	done; \
+	for name in ${RETIRED_PRIVILEGED_HELPERS}; do \
+		case " $(notdir ${PRIVILEGED_HELPERS}) " in \
+		*" $$name "*) echo "Retired helper is still installed: $$name" >&2; exit 1 ;; \
+		esac; \
+	done; \
+	stage_retired() { \
+		for name in ${RETIRED_COMMANDS}; do \
+			install -Dm755 /dev/null "$$stage/usr/bin/$$name"; \
+		done; \
+		for name in ${RETIRED_PRIVILEGED_HELPERS}; do \
+			install -Dm755 /dev/null "$$stage/usr/libexec/dwm-titus/$$name"; \
+		done; \
+	}; \
+	assert_retired_removed() { \
+		for name in ${RETIRED_COMMANDS}; do \
+			if [ -e "$$stage/usr/bin/$$name" ]; then \
+				echo "$$1 left retired command: $$name" >&2; exit 1; \
+			fi; \
+		done; \
+		for name in ${RETIRED_PRIVILEGED_HELPERS}; do \
+			if [ -e "$$stage/usr/libexec/dwm-titus/$$name" ]; then \
+				echo "$$1 left retired helper: $$name" >&2; exit 1; \
+			fi; \
+		done; \
+	}; \
+	stage_retired; \
 	$(MAKE) install-system \
 		DESTDIR="$$stage" PREFIX=/usr XSESSIONSDIR=/usr/share/xsessions; \
 	{ \
@@ -666,7 +685,6 @@ check-install-manifest: all
 			usr/bin/dwm \
 			usr/libexec/dwm-titus/dwm-settings-display-root \
 			usr/libexec/dwm-titus/dwm-desktop-update-root \
-			usr/libexec/dwm-titus/dwm-initial-update-root \
 			usr/share/dwm-titus/desktop-install.json \
 			usr/share/man/man1/dwm.1 \
 			usr/share/xsessions/dwm.desktop; \
@@ -689,6 +707,7 @@ check-install-manifest: all
 			usr/share/licenses/dwm-titus/capitaine-cursors/COPYING; \
 	} | sort > "$$expected"; \
 	find "$$stage" \( -type f -o -type l \) -printf '%P\n' | sort > "$$actual"; \
+	assert_retired_removed install-system; \
 	cmp "$$expected" "$$actual"; \
 	for name in dwm ${INSTALL_COMMAND_NAMES}; do \
 		test -x "$$stage/usr/bin/$$name"; \
@@ -698,11 +717,13 @@ check-install-manifest: all
 		"$$stage/usr/share/xsessions/dwm.desktop"; \
 	test -f "$$stage/usr/share/icons/${CAPITAINE_DARK_THEME}/cursors/default"; \
 	test -f "$$stage/usr/share/icons/${CAPITAINE_LIGHT_THEME}/cursors/default"; \
+	stage_retired; \
 	$(MAKE) uninstall \
 		DESTDIR="$$stage" PREFIX=/usr XSESSIONSDIR=/usr/share/xsessions; \
+	assert_retired_removed uninstall; \
 	find "$$stage" \( -type f -o -type l \) -printf '%P\n' | sort > "$$after"; \
 	cmp "$$before" "$$after"; \
-	echo "==> Install manifest and uninstall symmetry validated."
+	echo "==> Install manifest, retired-path removal, and uninstall symmetry validated."
 
 check-install-preservation:
 	tests/test-install-preservation.sh
@@ -754,13 +775,7 @@ check-picom-xvfb:
 check-app-themes:
 	$(call run_managed_test,xvfb-run -a python3 tests/test-app-themes.py)
 
-check-initial-update:
-	$(call run_managed_test,python3 tests/test-dnf-defaults.py)
-	$(call run_managed_test,python3 tests/test-initial-update.py)
-	$(call run_managed_test,dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/test-initial-update-ui.py)
-
 check: check-picom check-picom-xvfb
-	$(MAKE) check-initial-update
 	$(MAKE) check-app-themes
 	$(MAKE) check-desktop-update
 	$(MAKE) clean
@@ -830,13 +845,13 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-lightdm-config
 	$(MAKE) release-check
 
-.PHONY: check-update-center check-update-center-terminal check-update-center-window-rule check-quickshell-update-center-model check-quickshell-update-center check-quickshell-update-center-xvfb print-dnf-defaults-helper check-initial-update install-files install-user-files install-system-files clean all check check-desktop-update check-picom check-picom-xvfb check-accessibility check-appearance check-phase5-optional-components check-build-config check-build-deps check-default-apps check-xdg-autostart check-dev-sync-install \
+.PHONY: check-update-center check-update-center-terminal check-update-center-window-rule check-quickshell-update-center-model check-quickshell-update-center check-quickshell-update-center-xvfb install-files install-user-files install-system-files clean all check check-desktop-update check-picom check-picom-xvfb check-accessibility check-appearance check-phase5-optional-components check-build-config check-build-deps check-default-apps check-xdg-autostart check-dev-sync-install \
 	check-cursor-reload \
 	check-test-runner \
 	check-test-runner-podman \
 	check-update-center-settings \
-	check-display-profile check-display-setup check-fedora-iso-builder check-arch-packages check-arch-platform check-format check-install \
-	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-kickstart check-lock \
+	check-display-profile check-display-setup check-arch-packages check-arch-platform check-format check-install \
+	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-lock \
 	check-session-guards check-session-migration check-screenshot check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
 	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-terminal check-xvfb-runtime install install-system install-user \
 	install-cursors install-app-themes check-app-themes native release release-check uninstall uninstall-files

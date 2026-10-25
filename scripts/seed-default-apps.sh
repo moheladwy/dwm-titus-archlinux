@@ -2,7 +2,7 @@
 # Seed fresh accounts; never replace existing application preferences.
 set -euo pipefail
 [[ $(id -u) != 0 ]]
-[[ $# == 0 || ($# == 1 && $1 == --image) ]]
+[[ $# == 0 ]]
 config_home=${XDG_CONFIG_HOME:-$HOME/.config}
 data_home=${XDG_DATA_HOME:-$HOME/.local/share}
 # Desktop-specific files take precedence over the generic MIME file too.
@@ -18,7 +18,7 @@ done
 # Resolve installed XDG entries, validate all handlers before writing, and
 # advertise only the media/image formats supported by those entries.
 associations=$(
-	python3 - "${1:-}" <<'PY'
+	python3 - <<'PY'
 import configparser
 import os
 from pathlib import Path
@@ -53,7 +53,7 @@ def entry(desktop, command, prefixes, required=True):
 
 entry('io.github.celluloid_player.Celluloid.desktop', 'celluloid', ('audio/', 'video/', 'application/'))
 entry('sxiv.desktop', 'sxiv', ('image/',))
-entry('brave-origin.desktop', 'brave-origin', ('text/html', 'x-scheme-handler/http', 'application/xhtml', 'application/pdf'), required=sys.argv[1] == '--image')
+entry('brave-origin.desktop', 'brave-origin', ('text/html', 'x-scheme-handler/http', 'application/xhtml', 'application/pdf'), required=False)
 entry('org.kde.dolphin.desktop', 'dolphin', ('inode/directory',), required=False)
 PY
 )
