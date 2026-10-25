@@ -4,7 +4,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 
 <DocsLayout
   title="Development Progress"
-  description="A plain-English overview of how dwm-titus evolved from a personal window manager setup into a complete Fedora X11 desktop."
+  description="A plain-English overview of how dwm-titus evolved from a personal window manager setup into a complete X11 desktop, now built for Arch Linux."
   eyebrow="Project evolution"
   wide={true}
 >
@@ -12,7 +12,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <section class="progress-hero" aria-labelledby="progress-title">
       <div class="progress-hero-copy">
         <p class="progress-kicker">Development story / May 2023 to August 2026</p>
-        <h1 id="progress-title">From a personal DWM setup to a <em>complete Fedora desktop.</em></h1>
+        <h1 id="progress-title">From a personal DWM setup to a <em>complete Arch Linux desktop.</em></h1>
         <p class="progress-dek">Across the full commit history, dwm-titus steadily moved beyond window tiling. It now combines a fast keyboard-first workflow with a polished panel, launcher, settings, notifications, safer installation, and built-in help for everyday users.</p>
       </div>
       <aside class="progress-direction" aria-label="Overall direction">
@@ -20,7 +20,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
           <p class="progress-section-kicker">Overall direction</p>
           <blockquote>Keep the speed and focus of DWM. Remove the <span>assembly required.</span></blockquote>
         </div>
-        <p><strong>Focused scope</strong> The project experimented with broader installation paths, then made Fedora its single supported platform in August 2026 so setup, testing, and recovery could be more dependable.</p>
+        <p><strong>Focused scope</strong> The upstream project experimented with broader installation paths, then narrowed to a single supported platform in August 2026 so setup, testing, and recovery could be more dependable. This fork moved that single platform to Arch Linux, installed onto a system you set up yourself.</p>
       </aside>
     </section>
 
@@ -58,8 +58,8 @@ import DocsLayout from "../layouts/DocsLayout.astro";
           </article>
           <article>
             <time datetime="2026">2026 / Productization</time>
-            <h3>Become a complete Fedora desktop</h3>
-            <p>Installer profiles, bootable images, Quickshell, diagnostics, notifications, multi-display resilience, graphical Settings, safer previews, rollback, tests, and documentation made the system approachable.</p>
+            <h3>Become a complete desktop</h3>
+            <p>Installer profiles, Quickshell, diagnostics, notifications, multi-display resilience, graphical Settings, safer previews, rollback, tests, and documentation made the system approachable.</p>
           </article>
         </div>
       </div>
@@ -85,7 +85,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       <article><span>01</span><h3>Faster everyday flow</h3><p>Keyboard navigation, window layouts, workspaces, app launchers, fullscreen modes, and discoverable keybinds were repeatedly refined.</p></article>
       <article><span>02</span><h3>Multi-monitor confidence</h3><p>Per-monitor panels and workspaces, tray placement, terminal routing, hot-plug recovery, and active-screen screenshots became far more reliable.</p></article>
       <article><span>03</span><h3>A coherent desktop shell</h3><p>Quickshell brought together the panel, launcher, tray, notifications, media, quick controls, power actions, and Control Center.</p></article>
-      <article><span>04</span><h3>Safer setup and upgrades</h3><p>Install profiles, dry runs, Fedora images, preserved user configuration, validation, and rollback paths reduced setup risk.</p></article>
+      <article><span>04</span><h3>Safer setup and upgrades</h3><p>Install profiles, dry runs, an up-front full system upgrade, preserved user configuration, validation, and rollback paths reduced setup risk.</p></article>
       <article><span>05</span><h3>Less terminal dependence</h3><p>Graphical controls now cover displays, input, network, Bluetooth, sound, power, defaults, startup apps, and appearance.</p></article>
       <article><span>06</span><h3>More dependable by design</h3><p>Tests, CI, diagnostics, scoped permissions, careful error states, safe previews, and recovery handling grew alongside new features.</p></article>
     </section>
@@ -96,7 +96,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <h2 id="gains-title">A lightweight desktop that no longer expects you to build the missing pieces.</h2>
       </div>
       <div class="progress-gain-list">
-        <article><strong>Ready sooner</strong><p>Choose a Fedora image or install onto an existing Fedora system with sensible, documented defaults.</p></article>
+        <article><strong>Ready sooner</strong><p>Install Arch Linux with the official ISO or archinstall, then add the desktop with one installer and sensible, documented defaults.</p></article>
         <article><strong>Learn naturally</strong><p>Use built-in keybind help, diagnostics, clear status messages, and visible unsupported-feature states.</p></article>
         <article><strong>Adjust safely</strong><p>Preview risky display and appearance changes, keep what works, or automatically return to a known-good state.</p></article>
         <article><strong>Stay focused</strong><p>Keep DWM's responsive, keyboard-first character while gaining the everyday conveniences of a full desktop.</p></article>
@@ -104,12 +104,12 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     </section>
 
     <footer class="progress-sources">
-      <p>Grounded in the complete Git history through commit <a href="https://github.com/ChrisTitusTech/dwm-titus/commit/edb54788acbf93b467568138e4df8f6ce7b0ec66"><code>edb5478</code></a> on August 30, 2026. Counts include merge commits.</p>
+      <p>Grounded in the complete Git history through commit <a href="https://github.com/moheladwy/dwm-titus-archlinux/commit/edb54788acbf93b467568138e4df8f6ce7b0ec66"><code>edb5478</code></a> on August 30, 2026. Counts include merge commits.</p>
       <nav aria-label="Development overview sources">
-        <a href="https://github.com/ChrisTitusTech/dwm-titus/commits/main/">Commit history</a>
-        <a href="https://github.com/ChrisTitusTech/dwm-titus/blob/main/CHANGELOG.md">Changelog</a>
-        <a href="https://github.com/ChrisTitusTech/dwm-titus/blob/main/ROADMAP.md">Roadmap</a>
-        <a href="https://github.com/ChrisTitusTech/dwm-titus/releases">Releases</a>
+        <a href="https://github.com/moheladwy/dwm-titus-archlinux/commits/main/">Commit history</a>
+        <a href="https://github.com/moheladwy/dwm-titus-archlinux/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/moheladwy/dwm-titus-archlinux/blob/main/ROADMAP.md">Roadmap</a>
+        <a href="https://github.com/moheladwy/dwm-titus-archlinux/releases">Releases</a>
       </nav>
     </footer>
   </div>

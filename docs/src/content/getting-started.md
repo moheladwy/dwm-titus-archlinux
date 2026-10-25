@@ -7,8 +7,9 @@ eyebrow: First session
 
 # Getting Started
 
-> dwm-titus is a Fedora-only X11 desktop. These instructions assume a supported
-> Fedora installation completed through the Fedora image or `install.sh`.
+> dwm-titus is an Arch Linux-only X11 desktop. These instructions assume an
+> Arch Linux system where the desktop was added with
+> [`install.sh`](/install.html).
 
 After installing, the first thing to know: **Super** = the Windows key.
 

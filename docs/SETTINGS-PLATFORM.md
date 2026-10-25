@@ -124,7 +124,7 @@ Capability statuses are:
 | `partial` | Some state is readable, but the complete section contract is not available. |
 | `unavailable` | A normally supported provider is missing or not usable. |
 | `restricted` | Readable state remains available, but an authorization path is absent. |
-| `unsupported` | This phase or Fedora capability has no supported provider contract. |
+| `unsupported` | The capability has no supported provider contract on this platform. |
 
 Capability classes are `read-only`, `user-session`, `privileged`, and
 `delegated`. The broader inventory also treats an operation with no provider as
@@ -203,46 +203,54 @@ The Control Center's legacy terminal `sudo systemctl restart NetworkManager`
 action and `dwm-display-setup` terminal sudo flow remain compatibility paths;
 neither is a Settings provider contract.
 
-## Fedora-Only Packaging Plan
+## Arch Linux Packaging Plan
 
-Package ownership stays centralized in `scripts/dwm-packages.sh`. Phase 1 adds
-no runtime dependency beyond capabilities already present in the existing
-desktop and image profiles.
+Package ownership stays centralized in `scripts/dwm-packages.sh`
+(`dwm_packages arch <profile>`). Settings adds no runtime dependency beyond
+capabilities already present in the installer profiles, and every required
+package comes from the official Arch repositories.
 
-| Capability | Fedora source | Current image/map status | Missing behavior |
+| Capability | Arch source | Current map status | Missing behavior |
 | --- | --- | --- | --- |
-| Settings window | Quickshell 0.3 or newer | Included by both Kickstarts and `fedora:desktop` | Settings is unavailable without Quickshell. |
+| Settings window | Quickshell 0.3 or newer | `quickshell` in `arch:desktop` (`recommended`) | Settings is unavailable without Quickshell. |
 | Capability helper | POSIX shell and base utilities | Installed as a project command; no new package | Individual missing tools produce unavailable records. |
-| Display/default state | RandR and XDG utilities | Included by Kickstarts and required profiles | Missing tools disable only their controls. |
-| Network/Bluetooth/audio/power state | NetworkManager, BlueZ, PipeWire/WirePlumber, X11 tools, light-locker | Included by Fedora image/desktop profiles | Missing optional providers produce unavailable or partial cards. |
-| Authorization discovery | Polkit agent and trusted installed helper | Fedora image includes an agent; helper installation remains project-owned | Missing authorization leaves read-only state available. |
-| QML development | Qt declarative development tools | `fedora:qml-development` maps `qt6-qtdeclarative-devel`; excluded from runtime images | Developer tooling is opt-in. |
+| Display/default state | RandR and XDG utilities | `xorg-xrandr` in `arch:x11` and `xdg-utils` in `arch:runtime-required` (`core`) | Missing tools disable only their controls. |
+| Network/Bluetooth/audio/power state | NetworkManager, BlueZ, PipeWire/WirePlumber, X11 tools, light-locker | `arch:desktop` (`recommended`); `networkmanager` in `arch:desktop-optional` (`full`) | Missing optional providers produce unavailable or partial cards. |
+| Authorization discovery | Polkit agent and trusted installed helper | `mate-polkit` in `arch:desktop`; helper installation remains project-owned | Missing authorization leaves read-only state available. |
+| System updates | pyalpm and pacman-contrib | `arch:system-management` (`recommended`) | Missing pyalpm disables only the update rows. |
+| QML development | Qt 6 declarative tools | `arch:qml-development` maps `qt6-declarative`; not in any install profile | Developer tooling is opt-in. |
 
 The `qml-development` profile is opt-in developer tooling and is not part of
-`required`, `recommended`, `optional`, `full`, or either Kickstart. This avoids
-expanding the installed desktop for users who do not develop QML while keeping
-the Fedora package name in one map.
+`core`, `recommended`, or `full`. This avoids expanding the installed desktop
+for users who do not develop QML while keeping the Arch package name in one
+map. AUR-only packages appear only in `aur-optional`; no Settings provider
+requires them.
 
 ## Validation Plan
 
-| Phase 1 exit criterion | Automated evidence | Manual or runtime evidence |
+| Exit criterion | Automated evidence | Manual or runtime evidence |
 | --- | --- | --- |
 | Settings opens and navigates without idle polling | `make check-settings check-quickshell-settings-xvfb check-quickshell-qml` | Open from Control Center, search, use keyboard/mouse navigation, close, and record the closed CPU/process sample. |
-| Fedora discovery and clean fallback | `make check-settings` exercises Fedora 44 plus unavailable service fixtures | Run `dwm-settings-provider discover` on the Fedora qualification host and record platform/provider rows. |
-| Privilege, rollback, errors, unsupported state | `make check-settings check-system-health check-display-setup` plus source assertions for the no-elevation boundary | Cancel or deny any future authorization prompt; verify readable state remains. Phase 1 has no privileged Settings action to authorize. |
+| Arch discovery and clean fallback | `make check-settings` exercises the `arch` platform family plus unavailable service fixtures; `scripts/run-tests-podman` runs it in the pinned Arch container | Run `dwm-settings-provider discover` on an Arch qualification host and record platform/provider rows. |
+| Privilege, rollback, errors, unsupported state | `make check-settings check-system-health check-display-setup` plus source assertions for the no-elevation boundary | Cancel or deny an authorization prompt; verify readable state remains. |
 | Existing desktop compatibility | Existing launcher, Control Center, controls, network, health, runtime, install, and preservation checks in `make check` | Verify existing Control Center and hotkeys in the qualification session. |
-| Packaging and ownership | `make check-install check-install-manifest check-kickstart` | Verify installed helper ownership when a privileged Settings helper is introduced. None is introduced in Phase 1. |
+| Packaging and ownership | `make check-install check-install-manifest check-arch-packages` | Verify installed helper ownership for every privileged Settings helper. |
 
 The nested-X11 test must record window geometry, IPC navigation, keyboard and
 mouse selection, Escape close, provider cleanup, and a two-second CPU sample
 with Settings closed. A passing sample requires less than 10 percent of one CPU
 for the managed Quickshell process and no remaining Settings provider process.
 
-Real Fedora evidence must record release, architecture, session type, Settings
-entry path, discovered provider states, CPU/process sample, and limitations.
-Nested X11 does not prove real hardware providers.
+Real Arch evidence must record the rolling-release validation record from
+`SPEC.md` Section 9.4 (test date, archive snapshot for container runs, and the
+pacman, Quickshell, Qt, and kernel versions), architecture, session type,
+Settings entry path, discovered provider states, CPU/process sample, and
+limitations. Nested X11 does not prove real hardware providers.
 
-## Phase 1 Qualification Evidence
+The qualification evidence below was recorded on Fedora before the Arch Linux
+port. It is retained as history and is not a claim about Arch behavior.
+
+## Phase 1 Qualification Evidence (Fedora, pre-port)
 
 Evidence recorded on 2026-07-21:
 
@@ -312,7 +320,8 @@ Use **Apply changes** and **Keep changes** to test it first. Saved enabled
 monitors must be connected to edit, and all selected modes must be available
 on the currently connected hardware before saving.
 
-The optional Fedora `autorandr` package supplies login and DRM hotplug hooks.
+The optional `autorandr` package from the official Arch repositories supplies
+login and DRM hotplug hooks. It is not part of an installation profile.
 Without it, automatic-profile controls explain that dependency while normal
 display controls remain usable. Saving Undocked sets `default -> mobile` and
 stores only the built-in monitor identity; Docked stores the connected monitor
@@ -350,7 +359,7 @@ records only, then writes only
 repository copies, wrong ownership, writable files, symlinks, injected input,
 and authorization denial.
 
-Evidence recorded on 2026-08-15:
+Evidence recorded on Fedora before the Arch Linux port, on 2026-08-15:
 
 - Fedora Linux 44 x86_64 X11 discovered HDMI-0 and DP-0. A complete current
   two-monitor layout preview timed out and restored the exact captured layout.

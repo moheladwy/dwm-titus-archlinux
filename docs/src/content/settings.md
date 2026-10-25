@@ -43,8 +43,10 @@ use **Apply changes** and **Keep changes** to test first. You can prepare the
 Undocked layout while the dock remains connected. Connect the saved monitors
 before editing a Docked layout.
 
-This optional feature uses Fedora's `autorandr` login and hotplug integration,
-without administrator approval. Saving Undocked makes it the default fallback.
+This optional feature uses the login and hotplug integration of the
+`autorandr` package from the official Arch repositories, without administrator
+approval. It is not part of an installation profile; add it with a full
+upgrade, `sudo pacman -Syu --needed autorandr`. Saving Undocked makes it the default fallback.
 Docked matches the connected monitor identities, not just the connector type.
 Replaced profiles are backed up in the dwm-titus `display-profile-backups`
 configuration directory. Only one Docked slot is managed here; advanced

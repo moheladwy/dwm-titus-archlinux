@@ -109,8 +109,7 @@ provider that runs `<helper> -Sua` as your user. Neither path ever runs
 
 See [Desktop Dependencies](docs/src/content/dependencies.md) for the packages
 behind each desktop component, installation-profile differences, and build
-dependencies. The canonical package map is `scripts/dwm-packages.sh`. Some
-pages under `docs/src/content/` still describe Fedora and are being updated.
+dependencies. The canonical package map is `scripts/dwm-packages.sh`.
 
 ## First Login
 

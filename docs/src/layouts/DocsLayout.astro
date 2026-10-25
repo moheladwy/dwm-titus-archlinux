@@ -16,7 +16,7 @@ interface Props {
 
 const { frontmatter, wide = false } = Astro.props;
 const title = Astro.props.title ?? frontmatter?.title ?? "Documentation";
-const description = Astro.props.description ?? frontmatter?.description ?? "Documentation for the dwm-titus Fedora X11 desktop.";
+const description = Astro.props.description ?? frontmatter?.description ?? "Documentation for the dwm-titus Arch Linux X11 desktop.";
 const eyebrow = Astro.props.eyebrow ?? frontmatter?.eyebrow ?? "Documentation";
 const pathname = Astro.url.pathname;
 const currentHref = pathname === "/" || pathname === "/index.html" ? "/install.html" : pathname;
@@ -53,7 +53,7 @@ const canonical = Astro.site ? new URL(pathname === "/index.html" ? "/" : pathna
         </button>
         <a class="site-brand" href="/" aria-label="dwm-titus documentation home">
           <span class="site-mark">d</span>
-          <span><strong>dwm-titus</strong><small>Fedora X11 desktop</small></span>
+          <span><strong>dwm-titus</strong><small>Arch Linux X11 desktop</small></span>
         </a>
         <div class="site-header-actions">
           <a class="header-link" href="https://github.com/moheladwy/dwm-titus-archlinux/releases/latest">Get the latest release</a>
@@ -70,7 +70,7 @@ const canonical = Astro.site ? new URL(pathname === "/index.html" ? "/" : pathna
       <aside class="sidebar" aria-label="Documentation navigation">
         <div class="sidebar-intro">
           <span class="status-dot"></span>
-          <span>Fedora only / X11 native</span>
+          <span>Arch Linux only / X11 native</span>
         </div>
         <nav>
           <p class="nav-label">Explore the desktop</p>
@@ -109,7 +109,7 @@ const canonical = Astro.site ? new URL(pathname === "/index.html" ? "/" : pathna
           {next ? <a class="page-next" href={next.href}><span>Next</span><strong>{next.label}</strong></a> : <span></span>}
         </nav>
         <footer class="site-footer">
-          <p>dwm-titus is an open source Fedora X11 desktop.</p>
+          <p>dwm-titus is an open source Arch Linux X11 desktop.</p>
           <p><a href="https://github.com/moheladwy/dwm-titus-archlinux/blob/main/LICENSE">License</a> <span>/</span> <a href="https://github.com/moheladwy/dwm-titus-archlinux/issues">Report an issue</a></p>
         </footer>
       </main>

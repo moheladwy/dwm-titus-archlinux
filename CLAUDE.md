@@ -9,11 +9,10 @@ workflow, Arch platform and pacman policy, Settings safety, and validation. `SPE
 source of truth for scope and acceptance criteria. This file adds only
 commands and cross-file architecture notes.
 
-This fork is **Arch Linux-only** (`ID=arch`; derivatives are rejected). It is
-mid-port from Fedora per `.github/plans/arch-linux-port.md`; Fedora code that
-is still in the tree (Kickstarts, image tooling, DNF/PackageKit update paths)
-is legacy awaiting removal, not a support path. Never run tests, installers, or
-package operations on the host; use the Arch container or a VM.
+This fork is **Arch Linux-only** (`ID=arch`; derivatives are rejected). The
+port from Fedora (`.github/plans/arch-linux-port.md`) is complete, and the
+project ships no installer images. Never run tests, installers, or package
+operations on the host; use the Arch container or a VM.
 
 ## Commands
 
@@ -91,8 +90,6 @@ as root. It then installs `install-user-files` as the owner, never as root, and
 preserves user TOML. The `install-system`/`install-user` targets run each half
 alone, and `DESTDIR` stages an install. All of these go through
 `dwm-desktop-update guard-*-install`.
-The Fedora Kickstarts and `scripts/build-dwm-fedora-*` are legacy; there are
-no Arch images.
 
 ## Gotchas
 

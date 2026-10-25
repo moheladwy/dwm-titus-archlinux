@@ -80,9 +80,8 @@ published as optional GitHub release tarballs (`make release`).
 Arch Linux does not configure SELinux or another mandatory access control
 policy by default. The installer must never change host LSM state.
 
-Fedora is not supported by this fork. Fedora-specific code, Kickstarts, and
-image tooling remain in the tree only until a later phase removes them; their
-presence is not a support claim.
+Fedora is not supported by this fork, and no Fedora-specific code, Kickstarts,
+or image tooling remain in the tree.
 
 ## 5. Functional Requirements
 
@@ -560,8 +559,8 @@ requiring a reboot. The application must use a hybrid integration model:
 - Privileged or high-risk administration is performed only through allowlisted,
   installed helpers or delegated to trusted platform tools.
 - Providers and delegated administration tools target Arch Linux. Missing
-  capabilities, and code paths not yet ported from Fedora, must expose a clean
-  unavailable or unsupported state rather than failing the entire application.
+  capabilities must expose a clean unavailable or unsupported state rather
+  than failing the entire application.
 
 System package updates follow the native pacman contract in Section 5.11:
 
@@ -618,9 +617,6 @@ System package updates follow the native pacman contract in Section 5.11:
   during discovery and simulation without authorization, which produces the
   partial-upgrade state described in Section 5.11. If PackageKit is installed,
   Settings reports that its clients can do this.
-
-The first-boot initial update is image-only Fedora code. It is never armed on
-Arch and remains inactive until it is removed.
 
 The Settings platform must distinguish:
 
@@ -710,7 +706,7 @@ specification defines a narrow safe interface.
 Desktop source updates appear first in Settings > System, above system package
 updates. Opening System performs a bounded check against the `main` branch of
 this fork (`github.com/moheladwy/dwm-titus-archlinux`), never the upstream
-Fedora repository, cached for five minutes; Check again bypasses the cache.
+`ChrisTitusTech/dwm-titus` repository, cached for five minutes; Check again bypasses the cache.
 Checking does not install files. Installation receipts record the source
 revision and managed file hashes so both newer source and installed-file drift
 are detected, including installs without Git metadata. Unknown or unreadable
@@ -1027,11 +1023,11 @@ reported as such.
 
 ## 10. Current Gap
 
-The project is being ported from Fedora to Arch Linux following
-`.github/plans/arch-linux-port.md`. Fedora feature history (Phases 1-8 and the
-0.7.2 work) is archived in `docs/COMPLETED-ROADMAP-20260911.md`, the
-`docs/P*-*.md` evidence files, and `CHANGELOG.md`; it is not a claim about
-Arch behavior.
+The port from Fedora to Arch Linux following
+`.github/plans/arch-linux-port.md` is complete. Fedora feature history
+(Phases 1-8 and the 0.7.2 work) is archived in
+`docs/COMPLETED-ROADMAP-20260911.md`, the `docs/P*-*.md` evidence files, and
+`CHANGELOG.md`; it is not a claim about Arch behavior.
 
 Plan Phases 0-4 deliver this contract, fork endpoints, the Arch platform
 identity and package map, the pinned Arch test container and Qt 6 QML lint,
@@ -1039,20 +1035,33 @@ and the existing-system installer and runtime integrations, including Dolphin
 and the LightDM defaults. Phases 5-8 deliver the native pacman update stack
 (pyalpm discovery, terminal-only upgrades with the news gate, the `system`
 and optional `aur` Update Center providers) and the remaining Settings platform
-work (Arch identity, regional actions, delegates, and security rows).
+work (Arch identity, regional actions, delegates, and security rows). Phases
+9-10 deliver the Arch documentation site and reference docs, and remove the
+Fedora-only code: Kickstarts, image tooling, the first-boot initial update,
+the DNF defaults helper, the Fedora package profiles and test container, and
+the `protonrestart` gaming helper.
 
-The following remain open and are not yet implemented on Arch:
+The following have no Arch validation record yet and are untested until one
+says otherwise (Section 9.4):
 
-- The first-boot initial update is image-only, is never armed on Arch, and is
-  retired in Phase 10.
-- Phase 9: the documentation site and reference docs still describe Fedora in
-  places.
-- Phase 10: Fedora-only code, Kickstarts, image tooling, and Fedora tests are
-  still in the tree.
+- physical hardware in general, including NVIDIA drivers and composition,
+  Secure Boot systems, suspend and resume, laptop power and brightness,
+  Wi-Fi and Bluetooth radios, audio devices, and multi-monitor hotplug;
+- a real `--profile recommended` installation with LightDM in a virtual
+  machine with a fresh Arch installation, and display managers other than
+  LightDM;
+- the `startx` path with the manual `pam_gnome_keyring.so` login PAM change;
+- the `--enable-aur` install path and the optional `aur` Update Center
+  provider against the live AUR with a real `paru` or `yay`;
+- validation against current repositories rather than the pinned archive
+  snapshot.
 
-Physical hardware, NVIDIA, Secure Boot, and suspend behavior on Arch are
-untested until a validation record says otherwise. Arch Linux x86_64 and X11
-are the supported scope.
+Two automated checks are known to fail intermittently: the nested-X11 Picom
+test (`tests/test-picom-xvfb.py`) and the time-reconciliation scenario in
+`tests/test-quickshell-system-management-xvfb.sh`. They are tracked as
+follow-ups, and an intermittent failure is not reported as passing coverage.
+
+Arch Linux x86_64 and X11 are the supported scope.
 
 ## 11. Definition of Done
 

@@ -4,7 +4,7 @@
 
 dwm-titus borrows the visual grammar of Omarchy's Quickshell menus without
 adopting its Wayland or Hyprland runtime. The result must feel related while
-remaining a Fedora X11 desktop whose window manager, providers, IPC, and
+remaining an Arch Linux X11 desktop whose window manager, providers, IPC, and
 session policy continue to belong to dwm-titus.
 
 This is a design influence, not a shell transplant. Omarchy is MIT licensed;
@@ -79,10 +79,11 @@ authoritative syntax and integration gates.
 
 ## Integrated Six-Slice Delivery Plan
 
-The adaptation is delivered as six review and rollback boundaries inside the
-existing Fedora roadmap. The UI identifiers preserve the approved design-plan
-sequence; a product-phase prefix, such as `P3-UI4`, records where that work is
-scheduled in `ROADMAP.md`.
+The adaptation was delivered as six review and rollback boundaries inside the
+roadmap that preceded the Arch Linux port. The UI identifiers preserve the approved design-plan
+sequence; a product-phase prefix, such as `P3-UI4`, records where that work was
+scheduled in the archived
+[COMPLETED-ROADMAP-20260911.md](COMPLETED-ROADMAP-20260911.md).
 
 - UI-1, design-system foundation: Phase 3 prerequisite, complete in PR #157.
 - UI-2, DWM command menu and shared launcher model: Phase 3 prerequisite,
