@@ -173,7 +173,7 @@ Scope {
         id: progressCommand
         command: root.updaterCommand.concat(["progress"])
         stderr: StdioCollector { onStreamFinished: { if (text.trim()) root.progressError = text.trim(); } }
-        // Fedora Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
+        // Some Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
         onExited: (exitCode, exitStatus) => { // qmllint disable signal-handler-parameters
             root.progressPending = false;
             if ((exitCode !== 0 || exitStatus !== 0) && !root.progressError)
@@ -205,7 +205,7 @@ Scope {
         onStarted: { output = ""; errors = ""; }
         stdout: StdioCollector { onStreamFinished: command.output = text }
         stderr: StdioCollector { onStreamFinished: command.errors = text }
-        // Fedora Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
+        // Some Quickshell qmltypes omit QProcess::ExitStatus; the runtime signal is valid.
         onExited: (exitCode, exitStatus) => { // qmllint disable signal-handler-parameters
             if (root.terminating) {
                 root.terminating = false;
