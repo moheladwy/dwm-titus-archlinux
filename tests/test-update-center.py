@@ -1646,7 +1646,9 @@ api['watch_operation']()
                     return int(fields[11]) + int(fields[12])
                 before = ticks()
                 time.sleep(0.3)
-                self.assertLessEqual(ticks() - before, 1, "retained interruption must remain idle")
+                # A busy watcher burns about 30 ticks in this window; allow a
+                # little scheduler noise on a loaded test host.
+                self.assertLessEqual(ticks() - before, 3, "retained interruption must remain idle")
                 self.assertEqual(api["read_operation"]()["phase"], "interrupted")
                 watcher.terminate()
                 watcher.wait(timeout=5)
