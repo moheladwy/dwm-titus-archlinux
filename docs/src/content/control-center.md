@@ -56,6 +56,22 @@ The panel, popovers, and control-center cards use fully opaque colors. Their
 palette follows the active theme in `themes.toml` and updates when that file is
 changed.
 
+## Update Center
+
+The update icon beside the clock opens the Update Center. It lists system
+packages (labeled with your distribution name, such as "Arch Linux"), the
+managed desktop, and optional Flatpak and mise providers. An AUR row appears
+only when `paru` or `yay` is already installed. Expand a row to inspect its
+updates, then choose **Update** to run that provider in a terminal.
+
+The system update first checks the Arch Linux news feed and asks you to
+continue past unread items, then runs an interactive `sudo pacman -Syu` with
+pacman's own prompts and no `--noconfirm`. AUR updates run `paru -Sua` or
+`yay -Sua` as your user, never as root. Settings > System **Open system
+update** opens the same system terminal. See
+[Desktop updates](https://github.com/moheladwy/dwm-titus-archlinux/blob/main/docs/DESKTOP-UPDATES.md)
+for recovery and the full update contract.
+
 ---
 
 ## Modules

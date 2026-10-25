@@ -60,19 +60,37 @@ and `dwm` tokens instead of adding `NotShowIn`; other desktop choices remain
 intact. Existing user overrides are preserved and require an explicit repair
 if an older installation produced conflicting keys.
 
-Update recovery normally reads the calling process's logind session. A helper
-launched by the managed user service may have no session scope; in that case
-it uses logind's primary display only after verifying the session belongs to
-the current user and is active, local, and X11. Missing, changing, or invalid
-session evidence retains restart guidance and blocks update actions.
+System updates in Settings > System are read-only discovery plus one launch
+action, following the pacman contract in `SPEC.md` Sections 5.10 and 5.11:
 
-System updates show the current package (or repository during metadata refresh),
-its reported progress, and a separate overall transaction percentage. Missing
-item percentages use an activity indicator, never the overall percentage as a
-package estimate. Raw operation logs and audit hashes remain internal; the page
-shows concise verified completion, errors, cancellation, and recovery guidance.
-After a helper restart, recovery may have only overall progress until new item
-evidence is available. Opening Settings does not install updates.
+- Discovery runs unprivileged through pyalpm in a private temporary database
+  directory. Its `local` entry is a symlink to the real local database, and
+  its sync databases are seeded from the system copies and a per-user cache in
+  `${XDG_CACHE_HOME:-$HOME/.cache}/dwm-titus/pacman-sync`, with a remote check
+  at most every 300 seconds. It never writes `/var/lib/pacman/sync` or touches
+  `db.lck`. When the remote check fails, cached data is shown with a network
+  warning.
+- Packages held by `IgnorePkg` or `IgnoreGroup` are listed as blocked.
+- The dependency preview is a pyalpm `sysupgrade` transaction that is always
+  released. It is a preview only: pyalpm 0.12 does not ask replacement
+  questions, so pacman's own prompts in the terminal decide replacements and
+  conflicts.
+- Restart guidance reports `system` when `/usr/lib/modules/$(uname -r)` is
+  missing, `unknown` when that cannot be checked, and otherwise `none`.
+  Pending kernel, `*-ucode`, `systemd`, `glibc`, and `nvidia*` changes are
+  flagged "Restart after this change."
+- Change events come from inotify watches on `/var/lib/pacman`, `local/`, and
+  `sync/`. They are held until `db.lck` is gone, debounced, and re-checked
+  hourly. No pacman hook or system file is installed.
+- When the `packagekit` package is installed, a row warns that its clients can
+  run `pacman -Sy` behind the user's back.
+- **Open system update** (`updates-open`) runs `dwm-update-center launch
+  system`, which opens the Update Center terminal: the Arch news check, then an
+  interactive `sudo -- /usr/bin/pacman -Syu`. Settings never installs,
+  refreshes, or cancels package operations in place; the former refresh,
+  install-all, and cancel actions are removed, and there is no standalone
+  database refresh. Progress, prompts, and recovery belong to that terminal
+  (see `docs/DESKTOP-UPDATES.md`). Opening Settings does not install updates.
 
 ## Helper Protocol
 

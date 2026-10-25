@@ -2,8 +2,10 @@
 
 The first card in **Settings > System** checks the dwm-titus desktop against
 official `main`. It covers the managed Quickshell configuration, dwm, installed
-commands, managed data, and cursor assets. Fedora package updates below it
-continue to manage the Quickshell application and other RPM packages.
+commands, managed data, and cursor assets. The system updates section below
+it covers the Quickshell application and every other pacman package; its
+**Open system update** button opens the Update Center system terminal
+described below. Settings never installs system packages in place.
 
 ![Desktop updates at the top of System Settings](evidence/desktop-updates.png)
 
@@ -45,29 +47,59 @@ update or recovery terminal. This preference never changes the Update Center
 window itself. Existing preferences without a window mode default to tiled
 terminals; saved modes are preserved and now apply to terminals. Escape or a
 click outside the card closes the popup. It lists
-Fedora packages, the managed desktop, and optional Flatpak and mise providers.
+system packages, the managed desktop, and the optional AUR, Flatpak, and mise
+providers. The system row is labeled from the `os-release` `NAME`, such as
+"Arch Linux", and falls back to "System".
 Expand a provider to inspect its available updates, then choose **Update** for
 that provider. Updates run in a dedicated terminal using the saved mode; closing the panel
 leaves the operation running. **Progress** reopens the separate desktop-update
 progress window while desktop work is active or needs attention. Read the terminal
 result and press a key to close it. Interrupted work retains recovery guidance
 instead of claiming success.
-Fedora updates run the installed DNF5 directly in that terminal, with its full
-transaction plan, download progress, package/scriptlet output, and confirmation
-prompt. Existing sudo authorization is reused; otherwise sudo prompts in the
-terminal. No automatic Yes option is supplied. Declining confirmation or a normal command
-failure releases the Update Center slot after the terminal closes, without
-claiming the update succeeded. PackageKit provides read-only
-update discovery, and an existing PackageKit operation must finish or be
-recovered before a new DNF transaction starts.
+System updates first check the Arch Linux news feed
+(`https://archlinux.org/feeds/news/`, at most 1 MiB with a 15-second timeout).
+Unread items are listed with their dates and links, and the upgrade continues
+only after an explicit `y` or `yes`. Continuing records the newest item in
+`${XDG_STATE_HOME:-$HOME/.local/state}/dwm-titus/update-center/news-ack.json`;
+declining records nothing and starts no pacman command. If the feed cannot be
+fetched, the terminal says that news is unavailable, links the news page, and
+still asks before continuing.
+The terminal then runs `sudo -- /usr/bin/pacman -Syu` directly, with pacman's
+full transaction plan, download progress, replacement, conflict, and provider
+prompts, `.pacnew` notices, and confirmation. Existing sudo authorization is
+reused; otherwise sudo prompts in the terminal. `--noconfirm` or any other
+automatic Yes is never supplied. A held `/var/lib/pacman/db.lck` stops the
+update before pacman starts, with guidance to find its owner with
+`sudo fuser -v /var/lib/pacman/db.lck`; Update Center never deletes the lock.
+Declining confirmation or a normal command failure releases the Update Center
+slot after the terminal closes, without claiming the update succeeded.
+Settings > System **Open system update** runs `dwm-update-center launch system`
+to open this same terminal.
+
+Discovery for the system row is read-only and unprivileged. It uses pyalpm in
+a private temporary database directory, seeded from the system sync databases
+and a per-user cache in
+`${XDG_CACHE_HOME:-$HOME/.cache}/dwm-titus/pacman-sync`, and checks the
+mirrors at most every five minutes. It never refreshes `/var/lib/pacman/sync`
+or touches its lock, so checking for updates cannot leave the system in a
+partial-upgrade state. PackageKit is not used.
+
+When `paru` or `yay` is already installed (`paru` is preferred), an optional
+AUR row appears. It compares foreign packages from `pacman -Qqm` with the AUR
+RPC v5 interface in batches of 100, with a 4 MiB response limit, 20 seconds per
+request, and 60 seconds in total, using `pyalpm.vercmp`. VCS packages ending in
+`-git`, `-svn`, `-hg`, or `-bzr` are listed as version unknown and are not
+counted. **Update** runs `<helper> -Sua` as your user in the terminal, where
+the helper shows its own prompts. It refuses to run as root and never runs
+under `sudo` or `pkexec`. Without an installed helper, the AUR row is hidden.
 
 Choosing **Recover** reattaches to desktop work that is still running. For an
-interrupted DNF update, it explicitly retries the normal DNF workflow under
-DNF's transaction lock, with a fresh plan and confirmation. This is not rollback
-or proof that the previous attempt succeeded. Recovery of an older PackageKit
-operation remains separate: it reconciles that exact operation and releases
-its retained handoff only after no active work remains. An unprovable previous
-outcome stays unknown. Operation
+interrupted system or AUR update, it shows the last known result, states that
+pacman (or the AUR helper) never rolls back a transaction, and points to
+`/var/log/pacman.log` for what was applied. It then offers a fresh interactive `sudo pacman -Syu` (or
+`<helper> -Sua`), with a new plan and confirmation, only if you accept. This is
+not rollback or proof that the previous attempt succeeded. An unprovable
+previous outcome stays unknown. Operation
 changes and terminal exits are watched without continuous background polling.
 If an optional provider disappears while its operation is retained, its row stays
 visible with guidance to restore the tool, refresh Update Center, then choose
@@ -92,9 +124,12 @@ before adding the Update Center window-mode and terminal floating/no-swallow rul
 performs this idempotent migration for the first upgrade from an older worker.
 Personal rules and unrelated settings remain intact. Symlinked and non-regular
 personal rule files are left unchanged and do not block the desktop update.
-The fresh-image initial package-update offer and mirror measurement continue
-through the existing
-[first-update workflow](INITIAL-UPDATE.md).
+The first-boot initial package update belonged to the upstream Fedora images;
+it is never armed on Arch.
+
+Update Center state recorded before the port under the `fedora` provider is
+not shown as current Arch data. Cached `fedora` entries are dropped and
+rescanned, and a retained `fedora` operation receipt is converted to `system`.
 
 ## Installation and compatibility
 
@@ -141,9 +176,15 @@ Unsafe installed file modes or modified user-owned system files require the
 source installer; recovery never restores special or writable mode bits.
 The confirmed update can install missing build/source-update packages from the
 new release's package map, including changed dependency lists. The helper accepts
-only RPM names, binds the list to the reserved operation, and checks that the
-staged manifest matches it. The package manager owns its transaction and locks;
-desktop rollback does not remove installed packages.
+only plain repository package names (no files, URLs, version constraints, or
+option-like values), binds the list to the reserved operation, and checks that
+the staged manifest matches it. Missing packages are found with `pacman -T`.
+Because Arch does not support partial upgrades, they are installed with
+`pacman -S --needed` only when `pacman -Qu` reports no pending updates;
+otherwise the update stops with "Update system packages first". Run
+`sudo pacman -Syu`, then retry. Official repository packages only; the helper
+never calls an AUR helper. pacman owns its transaction and lock; desktop
+rollback does not remove installed packages.
 
 ### Upgrading an older updater
 
@@ -221,7 +262,7 @@ restores the managed user directories from the recorded copies. It refuses to
 replace a newer installation or user files changed after the interruption.
 Save conflicting changes separately before recovery; do not reset or delete a
 checkout to bypass that protection. Log out and back in after restoration, then
-check again. Recovery does not undo RPM transactions or downgrade packages.
+check again. Recovery does not undo pacman transactions or downgrade packages.
 
 If the installed updater itself is unavailable, use the existing full
 [source recovery procedure](src/content/install.md#source-updates-and-recovery).
@@ -239,12 +280,12 @@ scripts/run-tests
 ```
 
 `tests/test-desktop-update-security.py` must run as root inside a disposable
-Fedora container. It refuses to operate on a host. It tests real installed-helper
+Arch container. It refuses to operate on a host. It tests real installed-helper
 ownership, allowlists, bundle integrity, stale previews, installation, and
 rollback. GUI fixture tests do not substitute for this privileged coverage or
-for a clean Fedora build and staged installation.
+for a clean Arch build and staged installation.
 
-`tests/test-desktop-update-integration.py` also requires a disposable Fedora
+`tests/test-desktop-update-integration.py` also requires a disposable Arch
 container. It builds two local source revisions, runs the real unprivileged
 worker, authorizes only the test helper through a container-only polkit rule,
 and verifies the resulting installation and preserved personal configuration.
@@ -283,7 +324,7 @@ configuration variables, disable hooks, templates, filesystem monitors, and
 credential helpers, and allow only local-file and HTTPS transports. Use the
 forwarded proxy and certificate environment settings for network customization.
 
-Desktop builds require Fedora's `bubblewrap` and `libseccomp` packages. The
+Desktop builds require the `bubblewrap` and `libseccomp` packages. The
 source installer and source-sync dependency profile install them. Mutable
 checkout, source scripts, staged Git merges, and builds run in private user,
 process, mount, and network namespaces with no capabilities, host session bus,

@@ -82,15 +82,37 @@ seconds. These choices persist for future managed Quickshell sessions. Settings
 keeps them read-only when another notification daemon owns the session D-Bus
 name.
 
-The System section includes **Manage accounts**, **Change my password**,
-**Manage printers**, and **Manage software sources**. Each opens a fixed trusted
-Fedora tool only after a separate confirmation. Missing tools and stale provider
-status are explained beside the affected control. Reported accounts and enabled
-or disabled software sources are read-only lists here. The tool owns its own
-authorization and changes; an accepted launch is not proof that work inside it
-completed. Enter passwords only in the configured terminal's `passwd` prompt.
+The System section lists pending system package updates without changing
+anything. It reads pacman's databases through pyalpm, without administrator
+access, in a private copy, so checking never refreshes the real sync databases
+and cannot cause a partial upgrade. The remote check runs at most every five
+minutes; if it fails, cached data is shown with a network warning. Packages
+held by `IgnorePkg` or `IgnoreGroup` are marked blocked. The dependency preview
+is read-only, and pacman may resolve replacements and conflicts differently in
+the terminal. Restart guidance says when the running kernel is no longer
+installed, and flags pending kernel, microcode, `systemd`, `glibc`, and
+`nvidia*` updates with "Restart after this change." The list updates when a
+pacman transaction finishes. If the `packagekit` package is installed, a
+warning explains that its clients can run `pacman -Sy` behind your back.
+
+To update, choose **Open system update**. It opens the Update Center terminal,
+which checks the Arch Linux news feed and asks you to continue past any unread
+items, then runs an interactive `sudo pacman -Syu` with pacman's own prompts.
+Settings never installs, refreshes, or cancels package updates itself.
+
+The System section also includes **Manage accounts**, **Change my password**,
+and **Manage printers**. Each opens a fixed trusted tool only after a separate
+confirmation. **Manage software sources** is unsupported on Arch, because there
+is no graphical source manager; repositories come from `/etc/pacman.conf` and
+are listed read-only. Missing tools and stale provider status are explained
+beside the affected control. Reported accounts and software sources are
+read-only lists here. A launched tool owns its own authorization and changes;
+an accepted launch is not proof that work inside it completed. Enter passwords only in the configured terminal's `passwd` prompt.
 Cancel returns keyboard focus to the originating control. Closing Settings does
 not close a launched tool or undo its changes.
+
+System information reports SELinux and firewalld as unsupported on Arch, and
+shows the rolling `BUILD_ID` when `os-release` has no version.
 
 For timezone and system locale, select **Load choices**, filter the reported
 catalog, and select with click or Enter. **Review change** reads a fresh preview;
