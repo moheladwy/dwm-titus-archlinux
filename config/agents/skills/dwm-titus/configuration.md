@@ -170,8 +170,17 @@ dwm-settings-picom restart
 Opacity and backend (Automatic, XRender, GLX, EGL) live in Settings >
 Appearance > Compositor. dwm-titus seeds no Picom file. When the user has no
 `~/.config/picom.conf` (or `~/.config/picom/picom.conf`), Picom reads
-`/etc/xdg/picom.conf`; `dwm-settings-picom copy-config` creates an editable
-user copy. Edit the user copy, never the system file, then restart Picom.
+`/etc/xdg/picom.conf`. Create an editable user copy with Settings >
+Appearance > Compositor > **Create user configuration**, or from a terminal
+(the current `revision` guards against concurrent edits; `copyable` must be
+`true`):
+
+```sh
+dwm-settings-picom status        # JSON with "revision", "copyable", "path"
+dwm-settings-picom copy-config "$(dwm-settings-picom status | jq -r .revision)"
+```
+
+Edit the user copy, never the system file, then restart Picom.
 Use XRender if GLX shows artifacts.
 
 ## Application configs

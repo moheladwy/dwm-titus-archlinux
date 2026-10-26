@@ -121,7 +121,7 @@ allowlisted privileged actions; leave those to the UI.
 | `~/.config/dwm-titus/themes.toml` | user | Active theme, border size, custom themes. Live reload. |
 | `~/.config/dwm-titus/*.conf`, `*.json`, `display-profiles/` | helpers | Power, panel widgets, input, fonts, notifications, display profiles. Change these through their commands. |
 | `~/.config/alacritty/`, `kitty/`, `starship/` | user | Seeded once if missing, then never overwritten. |
-| `~/.config/picom.conf` | user | Not seeded. `dwm-settings-picom copy-config` creates it from the system file. |
+| `~/.config/picom.conf` | user | Not seeded. Settings > Appearance > Compositor > Create user configuration copies the system file (see `configuration.md`). |
 | `~/.config/quickshell/` | managed | Replaced on every install and update. |
 | `~/.local/share/dwm-titus/` | managed | Managed copy of the source `config/` and `scripts/`. |
 | `<checkout>/config.h` | user | Compile-time options. Preserved; rebuild after editing. |
