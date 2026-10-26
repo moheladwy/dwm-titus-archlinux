@@ -50,6 +50,7 @@ submitting a pull request.
 | Quickshell QML | `scripts/run-tests make check-quickshell-qml` plus real or nested X11 runtime validation |
 | System update UI | `scripts/run-tests tests/test-quickshell-update-ui-xvfb.sh` for the focused native fixture, plus configured QML lint |
 | Documentation | `npm --prefix docs ci`, then `npm --prefix docs run build` |
+| Agent skills (`config/agents/skills/`) | `scripts/run-tests make check-agent-skills check-install-preservation` |
 | Platform detection | `scripts/run-tests make check-arch-platform` |
 | Installer or package mapping | `scripts/run-tests-podman make check-arch-packages` in the Arch container, plus an installer run in a clean Arch container or VM |
 | Release automation | `scripts/run-tests make release-check` and a dry run of the release helper |

@@ -60,6 +60,11 @@ no signing keys. Fedora is not supported by this fork.
 - `docs/`: user, contributor, and release documentation.
 - `docs/ARCH-PORT-DECISIONS.md`: the approved Arch port decisions (D1-D14)
   and phase map.
+- `config/agents/skills/`: end-user agent skills (Agent Skills format) for
+  installing, using, and customizing the desktop. `.agents/skills/` and
+  `.claude/skills/` hold symlinks to them so agents find them in a checkout.
+  They ship in the managed data copy of `config/` and are never seeded into
+  `~/.config`.
 
 ## Planning Workflow
 
@@ -336,6 +341,9 @@ Quickshell, Qt, and kernel versions.
 - Update `SPEC.md` only when requirements intentionally change.
 - Update README and user-facing docs when commands, dependencies, defaults, or
   the supported platform or architectures change.
+- Update the agent skill in `config/agents/skills/dwm-titus/` in the same change
+  when user-facing commands, files, or install behavior change, and run
+  `scripts/run-tests make check-agent-skills`.
 - Do not perform destructive Git or filesystem operations without explicit
   authorization.
 - Never expose credentials, tokens, private keys, or secret file contents.

@@ -199,6 +199,20 @@ See the [Configuration Guide](docs/src/content/configuration.md)
 and [Theming Guide](docs/src/content/theming.md) for examples and
 safe customization paths.
 
+## AI Agent Skill
+
+The repository ships a `dwm-titus` skill in the open [Agent
+Skills](https://agentskills.io) format at
+[`config/agents/skills/dwm-titus/`](config/agents/skills/dwm-titus/SKILL.md).
+It teaches coding agents such as Claude Code and Codex to install dwm-titus on
+a fresh or existing Arch system and to change keybindings, window rules,
+themes, default apps, installed applications, and updates safely. Agents
+started inside this checkout find it automatically through the
+`.agents/skills/` and `.claude/skills/` symlinks. The user install also links
+the managed copy in `~/.local/share/dwm-titus/` into `~/.claude/skills/` when
+`~/.claude` exists and into `~/.agents/skills/` when `~/.agents` or `~/.codex`
+exists, without replacing an existing skill of the same name.
+
 ## Documentation
 
 - [Installation](docs/src/content/install.md)

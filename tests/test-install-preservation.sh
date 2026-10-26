@@ -271,6 +271,10 @@ ln -s ../wm-graphical-session.service \
 	"$XDG_CONFIG_HOME/systemd/user/default.target.wants/wm-graphical-session.service"
 printf '%s\n' '// stale quickshell marker' >"$XDG_CONFIG_HOME/quickshell/shell.qml"
 printf '%s\n' 'stale quickshell file' >"$XDG_CONFIG_HOME/quickshell/stale.txt"
+# A Claude skill of the same name is the user's; a Codex home without
+# ~/.agents still receives a link to the managed copy.
+mkdir -p "$TEST_HOME/.claude/skills/dwm-titus" "$TEST_HOME/.codex"
+printf '%s\n' '# user skill marker' >"$TEST_HOME/.claude/skills/dwm-titus/SKILL.md"
 
 snapshot_file() {
 	local path=$1
@@ -301,6 +305,7 @@ snapshot_file "$XDG_CONFIG_HOME/picom/picom.conf" "$WORK_DIR/picom.before"
 snapshot_file "$XDG_CONFIG_HOME/Thunar/uca.xml" "$WORK_DIR/thunar-uca.before"
 snapshot_file "$XDG_CONFIG_HOME/autostart/picom.desktop" "$WORK_DIR/picom-autostart.before"
 snapshot_file "$XDG_CONFIG_HOME/systemd/user/custom.service" "$WORK_DIR/custom-service.before"
+snapshot_file "$TEST_HOME/.claude/skills/dwm-titus/SKILL.md" "$WORK_DIR/claude-skill.before"
 
 if [[ $(id -u) -eq 0 ]]; then
 	chown -R "$OWNER:$OWNER_GROUP" "$WORK_DIR"
@@ -327,6 +332,15 @@ assert_preserved window-rules "$XDG_CONFIG_HOME/dwm-titus/window-rules.toml" "$W
 assert_preserved picom "$XDG_CONFIG_HOME/picom/picom.conf" "$WORK_DIR/picom.before"
 assert_preserved thunar-uca "$XDG_CONFIG_HOME/Thunar/uca.xml" \
 	"$WORK_DIR/thunar-uca.before"
+MANAGED_SKILLS="$XDG_DATA_HOME/dwm-titus/config/agents/skills"
+assert_preserved claude-skill "$TEST_HOME/.claude/skills/dwm-titus/SKILL.md" \
+	"$WORK_DIR/claude-skill.before"
+test ! -L "$TEST_HOME/.claude/skills/dwm-titus"
+[[ $(readlink "$TEST_HOME/.agents/skills/dwm-titus") == "$MANAGED_SKILLS/dwm-titus" ]] || {
+	printf 'Install did not link the agent skill for an existing Codex home.\n' >&2
+	exit 1
+}
+printf '%s\n' 'stale skill file' >"$MANAGED_SKILLS/dwm-titus/stale.md"
 if [ -e "$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf" ]; then
 	printf 'Install kept the unmodified legacy portals.conf.\n' >&2
 	exit 1
@@ -346,6 +360,11 @@ run_as_owner env HOME="$TEST_HOME" make -C "$TEST_REPO" install-user \
 	XDG_DATA_HOME="$XDG_DATA_HOME" >/dev/null
 assert_preserved edited-portals "$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf" \
 	"$WORK_DIR/portals.before"
+if [ -e "$MANAGED_SKILLS/dwm-titus/stale.md" ]; then
+	printf 'Install did not replace the managed agent skills.\n' >&2
+	exit 1
+fi
+diff -r "$TEST_REPO/config/agents/skills" "$MANAGED_SKILLS"
 assert_preserved picom-autostart "$XDG_CONFIG_HOME/autostart/picom.desktop" \
 	"$WORK_DIR/picom-autostart.before"
 assert_preserved custom-service "$XDG_CONFIG_HOME/systemd/user/custom.service" "$WORK_DIR/custom-service.before"
@@ -414,8 +433,31 @@ run_as_owner env HOME="$FRESH_HOME" make -C "$TEST_REPO" install-user \
 	XDG_CONFIG_DIRS="$FRESH_CONFIG_DIRS" \
 	XDG_DATA_HOME="$FRESH_DATA_HOME"
 
-# Two preservation passes, the edited-portal pass, and the fresh install.
-if [[ $(grep -Fxc -- '-f' "$WORK_DIR/fc-cache.log") -ne 4 ]]; then
+# An ~/.agents home alone gets the link, and a dangling link left by an
+# earlier dwm-titus data directory is repointed at the current copy.
+AGENTS_HOME="$WORK_DIR/agents-home"
+mkdir -p "$AGENTS_HOME/.agents/skills" "$WORK_DIR/agents-etc-xdg/autostart"
+ln -s "$WORK_DIR/old-data/dwm-titus/config/agents/skills/dwm-titus" \
+	"$AGENTS_HOME/.agents/skills/dwm-titus"
+if [[ $(id -u) -eq 0 ]]; then
+	chown -hR "$OWNER:$OWNER_GROUP" "$AGENTS_HOME" "$WORK_DIR/agents-etc-xdg"
+fi
+run_as_owner env HOME="$AGENTS_HOME" make -C "$TEST_REPO" install-user \
+	USER_HOME="$AGENTS_HOME" \
+	OWNER="$OWNER" \
+	XDG_CONFIG_HOME="$AGENTS_HOME/.config" \
+	XDG_CONFIG_DIRS="$WORK_DIR/agents-etc-xdg" \
+	XDG_DATA_HOME="$AGENTS_HOME/.local/share" >/dev/null
+[[ $(readlink "$AGENTS_HOME/.agents/skills/dwm-titus") == "$AGENTS_HOME/.local/share/dwm-titus/config/agents/skills/dwm-titus" ]] || {
+	printf 'Install did not repoint a stale dwm-titus agent skill link.\n' >&2
+	exit 1
+}
+test -f "$AGENTS_HOME/.agents/skills/dwm-titus/SKILL.md"
+test ! -e "$AGENTS_HOME/.claude"
+
+# Two preservation passes, the edited-portal pass, the fresh install, and the
+# agents-only install.
+if [[ $(grep -Fxc -- '-f' "$WORK_DIR/fc-cache.log") -ne 5 ]]; then
 	printf 'Expected one font-cache refresh per user install.\n' >&2
 	exit 1
 fi
@@ -428,6 +470,15 @@ for unexpected in Thunar dnf xdg-desktop-portal/portals.conf; do
 done
 cmp "$TEST_REPO/config/xdg-desktop-portal/dwm-portals.conf" \
 	"$FRESH_CONFIG_HOME/xdg-desktop-portal/dwm-portals.conf"
+# Without an agent home, only the managed copy is installed, and the skills
+# are never seeded as application configuration.
+test -f "$FRESH_DATA_HOME/dwm-titus/config/agents/skills/dwm-titus/SKILL.md"
+for unexpected in .claude .agents .config/agents; do
+	if [ -e "$FRESH_HOME/$unexpected" ]; then
+		printf 'Fresh install created an agent directory: %s\n' "$unexpected" >&2
+		exit 1
+	fi
+done
 for user_path in \
 	"$FRESH_HOME/.local" \
 	"$FRESH_DATA_HOME" \
