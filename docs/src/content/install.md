@@ -202,7 +202,15 @@ updates replace. When `~/.claude` exists, the installer links
 it as `~/.claude/skills/dwm-titus`; when `~/.agents` or `~/.codex` exists, it
 links it as `~/.agents/skills/dwm-titus` for Codex and other Agent Skills
 clients. An existing entry with that name is preserved, and no agent directory
-is created for an agent that is not set up.
+is created for an agent that is not set up. Settings desktop updates refresh
+the skill but do not create links, so for an agent set up later, link it by
+hand:
+
+```bash
+skill="${XDG_DATA_HOME:-$HOME/.local/share}/dwm-titus/config/agents/skills/dwm-titus"
+mkdir -p ~/.claude/skills && ln -s "$skill" ~/.claude/skills/dwm-titus   # Claude Code
+mkdir -p ~/.agents/skills && ln -s "$skill" ~/.agents/skills/dwm-titus   # Codex and others
+```
 
 Meslo Nerd Font comes from the `ttf-meslo-nerd` package. The installer's
 checksum-verified Meslo download runs only when that font is not detected.

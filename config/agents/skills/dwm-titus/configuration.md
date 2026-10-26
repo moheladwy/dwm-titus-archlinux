@@ -37,15 +37,18 @@ tag_keys = [
 - Each `tag_keys` entry generates the view, toggle-view, move, and toggle-tag
   bindings for that tag.
 
-Before adding a binding, search for the same `mod` and `key` pair and tell the
-user about any clash. Invalid TOML fails silently, so re-read the edited lines
-and test the key afterwards. Keys the TOML cannot express can go into
-`keys[]` in `config.h` (see below).
+Put new bindings inside the `keys = [ ... ]` array, before its closing `]`.
+The commented examples under "CUSTOM SHORTCUTS" sit after the array, and
+entries placed there are ignored. Before adding a binding, search for the same
+`mod` and `key` pair and tell the user about any clash. Invalid TOML fails
+silently, so re-read the edited lines and test the key afterwards. `SUPER`
+means the build's `MODKEY` (Super unless the user chose Alt when building).
 
 Panel and shell actions are `spawn` entries that call `quickshell ipc --path
-"$XDG_CONFIG_HOME/quickshell/shell.qml" call TARGET FUNCTION` or a
-`dwm-quickshell-*` helper. Copy an existing entry rather than writing one from
-scratch.
+"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml" call TARGET FUNCTION`
+or a `dwm-quickshell-*` helper. The session does not export
+`XDG_CONFIG_HOME`, so keep the `:-$HOME/.config` fallback. Copy an existing
+entry rather than writing one from scratch.
 
 ## Window rules: `window-rules.toml`
 
@@ -65,7 +68,10 @@ omitted = current tag), `isfloating`, `isterminal` (enables swallowing),
 `noswallow`, `fullscreen` (true fullscreen on open), `fakefullscreen`
 (borderless monitor-sized window without EWMH fullscreen; exit with
 `Super+Shift+Y`), `ignoresizehints`, and `alwaysontop`. Flags take integer
-`1`. The last matching rule wins for each field.
+`1`. Every matching rule applies in order, and a later match resets the flags
+it omits to 0, while `tags` accumulate across matches. Keep broad class rules
+before specific class-and-title rules, and repeat any flag the specific rule
+must keep.
 
 Identify a window first: run `xprop WM_CLASS WM_NAME` and click it. Rules
 apply when a window opens, so close and reopen it after saving. Unmanaged
@@ -106,7 +112,7 @@ dwm-settings-wallpaper randomize     # one-off random image from ~/Pictures/back
 dwm-settings-wallpaper reset         # random-fill session default
 
 dwm-settings-personalization apply font "Noto Sans"
-dwm-settings-personalization apply text-size 1.25   # 0.75 to 2.0
+dwm-settings-personalization apply text-size 1.25   # 0.75 0.875 1.0 1.125 1.25 1.5 1.75 2.0
 dwm-settings-personalization apply cursor Adwaita
 dwm-settings-personalization reset font
 dwm-settings-personalization status
@@ -148,8 +154,9 @@ These are easiest in Settings (`dwm-settings open`) or the Control Center
 - Input devices and keyboard layout: Settings > Input. Saved values live in
   `~/.config/dwm-titus/input-settings.conf` and replay at login and hotplug.
   `setxkbmap` changes last only for the current session.
-- Screen blanking, auto-lock, and suspend lock: Control Center > Power. The
-  file is `~/.config/dwm-titus/power.conf`.
+- Screen blanking, auto-lock, and suspend lock: Control Center > Power
+  Settings, or Settings > Power. The file is
+  `~/.config/dwm-titus/power.conf`.
 - Do Not Disturb and popup duration: Settings > Appearance. The file is
   `~/.config/dwm-titus/notification-settings.json`.
 
@@ -161,8 +168,10 @@ dwm-settings-picom restart
 ```
 
 Opacity and backend (Automatic, XRender, GLX, EGL) live in Settings >
-Appearance > Compositor. The user's `~/.config/picom.conf` (or
-`~/.config/picom/picom.conf`) is theirs to edit; restart Picom afterwards.
+Appearance > Compositor. dwm-titus seeds no Picom file. When the user has no
+`~/.config/picom.conf` (or `~/.config/picom/picom.conf`), Picom reads
+`/etc/xdg/picom.conf`; `dwm-settings-picom copy-config` creates an editable
+user copy. Edit the user copy, never the system file, then restart Picom.
 Use XRender if GLX shows artifacts.
 
 ## Application configs
@@ -175,9 +184,12 @@ changes in a custom theme instead.
 ## Compile-time options: `config.h`
 
 `config.h` sits in the source checkout (the `checkout` in
-`~/.local/state/dwm-titus/desktop-update/installed.json`). It holds options
-TOML does not cover: `refresh_rate`, bar `fonts[]`, `MODKEY`, fallback
-`keys[]`, and `rules[]`. Edit it, then rebuild and resync from the checkout:
+`${XDG_STATE_HOME:-$HOME/.local/state}/dwm-titus/desktop-update/installed.json`;
+if that is empty, see `maintenance.md`). It holds the build options TOML does
+not cover: `refresh_rate`, `cursorwarp`, `snap`, `swallowfloating`,
+`showbar`, `topbar`, bar `fonts[]`, `mfact`, `nmaster`, `resizehints`, and
+`MODKEY`. Keybindings and window rules are not in `config.h`; they come only
+from the TOML files. Edit it, then rebuild and resync from the checkout:
 
 ```sh
 cd CHECKOUT
@@ -197,9 +209,9 @@ the files in the checkout (`config/quickshell/`, `scripts/`), run
 `dwm-quickshell-controlcenter action restart-quickshell`. Never start the
 panel with a repository path (`quickshell --path config/quickshell`); hotkeys
 talk to the installed `~/.config/quickshell/shell.qml` instance. Local source
-edits block `git pull --ff-only` and are overwritten by desktop updates, so
-tell the user. Changes meant for the project follow the repository
-`AGENTS.md` instead of this skill.
+edits block `git pull --ff-only`, and Settings > Desktop updates refuses a
+checkout with local changes, so tell the user. Changes meant for the project
+follow the repository `AGENTS.md` instead of this skill.
 
 ## Resetting to defaults
 

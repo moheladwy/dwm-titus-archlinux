@@ -55,7 +55,9 @@ cat "${XDG_STATE_HOME:-$HOME/.local/state}/dwm-titus/desktop-update/installed.js
 
 `installed.json` records the `checkout` directory and Git `revision` the
 desktop was installed from. Compile-time changes and reinstalls run from that
-checkout.
+checkout. After an update through Settings > Desktop updates, `checkout` is
+empty (`""`): the desktop then has no local clone. Ask the user where their
+clone is, or make a fresh one (see `maintenance.md`); never `cd ""`.
 
 ## Critical safety rules
 
@@ -80,7 +82,8 @@ checkout.
    - `~/.local/share/dwm-titus/` (managed copy of `config/` and `scripts/`)
    - `/usr/local/bin/dwm*` and the other installed helpers
    - `/usr/local/libexec/dwm-titus/` (root-owned privileged helpers)
-   - `/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf`
+   - `/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf` and
+     `/etc/lightdm/slick-greeter.conf` (when LightDM is in use)
 
    Reading them is safe and useful. To change the panel or a helper, change
    the source checkout and resync (see `configuration.md`).
@@ -117,7 +120,8 @@ allowlisted privileged actions; leave those to the UI.
 | `~/.config/dwm-titus/window-rules.toml` | user | Window rules. Live reload on save. |
 | `~/.config/dwm-titus/themes.toml` | user | Active theme, border size, custom themes. Live reload. |
 | `~/.config/dwm-titus/*.conf`, `*.json`, `display-profiles/` | helpers | Power, panel widgets, input, fonts, notifications, display profiles. Change these through their commands. |
-| `~/.config/alacritty/`, `kitty/`, `starship/`, `picom.conf` | user | Seeded once if missing, then never overwritten. |
+| `~/.config/alacritty/`, `kitty/`, `starship/` | user | Seeded once if missing, then never overwritten. |
+| `~/.config/picom.conf` | user | Not seeded. `dwm-settings-picom copy-config` creates it from the system file. |
 | `~/.config/quickshell/` | managed | Replaced on every install and update. |
 | `~/.local/share/dwm-titus/` | managed | Managed copy of the source `config/` and `scripts/`. |
 | `<checkout>/config.h` | user | Compile-time options. Preserved; rebuild after editing. |
@@ -199,8 +203,10 @@ Press `Super+/` in the session for a searchable list of the live keybindings.
   `dwm-default-apps set-role terminal kitty.desktop`.
 - "Make Firefox my default browser" ->
   `dwm-default-apps set-browser firefox.desktop`.
-- "Install Spotify" -> Flatpak `com.spotify.Client`, because it is not in the
-  official repositories. See `apps.md`.
+- "Install Spotify" -> `sudo pacman -Syu --needed spotify-launcher` (official
+  `extra` repository). See `apps.md`.
+- "Install Slack" -> not in the official repositories, so Flatpak:
+  `flatpak install --user flathub com.slack.Slack`.
 - "Update my system" -> `dwm-update-center launch system`, or hand the user
   `sudo pacman -Syu`.
 - "The panel disappeared" ->

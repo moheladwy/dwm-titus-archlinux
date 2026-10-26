@@ -316,7 +316,8 @@ install-user-files:
 	@echo "==> Linking agent skills..."
 	@# The skills ship in the managed data copy of config/, which installs and
 	@# desktop updates replace. Agents that are already set up get a link to
-	@# them; an existing entry of the same name is the user's and is kept.
+	@# them; an existing entry of the same name is the user's and is kept,
+	@# except a dangling link into an earlier dwm-titus data directory.
 	skills="${DATA_DIR}/config/agents/skills"; \
 	for root in claude agents; do \
 		case $$root in \
@@ -328,8 +329,14 @@ install-user-files:
 			[ -d "$$skill" ] || continue; \
 			name=$$(basename "$$skill"); \
 			link="$$dir/$$name"; \
-			if [ -L "$$link" ] && [ "$$(readlink "$$link")" = "$$skills/$$name" ]; then \
+			target=$$(readlink "$$link" 2>/dev/null || true); \
+			if [ -L "$$link" ] && [ "$$target" = "$$skills/$$name" ]; then \
 				continue; \
+			elif [ -L "$$link" ] && [ ! -e "$$link" ] && \
+				case "$$target" in */dwm-titus/config/agents/skills/"$$name") true ;; *) false ;; esac; then \
+				rm -f "$$link"; \
+				ln -s "$$skills/$$name" "$$link"; \
+				echo "  Relinked $$link"; \
 			elif [ -e "$$link" ] || [ -L "$$link" ]; then \
 				echo "  Preserving existing $$link"; \
 			else \
@@ -388,7 +395,7 @@ install-user-files:
 	# Managed data keeps source modes; it may also be the user's Git checkout.
 	for dir in config/*/; do \
 		b=$$(basename $$dir); \
-		if [ ! -L "${CFG_DIR}/$$b" ]; then \
+		if [ "$$b" != agents ] && [ ! -L "${CFG_DIR}/$$b" ]; then \
 			find "${CFG_DIR}/$$b" \( -name '*.sh' -o -name '*.py' \) -print0 2>/dev/null | xargs -0 -r chmod +x; \
 		fi; \
 	done

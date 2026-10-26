@@ -31,10 +31,10 @@ If another pacman holds the lock, point to `sudo fuser -v
 ## Flatpak
 
 ```sh
-flatpak install --user flathub com.spotify.Client
-flatpak run com.spotify.Client
+flatpak install --user flathub com.slack.Slack
+flatpak run com.slack.Slack
 flatpak list --user --app
-flatpak uninstall --user com.spotify.Client
+flatpak uninstall --user com.slack.Slack
 ```
 
 Use `--user`, which matches the remote the installer configured. If the
@@ -66,10 +66,14 @@ launcher. Have the user open the `.AppImage` file with Gear Lever, or run
 ## Web apps
 
 ```sh
-webapp-create create 'Gmail' 'https://mail.google.com' 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/gmail.png'
+webapp-create create 'Gmail' 'https://mail.google.com' 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/gmail.png' webapp-launch
 webapp-create list
 webapp-create remove 'Gmail'
 ```
+
+Always pass `webapp-launch` as the fourth argument. Without it the entry
+falls back to a command named webapp-launcher, which is not installed, and
+the launcher item does nothing.
 
 This writes a `.desktop` entry to `~/.local/share/applications/`, so the app
 shows up in the launcher (`Super+R`). To bind it to a key, use
@@ -80,9 +84,10 @@ shows up in the launcher (`Super+R`). To bind it to a key, use
 Check that a package is not part of the desktop before removing it:
 
 ```sh
-for p in required recommended full; do dwm-packages.sh arch "$p"; done | sort -u | grep -x NAME
+for p in full lightdm terminal terminal-primary aur-optional; do dwm-packages.sh arch "$p"; done | sort -u | grep -x NAME
 pacman -Qi NAME                       # "Required By" shows dependents
-sudo pacman -Rns NAME                 # review the list pacman prints first
+pacman -Rns --print NAME              # preview; changes nothing
+sudo pacman -Rns NAME                 # then review pacman's own prompt
 ```
 
 If `NAME` is in the dwm-titus package map, explain what breaks and ask
@@ -101,15 +106,21 @@ dwm-default-apps reset-role browser
 ```
 
 Desktop ids are the `.desktop` file names in `/usr/share/applications/` or
-`~/.local/share/applications/`. Settings > Defaults does the same and offers
+`~/.local/share/applications/`. `set-mime` accepts only these types:
+`x-scheme-handler/http`, `x-scheme-handler/https`, `text/html`,
+`application/xhtml+xml`, `inode/directory`, `text/plain`, `application/pdf`,
+`image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`,
+`audio/mpeg`, `video/mp4`. For any other type use
+`xdg-mime default ID TYPE`. Settings > Defaults does the same and offers
 Restore Previous.
 
 ### Changing the terminal
 
 `dwm-default-apps set-role terminal ID` rewrites `terminal` under `[vars]` in
 `hotkeys.toml` (the `Super+X` binding), with rollback on failure. Supported
-ids: `Alacritty.desktop`, `kitty.desktop`, `st.desktop`, `xterm.desktop`,
-`warp-terminal.desktop`, `dwmterm.desktop`. Also:
+ids: `Alacritty.desktop`, `org.alacritty.Alacritty.desktop`, `kitty.desktop`,
+`st.desktop`, `xterm.desktop`, `warp-terminal.desktop`,
+`dev.warp.Warp.desktop`, `dwmterm.desktop`. Also:
 
 - `dwm-terminal`, used by helpers that open a terminal, reads `DWM_TERMINAL`
   if it is set in the session environment.
@@ -130,8 +141,8 @@ Add a `spawn` entry to `~/.config/dwm-titus/hotkeys.toml` after checking for
 clashes (see `configuration.md`):
 
 ```toml
-{ mod="SUPER SHIFT", key="o", desc="Obsidian", func="spawn", exec=["obsidian"] },
-{ mod="SUPER SHIFT", key="s", desc="Spotify",  func="spawn", exec=["flatpak", "run", "com.spotify.Client"] },
+{ mod="SUPER SHIFT", key="n", desc="Obsidian", func="spawn", exec=["obsidian"] },
+{ mod="SUPER SHIFT", key="s", desc="Slack",    func="spawn", exec=["flatpak", "run", "com.slack.Slack"] },
 ```
 
 Pair it with a window rule if the app should open on a tag, float, or stay

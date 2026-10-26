@@ -433,8 +433,31 @@ run_as_owner env HOME="$FRESH_HOME" make -C "$TEST_REPO" install-user \
 	XDG_CONFIG_DIRS="$FRESH_CONFIG_DIRS" \
 	XDG_DATA_HOME="$FRESH_DATA_HOME"
 
-# Two preservation passes, the edited-portal pass, and the fresh install.
-if [[ $(grep -Fxc -- '-f' "$WORK_DIR/fc-cache.log") -ne 4 ]]; then
+# An ~/.agents home alone gets the link, and a dangling link left by an
+# earlier dwm-titus data directory is repointed at the current copy.
+AGENTS_HOME="$WORK_DIR/agents-home"
+mkdir -p "$AGENTS_HOME/.agents/skills" "$WORK_DIR/agents-etc-xdg/autostart"
+ln -s "$WORK_DIR/old-data/dwm-titus/config/agents/skills/dwm-titus" \
+	"$AGENTS_HOME/.agents/skills/dwm-titus"
+if [[ $(id -u) -eq 0 ]]; then
+	chown -hR "$OWNER:$OWNER_GROUP" "$AGENTS_HOME" "$WORK_DIR/agents-etc-xdg"
+fi
+run_as_owner env HOME="$AGENTS_HOME" make -C "$TEST_REPO" install-user \
+	USER_HOME="$AGENTS_HOME" \
+	OWNER="$OWNER" \
+	XDG_CONFIG_HOME="$AGENTS_HOME/.config" \
+	XDG_CONFIG_DIRS="$WORK_DIR/agents-etc-xdg" \
+	XDG_DATA_HOME="$AGENTS_HOME/.local/share" >/dev/null
+[[ $(readlink "$AGENTS_HOME/.agents/skills/dwm-titus") == "$AGENTS_HOME/.local/share/dwm-titus/config/agents/skills/dwm-titus" ]] || {
+	printf 'Install did not repoint a stale dwm-titus agent skill link.\n' >&2
+	exit 1
+}
+test -f "$AGENTS_HOME/.agents/skills/dwm-titus/SKILL.md"
+test ! -e "$AGENTS_HOME/.claude"
+
+# Two preservation passes, the edited-portal pass, the fresh install, and the
+# agents-only install.
+if [[ $(grep -Fxc -- '-f' "$WORK_DIR/fc-cache.log") -ne 5 ]]; then
 	printf 'Expected one font-cache refresh per user install.\n' >&2
 	exit 1
 fi

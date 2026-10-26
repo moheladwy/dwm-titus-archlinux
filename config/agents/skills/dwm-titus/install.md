@@ -53,10 +53,22 @@ Profiles:
 
 What the installer does, in order: Arch check, plan and summary, one visible
 `sudo pacman -Syu` (aborts the install if it fails or is declined), official
-packages with `sudo pacman -S --needed --`, optional AUR extras, display
+packages with `sudo pacman -S --needed --`, optional AUR extras, build
+options (`scripts/configure-build.sh` asks for refresh rate, font size,
+modifier key, and layout defaults when `config.h` is missing), display
 manager handling, `make` as the user, `sudo make install` (system files to
 `/usr/local`, user files as the user), default apps, Gear Lever, and the
 display wizard when run inside an X11 session.
+
+For an unattended run, the build questions take their answers from
+`DWM_REFRESH_RATE`, `DWM_FONT_SIZE`, `DWM_MODKEY`, `DWM_MFACT`,
+`DWM_NMASTER`, `DWM_CURSORWARP`, `DWM_SWALLOWFLOATING`, and
+`DWM_RESIZEHINTS`, with detected defaults otherwise.
+
+Agent shells usually have no terminal on standard input and cannot answer
+`sudo` or pacman prompts. Run the dry run yourself, then hand the user the
+real install command to run in their own terminal, unless they explicitly ask
+for an unattended `--non-interactive` run.
 
 The installer preserves an existing `config.h`, user TOML files,
 `~/.xinitrc`, application configuration, and `mimeapps.list`. It **replaces**
@@ -77,7 +89,9 @@ No desktop environment or display manager is needed first.
    pacman -Syu --needed sudo git
    useradd -m -G wheel USERNAME
    passwd USERNAME
-   EDITOR=nano visudo    # uncomment: %wheel ALL=(ALL:ALL) ALL
+   printf '%s\n' '%wheel ALL=(ALL:ALL) ALL' >/etc/sudoers.d/10-wheel
+   chmod 0440 /etc/sudoers.d/10-wheel
+   visudo -c    # must report the sudoers files as parsed OK
    ```
 
    Log in as that user for every following step.
@@ -133,11 +147,21 @@ The user already has another desktop or display manager.
    `cp -a ~/.config/quickshell ~/.config/quickshell.bak.$(date +%s)`.
    Do not run another Quickshell shell alongside the dwm-titus panel.
 
-3. **Display manager.**
-   - GDM, SDDM, and LightDM are detected and kept. Log out and choose
-     **dwm**. With LightDM, the installer adds only a drop-in
-     (`/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf`) that selects
-     `lightdm-slick-greeter` and the dwm session; `lightdm.conf` is untouched.
+3. **Display manager.** Find the active one:
+
+   ```sh
+   readlink -f /etc/systemd/system/display-manager.service
+   ```
+
+   - GDM and SDDM are detected and kept. Log out and choose **dwm**.
+   - LightDM is detected and kept, but the installer then makes
+     `lightdm-slick-greeter` the greeter and `dwm` the default session (drop-in
+     `/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf`; `lightdm.conf` is
+     untouched) and replaces `/etc/lightdm/slick-greeter.conf`. On this path
+     it does not install the greeter, so a LightDM that uses another greeter
+     would be left without a login screen. Tell the user about both changes,
+     back up `/etc/lightdm/slick-greeter.conf` if it exists, and install the
+     greeter first: `sudo pacman -Syu --needed lightdm-slick-greeter`.
    - Other display managers (ly, greetd, lxdm, xdm, and so on) are not
      detected. With `--profile full`, the installer then installs LightDM and
      runs `systemctl enable lightdm.service`, which fails while another
@@ -180,7 +204,7 @@ After logging into the dwm session:
 
 ```sh
 dwm-diagnostics                         # zero required failures expected
-cd "$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.local/state/dwm-titus/desktop-update/installed.json")))["checkout"])')"
+cd ~/dwm-titus-archlinux                # the clone install.sh ran from
 ./scripts/dev-sync-install.sh --check   # installed files match the checkout
 ```
 
@@ -194,5 +218,8 @@ set resolution and monitor layout.
 From the checkout, `sudo make uninstall DATADIR=/usr/share` removes the
 installed binaries, helpers, session file, themes, and cursors.
 `DATADIR=/usr/share` matches what `install.sh` used. Uninstalling does not
-remove packages or user configuration. Ask before removing anything under
-`~/.config` or `~/.local/share/dwm-titus`.
+remove packages, user configuration, the LightDM drop-in and
+`slick-greeter.conf` (which still select the dwm session), a display-setup
+Xorg fragment, or the agent skill links in `~/.claude/skills/` and
+`~/.agents/skills/`. List those for the user and ask before removing any of
+them, or anything under `~/.config` or `~/.local/share/dwm-titus`.

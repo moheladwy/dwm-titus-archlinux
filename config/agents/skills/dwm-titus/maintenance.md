@@ -35,12 +35,26 @@ Two supported ways:
 2. **From the checkout** (clean tree required):
 
    ```sh
-   cd CHECKOUT                    # "checkout" in ~/.local/state/dwm-titus/desktop-update/installed.json
+   cd CHECKOUT                    # "checkout" in installed.json (see below)
    git status --short             # must be empty; ask the user about local changes
    git pull --ff-only
-   ./install.sh --yes --profile recommended   # use the profile they installed with
+   ./install.sh --dry-run --non-interactive --profile PROFILE   # review the plan
+   ./install.sh --yes --profile PROFILE
    ./scripts/dev-sync-install.sh
    ```
+
+   The profile is not recorded anywhere, so ask the user which one they use.
+   Do not fall back to the default `full` on a system with ly, greetd, or
+   another display manager the installer does not detect (see `install.md`).
+
+   `CHECKOUT` is the `checkout` value in
+   `${XDG_STATE_HOME:-$HOME/.local/state}/dwm-titus/desktop-update/installed.json`.
+   It is empty after a Settings desktop update. Then ask the user for their
+   clone, or clone again (`git clone
+   https://github.com/moheladwy/dwm-titus-archlinux.git`). A fresh clone has
+   no `config.h`; the last build's copy is
+   `${XDG_STATE_HOME:-$HOME/.local/state}/dwm-titus/desktop-update/build-config.h`,
+   so copy it into the clone as `config.h` to keep the user's build options.
 
    Log out, log back in to dwm, then run `./scripts/dev-sync-install.sh --check`
    and `dwm-diagnostics`.
@@ -97,6 +111,21 @@ confirmed repair buttons. For a source checkout, also run
 4. Rerun `./install.sh` and `./scripts/dev-sync-install.sh` from the checkout
    if installed files are missing or stale.
 5. Log back in, or run `startx` from the TTY to see errors directly.
+
+## Agent skill links
+
+This skill ships in the managed copy
+`${XDG_DATA_HOME:-$HOME/.local/share}/dwm-titus/config/agents/skills/dwm-titus`,
+which installs and desktop updates refresh. `./install.sh` links it into
+`~/.claude/skills/` and `~/.agents/skills/` only for agents already set up at
+that time, and keeps an existing entry of the same name. To add a link later,
+ask the user, then:
+
+```sh
+skill="${XDG_DATA_HOME:-$HOME/.local/share}/dwm-titus/config/agents/skills/dwm-titus"
+mkdir -p ~/.claude/skills && ln -s "$skill" ~/.claude/skills/dwm-titus   # Claude Code
+mkdir -p ~/.agents/skills && ln -s "$skill" ~/.agents/skills/dwm-titus   # Codex and others
+```
 
 ## Reporting a bug
 
