@@ -23,3 +23,7 @@ phase's tasks when one becomes active.
 - [ ] Check current repositories for drift: run the gate against live Arch
       mirrors instead of the pinned archive snapshot, and record the result
       separately from snapshot evidence. No scheduled job does this yet.
+- [ ] Investigate one silent `check-quickshell-power-backend` failure seen
+      once while several heavy suites and unrelated containers shared the test
+      host. It did not reproduce in seven traced reruns, four of them in
+      parallel, so its cause is unknown.
