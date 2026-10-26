@@ -69,11 +69,21 @@ ShellRoot {
         check(!find(origin).enabled, "Unavailable offer disables mutation without hiding state");
         model.actions = actions;
     }
-    function checkMessageFocus(names, index, finished) {
+    function checkMessageFocus(names, index, finished, deadline) {
         stage = -2;
         if (index === names.length) { finished(); return; }
         const control = find(names[index]);
-        check(control.visible && control.enabled, "Focus fixture control is available");
+        // A refresh started by a background event can briefly disable a
+        // control (Reload status while busy). Wait for it instead of failing:
+        // the claim under test is that asynchronous messages keep focus.
+        if (!(control.visible && control.enabled)) {
+            const until = deadline === undefined ? Date.now() + 3000 : deadline;
+            check(Date.now() < until, "Focus fixture control is available: " + names[index]
+                + " (visible=" + control.visible + ", enabled=" + control.enabled + ", busy=" + model.busy + ")");
+            focusRetry.retry = function() { root.checkMessageFocus(names, index, finished, until); };
+            focusRetry.restart();
+            return;
+        }
         control.forceActiveFocus();
         model.regional.message = "Fixture asynchronous message for " + names[index];
         Qt.callLater(function() {
@@ -320,6 +330,12 @@ ShellRoot {
         done = true;
         console.info("Regional UI tests: PASS (" + action + "/" + scenario + ", " + assertions + " assertions)");
         Qt.quit();
+    }
+    Timer {
+        id: focusRetry
+        property var retry: null
+        interval: 25
+        onTriggered: { if (retry !== null) retry(); }
     }
     SystemManagementModel { id: model }
     Connections {
