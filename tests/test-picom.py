@@ -615,6 +615,54 @@ class PicomTests(unittest.TestCase):
         self.assertEqual(spawn.call_count, 2)
         self.assertEqual(wait.call_count, 2)
 
+    def test_launch_waits_for_selection_after_renderer_probe(self):
+        # The renderer probe owns the selection until X processes its exit.
+        order = []
+        child = Mock()
+        child.poll.return_value = 1
+        with (
+            patch.object(
+                picom,
+                "backend",
+                side_effect=lambda *_: order.append("probe")
+                or ("xrender", "xrender", "", "software"),
+            ),
+            patch.object(
+                picom,
+                "await_selection_release",
+                side_effect=lambda: order.append("wait"),
+            ),
+            patch.object(
+                picom.subprocess,
+                "Popen",
+                side_effect=lambda *_, **__: order.append("spawn") or child,
+            ),
+            self.assertRaisesRegex(picom.Error, "Picom failed to start"),
+        ):
+            picom.launch(picom.Configuration())
+        self.assertEqual(order, ["probe", "wait", "spawn"])
+
+    def test_status_probe_excludes_concurrent_launches(self):
+        # A --diagnostics probe owns the compositor selection while none runs;
+        # Settings refreshes must not let it overlap a start or restart.
+        lock = picom.private_dir() / "mutation.lock"
+
+        def probe(_config):
+            fd = os.open(lock, os.O_RDWR)
+            try:
+                with self.assertRaises(BlockingIOError):
+                    picom.fcntl.flock(fd, picom.fcntl.LOCK_EX | picom.fcntl.LOCK_NB)
+                picom.fcntl.flock(fd, picom.fcntl.LOCK_SH | picom.fcntl.LOCK_NB)
+            finally:
+                os.close(fd)
+            return "software"
+
+        with patch.object(picom, "renderer", side_effect=probe) as renderer:
+            self.assertEqual(picom.status()["renderer"], "software")
+        renderer.assert_called_once()
+        with picom.locked():
+            pass
+
     def test_failed_import_storage_limit_preserves_existing_copies(self):
         vendor = self.home / "vendor.conf"
         original = '@include "' + str(vendor) + '"'
