@@ -14,6 +14,16 @@ the port.
 
 ### Added
 
+- Add the `dwm-titus` agent skill (`config/agents/skills/dwm-titus/`, linked
+  from `.agents/skills/` and `.claude/skills/`) so Claude Code, Codex, and
+  other Agent Skills clients can install the desktop on a fresh or existing
+  Arch system and safely change keybindings, window rules, themes, default
+  apps, installed applications, and updates. It ships in the managed
+  `~/.local/share/dwm-titus/config/` copy, which installs and desktop updates
+  replace. User installs link it into `~/.claude/skills/` and
+  `~/.agents/skills/` only for agents that are already set up, never
+  replacing an existing skill of the same name. `make check-agent-skills`
+  validates its format and command references.
 - Support Arch Linux (`ID=arch`) as the only platform. The installer rejects
   every other identity, including Arch derivatives such as EndeavourOS,
   CachyOS, and Manjaro, before making any change.

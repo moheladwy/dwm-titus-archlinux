@@ -196,6 +196,14 @@ Arch's `/etc/xdg/picom.conf` uses Picom's newer `rules` syntax. The installer's
 Quickshell tooltip opacity tweak recognizes only the legacy `opacity-rule`
 entry, so it leaves the file unchanged and prints a warning.
 
+The `dwm-titus` agent skill ships in the managed data copy at
+`~/.local/share/dwm-titus/config/agents/skills/`, which installs and desktop
+updates replace. When `~/.claude` exists, the installer links
+it as `~/.claude/skills/dwm-titus`; when `~/.agents` or `~/.codex` exists, it
+links it as `~/.agents/skills/dwm-titus` for Codex and other Agent Skills
+clients. An existing entry with that name is preserved, and no agent directory
+is created for an agent that is not set up.
+
 Meslo Nerd Font comes from the `ttf-meslo-nerd` package. The installer's
 checksum-verified Meslo download runs only when that font is not detected.
 

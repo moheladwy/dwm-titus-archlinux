@@ -293,7 +293,7 @@ install-user-files:
 	fi
 	for dir in config/*/; do \
 		b=$$(basename "$$dir"); \
-		if [ "$$b" = quickshell ]; then \
+		if [ "$$b" = quickshell ] || [ "$$b" = agents ]; then \
 			continue; \
 		fi; \
 		dst=${CFG_DIR}/$$b; \
@@ -313,6 +313,32 @@ install-user-files:
 	rm -rf "${CFG_DIR}/quickshell"
 	mkdir -p "${CFG_DIR}/quickshell"
 	cp -aL --no-preserve=ownership config/quickshell/. "${CFG_DIR}/quickshell"/
+	@echo "==> Linking agent skills..."
+	@# The skills ship in the managed data copy of config/, which installs and
+	@# desktop updates replace. Agents that are already set up get a link to
+	@# them; an existing entry of the same name is the user's and is kept.
+	skills="${DATA_DIR}/config/agents/skills"; \
+	for root in claude agents; do \
+		case $$root in \
+		claude) test -d "${USER_HOME}/.claude" || continue; dir="${USER_HOME}/.claude/skills" ;; \
+		agents) { test -d "${USER_HOME}/.agents" || test -d "${USER_HOME}/.codex"; } || continue; \
+			dir="${USER_HOME}/.agents/skills" ;; \
+		esac; \
+		for skill in "$$skills"/*/; do \
+			[ -d "$$skill" ] || continue; \
+			name=$$(basename "$$skill"); \
+			link="$$dir/$$name"; \
+			if [ -L "$$link" ] && [ "$$(readlink "$$link")" = "$$skills/$$name" ]; then \
+				continue; \
+			elif [ -e "$$link" ] || [ -L "$$link" ]; then \
+				echo "  Preserving existing $$link"; \
+			else \
+				mkdir -p "$$dir"; \
+				ln -s "$$skills/$$name" "$$link"; \
+				echo "  Linked $$link"; \
+			fi; \
+		done; \
+	done
 	@echo "==> Seeding user config (skipping existing files)..."
 	mkdir -p ${CFG_DIR}/dwm-titus
 	test -f ${CFG_DIR}/dwm-titus/hotkeys.toml || install -Dm644 config/hotkeys.toml ${CFG_DIR}/dwm-titus/hotkeys.toml
@@ -731,6 +757,9 @@ check-install-manifest: all
 check-install-preservation:
 	tests/test-install-preservation.sh
 
+check-agent-skills:
+	/usr/bin/python3 tests/test-agent-skills.py
+
 check-desktop-update: dwm
 	@python3 tests/test-desktop-update-sandbox.py
 	python3 tests/test-desktop-update.py
@@ -843,6 +872,7 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-arch-packages
 	$(MAKE) check-install
 	$(MAKE) check-install-preservation
+	$(MAKE) check-agent-skills
 	$(MAKE) check-test-runner
 	$(MAKE) check-test-runner-podman
 	$(MAKE) check-lightdm-config
@@ -855,7 +885,7 @@ check: check-picom check-picom-xvfb
 	check-test-runner-podman \
 	check-update-center-settings \
 	check-display-profile check-display-setup check-arch-packages check-arch-platform check-format check-install \
-	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-lock \
+	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-agent-skills check-lock \
 	check-session-guards check-session-migration check-screenshot check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
 	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-nvidia-suspend-test check-terminal check-xvfb-runtime install install-system install-user \
 	install-cursors install-app-themes check-app-themes native release release-check uninstall uninstall-files

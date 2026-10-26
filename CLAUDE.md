@@ -33,6 +33,7 @@ scripts/run-tests make check-quickshell-qml       # Qt6 qmllint with correct imp
 scripts/quickshell-qmllint --root config/quickshell   # same, directly
 scripts/run-tests make check-arch-platform check-arch-packages   # os-release gate + package map
 scripts/run-tests make check-xvfb-runtime check-monitor-tags   # nested X11 dwm smoke
+scripts/run-tests make check-agent-skills        # validate config/agents/skills (format, links, commands)
 scripts/run-tests-podman [make <target>]          # same, inside localhost/dwm-titus-tests:arch
 scripts/dev-sync-install.sh [--check]  # build + sync this checkout into the live install
 ./install.sh --dry-run --non-interactive --profile recommended   # inspect install plan
@@ -107,3 +108,6 @@ alone, and `DESTDIR` stages an install. All of these go through
   `scripts/dev-sync-install.sh`), not `quickshell --path config/quickshell`.
 - `TASKS.md` holds only the active roadmap phase; replace its contents rather
   than appending.
+- `config/agents/skills/dwm-titus/` is the end-user skill (install, configure,
+  apps, maintenance); `.agents/skills/` and `.claude/skills/` link to it. It is
+  for operating an installed desktop, not for developing this repository.
