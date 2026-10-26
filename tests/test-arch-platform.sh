@@ -253,12 +253,21 @@ if [[ $EUID -eq 0 ]]; then
 	chmod 0711 "$work"
 	chown -R nobody:"$(id -gn nobody)" "$work/user"
 	run_as_user=(runuser -u nobody --)
+	if ! "${run_as_user[@]}" test -x "$work/user/repo/install.sh"; then
+		printf 'Root-run platform tests need a workspace that nobody can traverse.\n' >&2
+		printf 'Set DWM_TEST_TMP_ROOT outside /root (CI uses /var/tmp/dwm-ci).\n' >&2
+		exit 1
+	fi
 fi
+run_user_install() {
+	local output=$1
+	shift
+	"${run_as_user[@]}" env DWM_TEST_MODE=1 DWM_OS_RELEASE="$work/user/os-release" \
+		DWM_MUTATION_LOG="$work/user/mutations.log" HOME="$work/user/home" \
+		PATH="$work/user/bin:$PATH" "$work/user/repo/install.sh" "$@" >"$output" 2>&1
+}
 set +e
-"${run_as_user[@]}" env DWM_TEST_MODE=1 DWM_OS_RELEASE="$work/user/os-release" \
-	DWM_MUTATION_LOG="$work/user/mutations.log" HOME="$work/user/home" \
-	PATH="$work/user/bin:$PATH" "$work/user/repo/install.sh" \
-	--non-interactive --profile core >"$work/upgrade-first.out" 2>&1
+run_user_install "$work/upgrade-first.out" --non-interactive --profile core </dev/null
 upgrade_status=$?
 set -e
 if [[ $upgrade_status -ne 1 ]]; then
@@ -267,46 +276,118 @@ if [[ $upgrade_status -ne 1 ]]; then
 	exit 1
 fi
 grep -Fq 'System upgrade failed or was declined' "$work/upgrade-first.out"
+# Only the explicit --non-interactive flag adds --noconfirm.
 printf 'sudo\tpacman -Syu --noconfirm\n' >"$work/upgrade-first.expected"
 cmp "$work/upgrade-first.expected" "$work/user/mutations.log"
+rm -f "$work/user/mutations.log"
 printf 'Installer upgrades the system before installing packages: PASS\n'
 
+# Unattended mode is never inferred. Without a terminal on stdin and without
+# --non-interactive, the installer refuses before any change, even with --yes.
+for refusal_flags in '' '--yes'; do
+	snapshot_tree "$work/user/home" "$work/no-tty-home.before"
+	refusal_args=(--profile core)
+	[[ -z $refusal_flags ]] || refusal_args+=("$refusal_flags")
+	set +e
+	run_user_install "$work/no-tty.out" "${refusal_args[@]}" </dev/null
+	refusal_status=$?
+	set -e
+	if [[ $refusal_status -ne 1 ]]; then
+		printf 'Installer without a terminal (%s) exited with %s instead of 1.\n' \
+			"${refusal_args[*]}" "$refusal_status" >&2
+		cat "$work/no-tty.out" >&2
+		exit 1
+	fi
+	grep -Fq 'Standard input is not a terminal' "$work/no-tty.out"
+	grep -Fq 'pass --non-interactive for an unattended install' "$work/no-tty.out"
+	if [[ -e $work/user/mutations.log ]] || grep -Fq 'Installation summary' "$work/no-tty.out"; then
+		printf 'Installer without a terminal continued past the mode check.\n' >&2
+		exit 1
+	fi
+	snapshot_tree "$work/user/home" "$work/no-tty-home.after"
+	cmp "$work/no-tty-home.before" "$work/no-tty-home.after"
+done
+# A dry run needs no prompts, so it still works without a terminal.
+run_user_install "$work/no-tty-dry-run.out" --dry-run --profile core </dev/null
+grep -Fq 'Mode: interactive' "$work/no-tty-dry-run.out"
+grep -Fq 'Dry run complete; no changes were made.' "$work/no-tty-dry-run.out"
+[[ ! -e $work/user/mutations.log ]]
+
+# Redirected stdout with a terminal on stdin keeps the interactive mode: the
+# installer asks its questions and pacman gets no --noconfirm.
+if command -v script >/dev/null 2>&1; then
+	pty_command=$(printf '%q ' env DWM_TEST_MODE=1 \
+		DWM_OS_RELEASE="$work/user/os-release" \
+		DWM_MUTATION_LOG="$work/user/mutations.log" HOME="$work/user/home" \
+		PATH="$work/user/bin:$PATH" "$work/user/repo/install.sh" --profile core)
+	pty_command+=">$(printf '%q' "$work/user/pty.out") 2>&1"
+	set +e
+	# script(1) runs the command with $SHELL; runuser sets nobody's nologin shell.
+	printf 'n\ny\n' | "${run_as_user[@]}" env SHELL=/bin/bash \
+		script -qec "$pty_command" /dev/null >/dev/null 2>&1
+	pty_status=$?
+	set -e
+	if [[ $pty_status -ne 1 ]]; then
+		printf 'Interactive install with redirected stdout exited with %s instead of 1.\n' \
+			"$pty_status" >&2
+		cat "$work/user/pty.out" >&2 || true
+		exit 1
+	fi
+	grep -Fq 'Mode: interactive' "$work/user/pty.out"
+	grep -Fq 'Install optional AUR packages' "$work/user/pty.out"
+	grep -Fq 'Skipping optional AUR packages.' "$work/user/pty.out"
+	grep -Fq 'Continue with installation? [y/N]' "$work/user/pty.out"
+	grep -Fq 'System upgrade failed or was declined' "$work/user/pty.out"
+	printf 'sudo\tpacman -Syu\n' >"$work/pty-upgrade.expected"
+	cmp "$work/pty-upgrade.expected" "$work/user/mutations.log"
+	rm -f "$work/user/mutations.log"
+else
+	printf 'SKIP: script(1) is unavailable; redirected-stdout interactive mode not exercised.\n'
+fi
+printf 'Installer interaction mode follows --non-interactive only: PASS\n'
+
 # AUR helpers never run as root and are never bootstrapped.
-mkdir -p "$work/helper-bin"
-cp "$work/bin/paru" "$work/helper-bin/"
+aur_dir="$work/aur-user"
+mkdir -p "$aur_dir/helper-bin"
+cp "$work/bin/paru" "$aur_dir/helper-bin/"
+cp "$repo/scripts/dwm-utils.sh" "$work/arch" "$aur_dir/"
 if [[ $EUID -eq 0 ]]; then
 	# shellcheck disable=SC2016
-	if DWM_TEST_MODE=1 DWM_OS_RELEASE="$work/arch" PATH="$work/helper-bin:$PATH" \
-		DWM_MUTATION_LOG="$work/aur.log" bash -c '. "$1"; install_aur_packages xkbset' \
-		sh "$repo/scripts/dwm-utils.sh" >"$work/aur-root.out" 2>&1; then
+	if DWM_TEST_MODE=1 DWM_OS_RELEASE="$aur_dir/arch" PATH="$aur_dir/helper-bin:$PATH" \
+		DWM_MUTATION_LOG="$aur_dir/aur.log" bash -c '. "$1"; install_aur_packages xkbset' \
+		sh "$aur_dir/dwm-utils.sh" >"$work/aur-root.out" 2>&1; then
 		printf 'AUR install succeeded as root.\n' >&2
 		exit 1
 	fi
 	grep -Fq 'Refusing to run an AUR helper as root.' "$work/aur-root.out"
-else
-	# shellcheck disable=SC2016
-	DWM_TEST_MODE=1 DWM_OS_RELEASE="$work/arch" PATH="$work/helper-bin:$PATH" \
-		DWM_MUTATION_LOG="$work/aur.log" bash -c '. "$1"; install_aur_packages xkbset' \
-		sh "$repo/scripts/dwm-utils.sh" >/dev/null 2>&1 || true
-	printf 'paru\t-S --needed -- xkbset\n' >"$work/aur.expected"
-	cmp "$work/aur.expected" "$work/aur.log"
-	rm "$work/aur.log"
+	if [[ -e $aur_dir/aur.log ]]; then
+		printf 'AUR helper ran as root.\n' >&2
+		exit 1
+	fi
+	chown -R nobody:"$(id -gn nobody)" "$aur_dir"
 fi
+# The unprivileged branch runs in every gate; root-run gates use nobody.
+# shellcheck disable=SC2016
+"${run_as_user[@]}" env DWM_TEST_MODE=1 DWM_OS_RELEASE="$aur_dir/arch" \
+	PATH="$aur_dir/helper-bin:$PATH" DWM_MUTATION_LOG="$aur_dir/aur.log" \
+	bash -c '. "$1"; install_aur_packages xkbset' sh "$aur_dir/dwm-utils.sh" \
+	>/dev/null 2>&1 || true
+printf 'paru\t-S --needed -- xkbset\n' >"$work/aur.expected"
+cmp "$work/aur.expected" "$aur_dir/aur.log"
+rm -f "$aur_dir/aur.log"
 # Without an installed helper nothing runs and nothing is bootstrapped.
 # shellcheck disable=SC2016
-if DWM_TEST_MODE=1 DWM_OS_RELEASE="$work/arch" PATH="$work/bin:$PATH" \
-	DWM_MUTATION_LOG="$work/aur.log" bash -c '
+if "${run_as_user[@]}" env DWM_TEST_MODE=1 DWM_OS_RELEASE="$aur_dir/arch" \
+	PATH="$work/bin:$PATH" DWM_MUTATION_LOG="$aur_dir/aur.log" bash -c '
 		. "$1"
 		dwm_aur_helper() { return 1; }
 		install_aur_packages xkbset
-	' sh "$repo/scripts/dwm-utils.sh" >"$work/aur.out" 2>&1; then
+	' sh "$aur_dir/dwm-utils.sh" >"$work/aur.out" 2>&1; then
 	printf 'AUR install succeeded without an AUR helper.\n' >&2
 	exit 1
 fi
-if [[ $EUID -ne 0 ]]; then
-	grep -Fq 'No AUR helper (paru or yay) is installed' "$work/aur.out"
-fi
-if [[ -e $work/aur.log ]]; then
+grep -Fq 'No AUR helper (paru or yay) is installed' "$work/aur.out"
+if [[ -e $aur_dir/aur.log ]]; then
 	printf 'AUR install without a helper attempted a mutation.\n' >&2
 	exit 1
 fi

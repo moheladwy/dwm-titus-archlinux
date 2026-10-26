@@ -22,7 +22,9 @@ Usage: ./install.sh [options]
 Options:
   --profile PROFILE      Install profile: core, recommended, or full.
                          Defaults to DWM_INSTALL_PROFILE or full.
-  --non-interactive      Use unattended defaults and do not prompt.
+  --non-interactive      Use unattended defaults and do not prompt; pacman
+                         runs with --noconfirm. Required when standard
+                         input is not a terminal.
   --yes                  Accept the interactive install summary.
   --install-herdr        Install verified Herdr as an optional workspace.
   --skip-herdr           Do not install Herdr.
@@ -143,9 +145,14 @@ auto)
 	;;
 esac
 
-if [[ ! -t 0 || ! -t 1 ]]; then
-	NON_INTERACTIVE=true
-	ASSUME_YES=true
+# Only an explicit --non-interactive selects unattended defaults and adds
+# --noconfirm to pacman. Redirected output, such as `./install.sh | tee log`,
+# never changes the mode. Without a terminal on stdin the prompts cannot be
+# answered, so refuse rather than silently switching to unattended mode.
+if [[ ! -t 0 && $NON_INTERACTIVE != true && $DRY_RUN != true ]]; then
+	err "Standard input is not a terminal, so the installer cannot ask for confirmation."
+	err "Run it from a terminal, or pass --non-interactive for an unattended install."
+	exit 1
 fi
 
 if [[ $EUID -eq 0 && $DRY_RUN != true ]]; then
@@ -448,15 +455,11 @@ detect_display_manager() {
 }
 
 install_lightdm_config() {
-	# Arch packages the greeter as lightdm-slick-greeter and ships the session
-	# wrapper at /etc/lightdm/Xsession. The rendered lightdm.conf replaces the
-	# packaged one (with a backup), so the wrapper must be set explicitly.
-	sudo make -C "$REPO_DIR/lightdm" \
-		LIGHTDM_SEAT_SECTION="Seat:*" \
-		LIGHTDM_GREETER_SESSION="lightdm-slick-greeter" \
-		LIGHTDM_SESSION_WRAPPER="/etc/lightdm/Xsession" \
-		LIGHTDM_LOGIND_CHECK=true \
-		install
+	# Install /etc/lightdm/lightdm.conf.d/50-dwm-titus.conf, which selects
+	# lightdm-slick-greeter and the dwm session. lightdm.conf is never touched:
+	# it keeps Arch's /etc/lightdm/Xsession wrapper and any local settings such
+	# as autologin, and LightDM reads it after drop-ins, so its values win.
+	sudo make -C "$REPO_DIR/lightdm" install
 }
 
 # Dolphin's "Open Terminal Here" action reads the terminal from kdeglobals.
