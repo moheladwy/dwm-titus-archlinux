@@ -52,7 +52,7 @@ submitting a pull request.
 | Documentation | `npm --prefix docs ci`, then `npm --prefix docs run build` |
 | Platform detection | `scripts/run-tests make check-arch-platform` |
 | Installer or package mapping | `scripts/run-tests-podman make check-arch-packages` in the Arch container, plus an installer run in a clean Arch container or VM |
-| Legacy Fedora Kickstart or ISO code | Not part of the product; it remains only until removal. Do not extend it. Keep `scripts/run-tests make check-kickstart` passing until it is deleted. |
+| Legacy Fedora Kickstart or ISO code | Not part of the product and not validated: its checks need Fedora tools such as `ksvalidator`, which the Arch image cannot provide. Do not modify or extend it; it is removed in Phase 10. |
 | Release automation | `scripts/run-tests make release-check` and a dry run of the release helper |
 
 Arch package, VM, and X11 checks require their documented tools. If a
