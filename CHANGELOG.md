@@ -8,7 +8,7 @@ versions from `config.mk`.
 
 This fork (`moheladwy/dwm-titus-archlinux`) now supports Arch Linux only.
 Fedora is no longer supported. See the migration notes under Changed and the
-port plan in `.github/plans/arch-linux-port.md`. Entries below that mention
+port decisions in `docs/ARCH-PORT-DECISIONS.md`. Entries below that mention
 Fedora, DNF, PackageKit, Path, or images describe upstream work that predates
 the port.
 
@@ -59,8 +59,21 @@ the port.
 - Dolphin replaces Thunar as the managed file manager in the `full` profile,
   and fresh accounts open folders in Dolphin. Existing MIME preferences are
   unchanged.
-- LightDM integration uses `lightdm-slick-greeter` and Arch's
-  `/etc/lightdm/Xsession` session wrapper, keeping Arch's packaged defaults.
+- LightDM integration adds the drop-in
+  `/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf` (`lightdm-slick-greeter`,
+  the `dwm` session, and the logind graphical check) and never rewrites
+  `/etc/lightdm/lightdm.conf`, so existing settings such as autologin are kept
+  and Arch's packaged session wrapper applies. Installs where an earlier
+  version replaced `lightdm.conf` keep that file and its `.dwm-titus.*.bak`
+  backup; the drop-in repeats the same values harmlessly.
+- The installer no longer switches to non-interactive mode, or adds
+  `--noconfirm`, because standard input or output is not a terminal. Without a
+  terminal on standard input it refuses unless `--non-interactive` (or
+  `--dry-run`) is given, and a piped standard output, such as `| tee`, keeps
+  the interactive prompts.
+- `nvidia-suspend-test.sh` reads `/etc/mkinitcpio.conf.d/*.conf` drop-ins in
+  mkinitcpio's order and finds the NVIDIA module with `modinfo`, so DKMS
+  modules outside `extramodules` are checked.
 - The keyring dependency is `gnome-keyring`, which ships the PAM module on
   Arch. Using it with `startx` requires a manual `/etc/pam.d/login` edit; the
   installer never edits PAM files.

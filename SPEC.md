@@ -186,11 +186,15 @@ The project must support:
 Missing optional components must be logged or skipped without terminating dwm.
 
 Display-manager integration (the `full` profile) uses LightDM with
-`lightdm-slick-greeter`. The managed configuration must keep Arch's packaged
-LightDM defaults rather than overwrite them, and set only what the session
-needs under `[Seat:*]`: `greeter-session=lightdm-slick-greeter`,
-`session-wrapper=/etc/lightdm/Xsession`, and `logind-check-graphical=true`.
-Enabling the display-manager service must be visible to the user.
+`lightdm-slick-greeter`. The installer adds the drop-in
+`/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf` (`[LightDM]`
+`logind-check-graphical=true`; `[Seat:*]` `greeter-session=lightdm-slick-greeter`
+and `user-session=dwm`) and never creates, modifies, or backs up
+`/etc/lightdm/lightdm.conf`. LightDM reads `lightdm.conf` after its drop-ins,
+so values the user sets there take precedence, and
+`session-wrapper=/etc/lightdm/Xsession` comes from Arch's packaged
+`lightdm.conf`. Enabling the display-manager service must be visible to the
+user.
 
 The default screenshot-to-clipboard binding must capture through the managed
 `dwm-screenshot` helper. On X11, the helper must use `maim` to capture without
@@ -233,7 +237,10 @@ but X11/EWMH behavior remains the compatibility boundary for this project.
 The supported installation flow must:
 
 1. Read `/etc/os-release`, require `ID=arch`, and reject every other identity
-   before making changes. Require `pacman`.
+   before making changes. Require `pacman`. If standard input is not a
+   terminal, refuse before any change unless `--non-interactive` or
+   `--dry-run` was given; a redirected standard output never changes the
+   interaction mode.
 2. Resolve Arch package names from one maintained dependency map.
 3. Show required and optional packages before installing them. The plan,
    including the system upgrade in step 4, appears in `--dry-run` output.
@@ -992,13 +999,14 @@ Arch has no release number, so every validation record must state:
 - every path that was not tested.
 
 A record against the pinned snapshot does not prove behavior against current
-repositories. Drift against current repositories is caught separately and
-reported as such.
+repositories. No automated job checks current repositories yet: drift is found
+by a manual run against live mirrors, recorded as such, and tracked as a
+follow-up in `TASKS.md`.
 
 ## 10. Current Gap
 
-The project is being ported from Fedora to Arch Linux following
-`.github/plans/arch-linux-port.md`. Fedora feature history (Phases 1-8 and the
+The project is being ported from Fedora to Arch Linux following the decisions
+in `docs/ARCH-PORT-DECISIONS.md`. Fedora feature history (Phases 1-8 and the
 0.7.2 work) is archived in `docs/COMPLETED-ROADMAP-20260911.md`, the
 `docs/P*-*.md` evidence files, and `CHANGELOG.md`; it is not a claim about
 Arch behavior.

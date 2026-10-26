@@ -2,7 +2,7 @@
 
 ## Arch Linux port, Phases 0-4
 
-Plan: [arch-linux-port.md](.github/plans/arch-linux-port.md). This pull request
+Decisions: [ARCH-PORT-DECISIONS.md](docs/ARCH-PORT-DECISIONS.md). This pull request
 covers plan Phases 0-4 only. No merge or release publication is authorized.
 Tests that install packages or change system state run only in the Arch
 container or a VM, never on the host.
@@ -54,8 +54,8 @@ container or a VM, never on the host.
       `--enable-aur` for an already-installed `paru` or `yay`, run as the user.
 - [ ] Replace Thunar and Path with Dolphin (default apps, menu integration,
       theming), and remove the Path window rule from the shipped defaults.
-- [ ] Use Arch LightDM defaults with `lightdm-slick-greeter` and
-      `session-wrapper=/etc/lightdm/Xsession`.
+- [ ] Add a LightDM drop-in for `lightdm-slick-greeter` and the `dwm`
+      session without rewriting `/etc/lightdm/lightdm.conf`.
 - [ ] Check `gnome-keyring` and its PAM module; treat `xkbset` as optional.
 - [ ] Port `dev-sync-install.sh`, power, screensaver, health, diagnostics, and
       Quickshell version and wording helpers to Arch.
@@ -73,3 +73,9 @@ container or a VM, never on the host.
 - [ ] `--profile recommended` with LightDM in a VM with a fresh Arch install.
 - [ ] Nested X11 dwm smoke and a `quickshell --no-duplicate` idle check.
 - [ ] Record the rolling-release evidence and every untested path in the PR.
+
+### Follow-ups
+
+- [ ] Check current repositories for drift: run the gate against live Arch
+      mirrors instead of the pinned archive snapshot, and record the result
+      separately from snapshot evidence. No scheduled job does this yet.

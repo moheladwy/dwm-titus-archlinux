@@ -112,7 +112,7 @@ installer does not remove packages.
 | Option | Effect |
 | --- | --- |
 | `--profile PROFILE` | `core`, `recommended`, or `full`. Defaults to `DWM_INSTALL_PROFILE` or `full`. |
-| `--non-interactive` | Use unattended defaults and do not prompt. Adds `--noconfirm` to pacman. |
+| `--non-interactive` | Use unattended defaults and do not prompt. Adds `--noconfirm` to pacman. Required when standard input is not a terminal. |
 | `--yes` | Accept the interactive install summary. pacman still shows its own prompt. |
 | `--install-herdr` | Install the verified Herdr terminal workspace. |
 | `--skip-herdr` | Do not install Herdr (the default). |

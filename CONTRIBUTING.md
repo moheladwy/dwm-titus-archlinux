@@ -3,8 +3,8 @@
 Thanks for helping improve dwm-titus. Changes should preserve the small X11
 window-manager core, existing user workflows, and the Arch Linux-only desktop
 target. Arch Linux (`ID=arch`) is the sole supported distribution; this fork
-does not support Fedora or Arch derivatives. The port plan is
-`.github/plans/arch-linux-port.md`.
+does not support Fedora or Arch derivatives. The port decisions are recorded
+in `docs/ARCH-PORT-DECISIONS.md`.
 
 ## Before You Start
 
@@ -44,6 +44,7 @@ submitting a pull request.
 | --- | --- |
 | C or build configuration | `scripts/run-tests make clean all`, then `scripts/run-tests` |
 | Shell or installer | `scripts/run-tests make check-shell check-format` and focused tests |
+| NVIDIA suspend helper | `scripts/run-tests make check-nvidia-suspend-test` |
 | X11 behavior | `scripts/run-tests make check-xvfb-runtime check-monitor-tags` |
 | Settings loading, search, and section navigation | `scripts/run-tests make check-quickshell-settings-responsiveness-xvfb` plus the full Settings runtime gate |
 | Quickshell QML | `scripts/run-tests make check-quickshell-qml` plus real or nested X11 runtime validation |
@@ -177,7 +178,8 @@ Hosted CI runs one Arch desktop smoke job after code changes reach `main`:
 a clean dwm build, managed Quickshell startup, panel visibility, launcher hotkey,
 and a test application launch. Documentation-only changes skip this job and use
 the documentation workflow. Manual CI dispatch runs the same smoke check.
-The job has a ten-minute ceiling; the runtime step has a two-minute ceiling.
+The job has a twenty-minute ceiling, because the pinned Arch Linux Archive is
+slower than a live mirror; the runtime step has a two-minute ceiling.
 The full desktop, installer, security, QML lint, and alternate-compiler checks
 remain local checks rather than additional hosted CI jobs. CodeQL remains a
 separate workflow.
