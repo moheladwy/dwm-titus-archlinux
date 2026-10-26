@@ -82,7 +82,6 @@ keys = [
   { mod="SUPER",            key="F1",      desc="Control center",          func="spawn",       cmd="quickshell ipc --path \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml\" call controlcenter open" },
   { mod="SUPER ALT",        key="F1",      desc="Control center",          func="spawn",       cmd="quickshell ipc --path \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml\" call controlcenter open" },
   { mod="SUPER SHIFT",      key="r",       desc="Restart Quickshell",      func="spawn",       cmd="dwm-quickshell-controlcenter action restart-quickshell" },
-  { mod="SUPER CTRL",       key="r",       desc="Restart Proton/Steam",    func="spawn",       cmd="protonrestart" },
 
   # ── Volume  (no modifier — press the media key directly) ─────────────────────
   { mod="",                 key="XF86AudioRaiseVolume",   desc="Volume up",     func="spawn",  cmd="amixer sset Master 5%+ unmute" },

@@ -819,14 +819,14 @@ if command -v inotifywait >/dev/null 2>&1; then
 	[[ $(tr '\0' '\n' <"/proc/$generation_child/cmdline" | grep -Fxc -- "$watch_generation_root") == 1 ]]
 
 	printf '[Default Applications]\n' >"$work/data/applications/mimeapps.list"
-	printf '[Default Applications]\n' >"$work/data/applications/fedora-mimeapps.list"
+	printf '[Default Applications]\n' >"$work/data/applications/vendor-mimeapps.list"
 	for _ in {1..100}; do
 		grep -Eq ':mimeapps[.]list$' "$work/watch.out" 2>/dev/null &&
-			grep -Eq ':fedora-mimeapps[.]list$' "$work/watch.out" 2>/dev/null && break
+			grep -Eq ':vendor-mimeapps[.]list$' "$work/watch.out" 2>/dev/null && break
 		sleep 0.02
 	done
 	grep -Eq ':mimeapps[.]list$' "$work/watch.out"
-	grep -Eq ':fedora-mimeapps[.]list$' "$work/watch.out"
+	grep -Eq ':vendor-mimeapps[.]list$' "$work/watch.out"
 
 	printf '# watched\n' >>"$work/data/applications/vendor/nested.desktop"
 	for _ in {1..100}; do

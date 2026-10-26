@@ -296,7 +296,7 @@ class JournalFixture:
 
 class LocalInformationTests(unittest.TestCase):
     FILES = {
-        "/etc/os-release": b'NAME=ignored\nPRETTY_NAME="Fedora Linux 44 (Fixture)"\nVERSION_ID=44\n',
+        "/etc/os-release": b'NAME=ignored\nPRETTY_NAME="Arch Linux (Fixture)"\nVERSION_ID=44\n',
         "/proc/cpuinfo": b"processor: 0\nmodel name\t: Fixture CPU\nmodel name: Later CPU\n",
         "/proc/meminfo": b"MemTotal: 1024 kB\nMemAvailable: 768 kB\nSwapTotal: 256 kB\nSwapFree: 128 kB\n",
     }
@@ -357,7 +357,7 @@ class LocalInformationTests(unittest.TestCase):
     def test_complete_fixed_local_snapshot(self):
         result = self.read()
         self.assertTrue(all(state.status == "available" and state.error_code == "" for state in result.values()))
-        expected = {"os-name": "Fedora Linux 44 (Fixture)", "os-version": "44",
+        expected = {"os-name": "Arch Linux (Fixture)", "os-version": "44",
             "kernel-release": "6.fixture", "architecture": "x86_64", "cpu-model": "Fixture CPU",
             "logical-cpus": "4", "memory-total-bytes": "1048576", "memory-available-bytes": "786432",
             "swap-total-bytes": "262144", "swap-free-bytes": "131072", "uptime-seconds": "10"}
@@ -414,7 +414,7 @@ class LocalInformationTests(unittest.TestCase):
     def test_missing_fields_and_invalid_utf8_are_scoped(self):
         result = self.read({"/etc/os-release": b"", "/proc/cpuinfo": b"", "/proc/meminfo": b""})
         self.assertEqual(sum(state.status == "available" for state in result.values()), 4)
-        for path, identifier, target in (("/etc/os-release", "os-name", b"Fedora Linux 44 (Fixture)"),
+        for path, identifier, target in (("/etc/os-release", "os-name", b"Arch Linux (Fixture)"),
                 ("/proc/cpuinfo", "cpu-model", b"Fixture CPU"), ("/proc/meminfo", "memory-total-bytes", b"1024 kB")):
             result = self.read({path: self.FILES[path].replace(target, b"\xff")})
             self.assertEqual(result[identifier].error_code, "malformed")
@@ -917,14 +917,14 @@ class RootEncryptionTests(unittest.TestCase):
         self.assertEqual(self.parse(rows).value, "encrypted")
 
     def test_mapper_parent_kernel_alias_and_lvm_root(self):
-        root = self.node("fedora-root", type="lvm", fstype="btrfs", mountpoints=["/", "/home"], pkname="dm-0")
+        root = self.node("vg-root", type="lvm", fstype="btrfs", mountpoints=["/", "/home"], pkname="dm-0")
         crypt = self.node("luks-volume", type="crypt", pkname="disk", children=[root])
         self.assertEqual(self.parse([self.node(children=[crypt])]).value, "encrypted")
         # kpartx mapper partitions also have a PART-prefixed UUID and alias.
         crypt["type"] = "part"
         self.assertEqual(self.parse([self.node(fstype="crypto_LUKS", children=[crypt])]).value, "encrypted")
         # A second child must observe the same kernel identity for this mapper.
-        crypt["children"].append(self.node("fedora-swap", type="lvm", fstype="swap", pkname="dm-1"))
+        crypt["children"].append(self.node("vg-swap", type="lvm", fstype="swap", pkname="dm-1"))
         self.assert_unknown([self.node(children=[crypt])])
 
     def test_multiple_backing_paths_all_encrypted_or_mixed(self):

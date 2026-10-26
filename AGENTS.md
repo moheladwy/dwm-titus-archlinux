@@ -52,10 +52,6 @@ no signing keys. Fedora is not supported by this fork.
 - `scripts/dwm-packages.sh`: the single package capability map
   (`dwm_packages arch <profile>`).
 - `tests/containers/arch/`: the pinned Arch test container.
-- `dwm-fedora.ks`, `dwm-fedora-nvidia.ks`, `scripts/build-dwm-fedora-*`,
-  `scripts/image/`, and remaining `fedora:*` map entries: legacy Fedora code.
-  It is not part of the product and remains in the tree only until a later
-  port phase removes it. Do not extend it.
 - `dwm.desktop`: display-manager X session entry.
 - `AGENTS.md`: durable engineering and agent-execution rules.
 - `SPEC.md`: product scope, interfaces, and acceptance criteria.

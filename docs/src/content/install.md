@@ -269,8 +269,7 @@ them with `paru -Sua` or `yay -Sua` as your user, never as root. Packages
 ending in `-git`, `-svn`, `-hg`, or `-bzr` show "version unknown" and are not
 counted. dwm-titus never installs an AUR helper.
 
-Never run `pacman -Sy` on its own. The first-boot initial update belonged to
-the upstream Fedora images and does not apply to Arch installations.
+Never run `pacman -Sy` on its own.
 
 ## Source Updates and Recovery
 

@@ -194,29 +194,30 @@ error<TAB>capability<TAB>code<TAB>detail
 | Date, timezone, NTP, and locale | `org.freedesktop.timedate1` and `org.freedesktop.locale1` properties and fixed methods | Read-only and delegated | systemd and polkit own authorization. Denial leaves the current properties visible. Manual timestamps, NTP servers, RTC mode, and keyboard layout are not accepted. |
 | Users | AccountsService properties; fixed `lxqt-admin-user` and terminal `passwd` entry points | Read-only and delegated | QML never carries a password or constructs account arguments. Missing delegated tools do not hide the read-only account summary. |
 | Printers | CUPS availability; fixed `system-config-printer` entry point | Read-only and delegated | CUPS and the trusted delegated tool own printer discovery, authentication, jobs, queues, and cancellation. |
-| Software sources | Repository list read from `pacman.conf`; `sources-open` reports unsupported | Read-only | Arch has no `dnfdragora` equivalent, so **Manage software sources** is unsupported with an explanation: repositories and the mirrorlist are edited as root outside Settings. Settings does not accept a repository identifier for mutation, and the repository list stays readable. |
+| Software sources | Repository list read from `pacman.conf`; `sources-open` reports unsupported | Read-only | Arch has no graphical software-source manager, so **Manage software sources** is unsupported with an explanation: repositories and the mirrorlist are edited as root outside Settings. Settings does not accept a repository identifier for mutation, and the repository list stays readable. |
 | Partitions, arbitrary services, firewall policy | Explicitly outside the current helper allowlist | Delegated | The capability is unsupported until a later specification defines a narrow contract; use trusted administration tools. |
 
-## Fedora Provider Matrix
+## Arch Provider Matrix
 
 Package names remain owned by `scripts/dwm-packages.sh`. This document names
 package profiles and runtime capabilities so future Settings code does not
-duplicate Fedora package lists. The update and delegated-administration rows
-describe the Arch profiles; the remaining Fedora rows are swept in plan Phase 9.
+duplicate Arch package lists. Every required provider comes from the official
+Arch repositories; AUR-only packages appear only in `arch:aur-optional`.
 
-| Provider capability | Fedora path | Missing capability behavior |
+| Provider capability | Arch path | Missing capability behavior |
 | --- | --- | --- |
-| Quickshell Settings frontend | `fedora:desktop` | Missing Quickshell makes the Settings UI unavailable. |
-| X11 display state | `fedora:x11` | Missing RandR tools disable display controls. TearFree and NVIDIA composition remain driver-dependent. |
-| NetworkManager | `fedora:desktop-optional`; enabled by the Fedora image | Missing service reports unavailable while other sections continue. |
-| BlueZ and D-Bus JSON parsing | `bluez`, `systemd`, and `jq` from `fedora:desktop` plus the image service/package set | Adapter absence is a runtime unsupported state. |
-| PipeWire/WirePlumber and controls | `fedora:desktop`; included by the image | Missing session services report unavailable. |
-| UPower, Power Profiles, and D-Bus monitoring | `upower`, `power-profiles-daemon`, and `dbus-tools` in `fedora:desktop`; included by the Fedora image | Existing installs retain any provider of `ppd-service`; missing battery hardware or profile service disables only the corresponding Power controls. |
-| DPMS and auto-lock | X11 tools plus `fedora:desktop` | Missing schemas or locker disable only lock controls. |
-| Defaults and autostart | `xdg-utils` from `fedora:runtime-required`; `inotify-tools` from `fedora:desktop` | Missing XDG utilities disable only default-application controls; missing inotify keeps snapshots/actions usable but disables live refresh. |
-| Themes and GTK integration | `fedora:theme`, `fedora:theme-gtk`, and optional profiles | Missing optional theme packages do not disable Settings. |
-| Polkit authorization | Fedora desktop/image polkit agent and trusted helper | Missing authorization leaves read-only state available. |
-| System health | Fedora/systemd providers | Missing commands, services, hardware, or authorization emit partial or restricted records. |
+| Quickshell Settings frontend | `quickshell` from `arch:desktop`; included by `arch:recommended` | Missing Quickshell makes the Settings UI unavailable. |
+| X11 display state | `arch:x11` (`xorg-xrandr` and related X11 tools) | Missing RandR tools disable display controls. TearFree and NVIDIA composition remain driver-dependent. |
+| NetworkManager | `networkmanager` from `arch:desktop-optional` (`full`) and `arch:source-update` | Missing service reports unavailable while other sections continue. |
+| BlueZ and D-Bus JSON parsing | `bluez`, `bluez-utils`, `dbus`, and `jq` from `arch:desktop`; `systemd` from the base system | Adapter absence is a runtime unsupported state. |
+| PipeWire/WirePlumber and controls | `pipewire`, `pipewire-pulse`, `wireplumber`, and `pavucontrol` from `arch:desktop` | Missing session services report unavailable. An installed PulseAudio server is retained instead of `pipewire-pulse`. |
+| UPower, Power Profiles, and D-Bus monitoring | `upower`, `power-profiles-daemon`, and `dbus` in `arch:desktop` | Existing installs retain any installed provider of `power-profiles-daemon`, such as `tuned-ppd`; missing battery hardware or profile service disables only the corresponding Power controls. |
+| DPMS and auto-lock | `xorg-xset` from `arch:x11` plus `light-locker` from `arch:desktop` | Missing schemas or locker disable only lock controls. |
+| Defaults and autostart | `xdg-utils` from `arch:runtime-required`; `inotify-tools` from `arch:desktop` | Missing XDG utilities disable only default-application controls; missing inotify keeps snapshots/actions usable but disables live refresh. |
+| Themes and GTK integration | `arch:theme`, `arch:theme-gtk`, `arch:theme-optional`, and the opt-in `arch:aur-optional` GTK themes | Missing optional theme packages do not disable Settings. |
+| Input accessibility (AccessX) | `xkbset` from `arch:aur-optional`, installed only with `--enable-aur` | Missing `xkbset` reports the AccessX controls as unavailable; other input controls continue. |
+| Polkit authorization | `mate-polkit` from `arch:desktop` and the trusted installed helper | Missing authorization leaves read-only state available. |
+| System health | systemd and the Arch runtime providers | Missing commands, services, hardware, or authorization emit partial or restricted records. |
 | System updates | `pyalpm`, `pacman-contrib`, and `python-gobject` from `arch:system-management`; included by `arch:recommended` | Missing pyalpm disables updates only and reports the provider as unavailable; pacman's human output is never parsed as provider state. PackageKit is not used. Existing source installations rerun the recommended or full installer because source-sync cannot safely infer the selected profile. |
 | Delegated administration | `accountsservice`, `cups`, and `system-config-printer` from `arch:system-management`; `lxqt-admin` from `arch:system-management-optional` | Service absence preserves unrelated state; optional delegated tools expose unavailable entry points with exact package guidance. Software sources have no delegated tool on Arch and report unsupported. |
 
@@ -231,7 +232,7 @@ describe the Arch profiles; the remaining Fedora rows are swept in plan Phase 9.
   Watches created only for a Settings section must start on section activation
   and stop on close.
 - Provider failures must be per section. Missing Quickshell, NetworkManager,
-  BlueZ, PipeWire, X11, or a Fedora-only tool must not damage the core session.
+  BlueZ, PipeWire, X11, or an optional tool must not damage the core session.
 - Settings discovery follows the versioned contract in
   `docs/SETTINGS-PLATFORM.md`. Connectivity, audio, and power use their own
   documented versioned protocols; other tab-separated interfaces remain

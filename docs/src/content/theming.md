@@ -90,7 +90,7 @@ Each `[theme.name]` section sets colors for all components:
 | `term_bg` / `term_fg` / `term_cursor` | Terminal background, text, cursor |
 | `term_color0`–`term_color15` | Full 16-color terminal palette |
 | `dark_mode` | GTK dark preference and Capitaine cursor variant (`true` / `false`) |
-| `gtk_theme` | Optional installed GTK theme name for GTK apps such as Thunar |
+| `gtk_theme` | Optional installed GTK theme name for GTK apps such as Pavucontrol and Blueman |
 
 Quickshell derives its opaque surfaces, text, borders, accent, success,
 warning, and danger colors from the active theme's existing dwm and terminal

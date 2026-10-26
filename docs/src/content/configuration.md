@@ -268,9 +268,10 @@ prefers Alacritty and opens the emulator directly by default. Explicit
 arguments such as `dwm-terminal -e command` retain their direct execution
 contract.
 
-Thunar's seeded **Open Terminal Here** action launches Alacritty directly in
-the selected directory, matching the normal `Super` + `X` default. Existing
-Thunar custom actions are preserved during installation and upgrades.
+Dolphin's terminal actions read the terminal from `~/.config/kdeglobals`. When
+that file is absent, the installer seeds it with the selected terminal, which
+matches the normal `Super` + `X` default. An existing `kdeglobals` is preserved
+during installation and upgrades.
 
 Set `DWM_TERMINAL` to choose another emulator for `dwm-terminal`. Herdr is an
 optional layer: install it explicitly, set `DWM_HERDR=1`, and run
@@ -347,7 +348,7 @@ only while automatic locking is enabled or for the duration of an explicit
 manual lock, so DPMS display-off events remain independent from locking.
 External `loginctl lock-session` requests are forwarded to `dwm-lock` by an
 event-driven session listener. Until `power.conf` exists, dwm-titus leaves any
-user or Fedora-managed locker untouched.
+user- or distribution-managed locker untouched.
 
 ### Modifier Syntax
 

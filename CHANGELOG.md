@@ -153,6 +153,13 @@ the port.
 - Reuse existing non-interactive sudo authorization for confirmed desktop
   updates and recovery, falling back to polkit when unavailable. Passwords and
   authorization policy are not stored or changed by the updater.
+- Migration: an existing `hotkeys.toml` keeps any `protonrestart` binding
+  (the former default was `Super+Ctrl+R`, "Restart Proton/Steam"), because
+  user TOML files are never overwritten. The command is no longer installed,
+  and system installs and uninstalls remove the retired `protonrestart`,
+  `dwm-initial-update`, `dwm-initial-update-root`, and `dwm-dnf-defaults`
+  copies left by earlier installs, so the binding now does nothing; delete it
+  if you like.
 
 ### Removed
 
@@ -171,6 +178,25 @@ the port.
 - Remove the Settings > System update refresh, install-in-place, and cancel
   actions. There is no standalone database refresh; the full upgrade runs in
   the Update Center terminal.
+- Remove the Fedora image tooling: the Kickstarts (`dwm-fedora*.ks`),
+  `scripts/build-dwm-fedora-*`, `scripts/image/`, the Anaconda branding and
+  its sidebar-logo generator, the `--iso` mode of `scripts/dwm-titus-release`,
+  the `--image` mode of `scripts/seed-default-apps.sh`, and the
+  `check-kickstart` and `check-fedora-iso-builder` targets. Releases are
+  source tarballs only. `docs/COMPRESSED-IMAGES.md` and the image sections of
+  `docs/RELEASING.md` are removed with it.
+- Remove the first-boot initial updater (`dwm-initial-update` and its root
+  helper), its `check-initial-update` target, and
+  `docs/INITIAL-UPDATE.md`. It belonged to the Fedora images and was never
+  armed on Arch.
+- Remove the `dwm-dnf-defaults` helper and `config/dnf/`. pacman already
+  prompts `[Y/n]` and downloads in parallel by default, and the installer
+  ships no `pacman.conf` changes.
+- Remove the `fedora:*` package profiles and the Fedora 44 test container
+  (`tests/containers/fedora-44/`). `ID=fedora` is rejected like every other
+  non-Arch identity.
+- Remove `protonrestart` and its "Restart Proton/Steam" default hotkey
+  (`Super+Ctrl+R`), the last gaming helper.
 
 ### Fixed
 

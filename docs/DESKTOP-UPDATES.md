@@ -124,8 +124,6 @@ before adding the Update Center window-mode and terminal floating/no-swallow rul
 performs this idempotent migration for the first upgrade from an older worker.
 Personal rules and unrelated settings remain intact. Symlinked and non-regular
 personal rule files are left unchanged and do not block the desktop update.
-The first-boot initial package update belonged to the upstream Fedora images;
-it is never armed on Arch.
 
 Update Center state recorded before the port under the `fedora` provider is
 not shown as current Arch data. Cached `fedora` entries are dropped and

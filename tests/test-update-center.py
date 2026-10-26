@@ -23,7 +23,7 @@ def workspace():
 
 def source(rows=""):
     return ("system-management-protocol\t1\t0\n"
-            "provider\tupdates\tavailable\tdelegated\tPackageKit\tReady\n"
+            "provider\tupdates\tavailable\tdelegated\tpacman\tReady\n"
             "state\tupdate-summary\tavailable\t1\tReady\n"
             "action\tupdates-install-all\tavailable\tdelegated\tupdates\tInstall\tReady\n"
             + rows + "complete\tsnapshot\n")

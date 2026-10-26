@@ -30,8 +30,6 @@ RUN bash -euo pipefail -c 'retry() { local attempt; \
 COPY scripts/dwm-packages.sh /tmp/dwm-packages.sh
 # Capabilities stay in the product package map. Extra utilities serve existing
 # automated gates: lint, Git staging, GTK/Pillow, and Xauthority fixtures.
-# pykickstart is not in the official repositories, so Kickstart validation is
-# unavailable in this image.
 RUN bash -euo pipefail -c 'retry() { local attempt; \
         for attempt in 1 2 3 4 5; do "$@" && return 0; \
             printf "Download attempt %s failed; retrying\n" "$attempt" >&2; \

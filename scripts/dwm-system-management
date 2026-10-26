@@ -8364,7 +8364,7 @@ def mount_baseline_ready(process, identity) -> bool:
                 continue
             try:
                 if os.readlink(entry.path) == directory + "/mountinfo":
-                    # Fedora util-linux opens its temporary parsing descriptor
+                    # util-linux opens its temporary parsing descriptor
                     # with CLOEXEC, but poll_table's persistent fopen("r") does
                     # not. Merely seeing mountinfo can race the first parse.
                     with open(directory + "/fdinfo/" + entry.name, "r", encoding="ascii") as info:

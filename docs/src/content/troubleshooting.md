@@ -28,9 +28,9 @@ module. If you start the session with `startx` from a TTY, add the module to
 the installer never edits PAM files.
 
 Log out and back in with your account password. If the prompt persists, use
-Passwords and Keys to set the Login keyring password to match your account password. Passwordless
-autologin and `startx` do not pass a login password to the keyring, so installing
-the PAM module alone cannot enable automatic unlock for those paths.
+Passwords and Keys to set the Login keyring password to match your account
+password. Passwordless autologin does not pass a login password to the
+keyring, so the PAM module alone cannot enable automatic unlock for that path.
 
 ## Gear Lever does not open
 
@@ -219,5 +219,5 @@ activation errors identify a recovery backup and session log.
 
 ## Still Stuck?
 
-- Open an issue: [github.com/ChrisTitusTech/dwm-titus/issues](https://github.com/ChrisTitusTech/dwm-titus/issues)
+- Open an issue: [github.com/moheladwy/dwm-titus-archlinux/issues](https://github.com/moheladwy/dwm-titus-archlinux/issues)
 - Run the full check: `bash scripts/check-deps.sh`

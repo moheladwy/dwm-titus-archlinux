@@ -10,9 +10,10 @@ integrations are out of scope.
 
 Each phase is one independently testable review boundary. Phases 0-4 are in
 the first pull request (#1). Phases 5-8 are delivered in the update-stack pull
-request stacked on it. Phase 9 is next; Phases 9 and 10 must not start in
-either of those pull requests. Merge, release publication, and deployment
-require explicit owner authorization.
+request (#2) stacked on it, and Phases 9-10 in a third pull request stacked on
+that one. All phases of the port are delivered; there is no active phase.
+Merge, release publication, and deployment require explicit owner
+authorization.
 
 ## Phases
 
@@ -42,8 +43,11 @@ require explicit owner authorization.
    user-scope AUR provider for an installed `paru` or `yay`. (Delivered.)
 8. Remaining Settings and system-management platform work: exact `ID=arch`
    identity, regional actions, delegates, and security rows. (Delivered.)
-9. Documentation site and reference-doc sweep. (Next.)
-10. Retire Fedora-only, image, and gaming code. (Future.)
+9. Documentation site and reference-doc sweep: the docs site, reference docs,
+   and contributor files describe Arch Linux only. (Delivered.)
+10. Retire Fedora-only, image, and gaming code: the Kickstarts, image tooling,
+    first-boot initial update, DNF defaults helper, Fedora package profiles
+    and test container, and `protonrestart` are removed. (Delivered.)
 
 Exit for each pull request: its phases meet their plan validation, with
 evidence that separates host-safe checks, Arch container runs, VM installs, and
@@ -51,8 +55,9 @@ nested X11 runtime checks, and states every path that was not tested.
 
 ## History
 
-The previous active phase was the Fedora 0.7.2 initial-update work (issues
-#347, #344, #346, and #345). It is recorded in `CHANGELOG.md` under 0.7.2,
+Before the Arch port, the active phase was the upstream Fedora 0.7.2
+initial-update work (issues #347, #344, #346, and #345). It is recorded in
+`CHANGELOG.md` under 0.7.2,
 [INITIAL-UPDATE-QUALIFICATION.md](docs/INITIAL-UPDATE-QUALIFICATION.md), and
 [P8-QUALIFICATION.md](docs/P8-QUALIFICATION.md). Earlier roadmap detail is
 archived in [COMPLETED-ROADMAP-20260911.md](docs/COMPLETED-ROADMAP-20260911.md).
