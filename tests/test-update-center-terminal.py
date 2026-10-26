@@ -752,9 +752,15 @@ class RunnerTests(Environment):
         )
         for code, stdout, expected in cases:
             with self.subTest(stdout=stdout), patch.object(
-                    subprocess, "run", return_value=subprocess.CompletedProcess(["pacman", "-Qu"], code, stdout)) as run:
+                    subprocess, "run", return_value=subprocess.CompletedProcess(["pacman", "-Qu"], code, stdout)) as run, \
+                    patch.dict(os.environ, {"LANG": "de_DE.UTF-8", "LANGUAGE": "de", "LC_MESSAGES": "de_DE.UTF-8"}):
                 self.assertIs(pending(), expected)
                 self.assertEqual(run.call_args.args[0], ["/usr/bin/pacman", "-Qu"])
+                # pacman translates "[ignored]"; the marker is read in the C locale.
+                environment = run.call_args.kwargs["env"]
+                self.assertEqual(environment["LC_ALL"], "C")
+                self.assertNotIn("LANGUAGE", environment)
+                self.assertNotIn("LC_MESSAGES", environment)
         with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess(["pacman", "-Qu"], 2, "")), \
                 self.assertRaisesRegex(RuntimeError, "Could not read pending system updates"):
             pending()
