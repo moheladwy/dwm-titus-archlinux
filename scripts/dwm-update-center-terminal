@@ -459,9 +459,12 @@ AUR_PENDING_REFUSAL = ("Update system packages first with sudo pacman -Syu; AUR 
 def system_updates_pending():
     """Report pending repository updates; packages held by IgnorePkg never block."""
     # pacman -Qu exits 1 with no output when nothing is pending. It reads the
-    # local sync databases only and never refreshes them.
+    # local sync databases only and never refreshes them. pacman translates the
+    # "[ignored]" marker, so read it in the C locale.
+    environment = {key: value for key, value in os.environ.items() if key not in ("LANGUAGE", "LC_MESSAGES")}
+    environment["LC_ALL"] = "C"
     completed = subprocess.run(["/usr/bin/pacman", "-Qu"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, text=True, timeout=60, check=False)
+                               stderr=subprocess.DEVNULL, text=True, timeout=60, check=False, env=environment)
     if completed.returncode not in (0, 1):
         raise RuntimeError("Could not read pending system updates; run sudo pacman -Syu before the AUR update")
     return any(line.strip() and not line.rstrip().endswith("[ignored]")
