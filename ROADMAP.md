@@ -3,8 +3,8 @@
 ## Current scope
 
 Replace Fedora with Arch Linux as the only supported platform for this fork
-(`github.com/moheladwy/dwm-titus-archlinux`). The approved plan, with final
-decisions D1-D14, is [arch-linux-port.md](.github/plans/arch-linux-port.md).
+(`github.com/moheladwy/dwm-titus-archlinux`). The final decisions D1-D14 are
+recorded in [ARCH-PORT-DECISIONS.md](docs/ARCH-PORT-DECISIONS.md).
 Installer images, hosted package repositories, signing keys, and gaming
 integrations are out of scope.
 

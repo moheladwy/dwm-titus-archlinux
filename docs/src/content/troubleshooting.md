@@ -10,20 +10,25 @@ eyebrow: Get unstuck
 ## Login keyring asks for a password every login
 
 If the prompt says the login keyring did not get unlocked, run
-`dwm-diagnostics` or open System Health. The keyring daemon and its PAM login
-module are separate Fedora packages; a working daemon does not prove automatic
-unlock is available. The display manager's PAM stack must also load
-`pam_gnome_keyring.so`; installing the packages alone does not configure that
-stack. Install missing packages with:
+`dwm-diagnostics` or open System Health. On Arch, the `gnome-keyring` package
+ships both the keyring daemon and the `pam_gnome_keyring.so` login module, but
+a working daemon does not prove automatic unlock is available: the login PAM
+stack must also load that module. Every installer profile includes
+`gnome-keyring`, and source/desktop updates reconcile it on existing
+installations. To repair it by hand, use a full upgrade:
 
 ```sh
-sudo dnf install gnome-keyring gnome-keyring-pam
+sudo pacman -Syu --needed gnome-keyring
 ```
 
-Log out and back in with your account password. All installer profiles and
-both image variants include this pair, and source/desktop updates reconcile it
-on existing installations. If the prompt persists, use Passwords and Keys to
-set the Login keyring password to match your account password. Passwordless
+Arch's LightDM PAM configuration (`/etc/pam.d/lightdm`) already loads the
+module. If you start the session with `startx` from a TTY, add the module to
+`/etc/pam.d/login` yourself, as described in the
+[ArchWiki GNOME Keyring page](https://wiki.archlinux.org/title/GNOME/Keyring#PAM_step);
+the installer never edits PAM files.
+
+Log out and back in with your account password. If the prompt persists, use
+Passwords and Keys to set the Login keyring password to match your account password. Passwordless
 autologin and `startx` do not pass a login password to the keyring, so installing
 the PAM module alone cannot enable automatic unlock for those paths.
 
@@ -82,7 +87,7 @@ Or use the [Control Center](./control-center.html) -> **System Health**.
 ## Terminal Won't Open (`Super`+`X`)
 
 - Run `alacritty` from an existing shell to inspect its error directly
-- Install Alacritty with `sudo dnf install alacritty`
+- Install Alacritty with a full upgrade: `sudo pacman -Syu --needed alacritty`
 - Confirm the fixed terminal in `config/hotkeys.toml`:
   ```toml
   [vars]

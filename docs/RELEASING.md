@@ -9,15 +9,18 @@ use `make native` for published binaries.
    version mismatches, and commits that are unavailable on GitHub.
 3. Run `scripts/run-tests`.
 4. Run `scripts/run-tests make check-xvfb-runtime check-monitor-tags` in isolated X11.
-5. Run `scripts/run-tests make check-fedora-packages` on Fedora 44.
+5. Run `scripts/run-tests make check-arch-platform check-arch-packages` in the
+   pinned Arch container (`scripts/run-tests-podman`).
 6. Run `scripts/run-tests make check-quickshell-qml check-quickshell-health-xvfb
    check-quickshell-settings-xvfb` when QML changed.
 7. Run `npm --prefix docs ci` and `npm --prefix docs run build` when published
    documentation changed.
 8. Run `scripts/run-tests make release-check` and confirm the artifact is named
    `release/dwm-titus-VERSION.tar.gz`.
-9. Record the tested Fedora release, architectures, X11 environments, known
-   limitations, and SHA-256 checksum in the release notes.
+9. Record the rolling-release validation record (SPEC Section 9.4: test date,
+   archive snapshot, and pacman, Quickshell, Qt, and kernel versions),
+   architectures, X11 environments, known limitations, and SHA-256 checksum in
+   the release notes.
 10. Tag the release only after all applicable `SPEC.md` acceptance criteria
     and required GitHub checks pass.
 

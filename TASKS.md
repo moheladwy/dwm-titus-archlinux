@@ -2,7 +2,7 @@
 
 ## Arch Linux port, Phase 9
 
-Plan: [arch-linux-port.md](.github/plans/arch-linux-port.md). Phases 0-4 are
+Decisions: [ARCH-PORT-DECISIONS.md](docs/ARCH-PORT-DECISIONS.md). Phases 0-4 are
 delivered in the first pull request (#1), and Phases 5-8 (the native pacman
 update stack, the optional AUR provider, and the remaining Settings platform
 work) in the update-stack pull request stacked on it. This file covers plan
@@ -32,3 +32,9 @@ start in the same change. No merge or release publication is authorized.
       container, never on the host.
 - [ ] Record every page that still mentions Fedora and why (legacy code that
       Phase 10 removes, or upstream history).
+
+### Follow-ups
+
+- [ ] Check current repositories for drift: run the gate against live Arch
+      mirrors instead of the pinned archive snapshot, and record the result
+      separately from snapshot evidence. No scheduled job does this yet.
