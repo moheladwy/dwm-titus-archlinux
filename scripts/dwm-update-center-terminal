@@ -452,6 +452,22 @@ def execute_system(operation, action, *, input_stream=None, output=None):
 AUR_ROOT_REFUSAL = "AUR helpers never run as root, under sudo, or under pkexec; run Update Center as your user"
 
 
+AUR_PENDING_REFUSAL = ("Update system packages first with sudo pacman -Syu; AUR packages must build "
+                       "against a fully upgraded system")
+
+
+def system_updates_pending():
+    """Report pending repository updates; packages held by IgnorePkg never block."""
+    # pacman -Qu exits 1 with no output when nothing is pending. It reads the
+    # local sync databases only and never refreshes them.
+    completed = subprocess.run(["/usr/bin/pacman", "-Qu"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, text=True, timeout=60, check=False)
+    if completed.returncode not in (0, 1):
+        raise RuntimeError("Could not read pending system updates; run sudo pacman -Syu before the AUR update")
+    return any(line.strip() and not line.rstrip().endswith("[ignored]")
+               for line in (completed.stdout or "").splitlines())
+
+
 def execute_aur(operation, action, *, input_stream=None, output=None):
     """Run the existing AUR helper as the invoking user, never as root."""
     destination = sys.stdout if output is None else output
@@ -465,6 +481,16 @@ def execute_aur(operation, action, *, input_stream=None, output=None):
                                                    input_stream=input_stream, output=destination):
         return result("unknown", "failed", "Recovery reviewed; no new AUR upgrade was started. "
                       "The previous AUR update outcome remains unknown.")
+    # Building AUR packages, or letting the helper install repository
+    # dependencies, while system updates are pending is a partial upgrade.
+    try:
+        pending = system_updates_pending()
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        print_step(str(error), output=destination)
+        return result("failed", "failed", str(error))
+    if pending:
+        print_step(AUR_PENDING_REFUSAL, output=destination)
+        return result("failed", "failed", AUR_PENDING_REFUSAL + ". No AUR upgrade was started.")
     print_step("Starting " + name + " -Sua as your user; review its prompts below", output=destination)
     CENTER["update_operation"](operation, phase="aur-executing", provider_phase="aur-helper",
                                detail=name + " owns the terminal")
