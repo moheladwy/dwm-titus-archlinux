@@ -17,9 +17,10 @@ use `make native` for published binaries.
    documentation changed.
 8. Run `scripts/run-tests make release-check` and confirm the artifact is named
    `release/dwm-titus-VERSION.tar.gz`.
-9. Record the rolling-release validation record (test date, archive snapshot,
-   and pacman, Quickshell, Qt, and kernel versions), X11 environments, known
-   limitations, and SHA-256 checksum in the release notes.
+9. Record the rolling-release validation record (SPEC Section 9.4: test date,
+   archive snapshot, and pacman, Quickshell, Qt, and kernel versions),
+   architectures, X11 environments, known limitations, and SHA-256 checksum in
+   the release notes.
 10. Tag the release only after all applicable `SPEC.md` acceptance criteria
     and required GitHub checks pass.
 

@@ -185,11 +185,15 @@ The project must support:
 Missing optional components must be logged or skipped without terminating dwm.
 
 Display-manager integration (the `full` profile) uses LightDM with
-`lightdm-slick-greeter`. The managed configuration must keep Arch's packaged
-LightDM defaults rather than overwrite them, and set only what the session
-needs under `[Seat:*]`: `greeter-session=lightdm-slick-greeter`,
-`session-wrapper=/etc/lightdm/Xsession`, and `logind-check-graphical=true`.
-Enabling the display-manager service must be visible to the user.
+`lightdm-slick-greeter`. The installer adds the drop-in
+`/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf` (`[LightDM]`
+`logind-check-graphical=true`; `[Seat:*]` `greeter-session=lightdm-slick-greeter`
+and `user-session=dwm`) and never creates, modifies, or backs up
+`/etc/lightdm/lightdm.conf`. LightDM reads `lightdm.conf` after its drop-ins,
+so values the user sets there take precedence, and
+`session-wrapper=/etc/lightdm/Xsession` comes from Arch's packaged
+`lightdm.conf`. Enabling the display-manager service must be visible to the
+user.
 
 The default screenshot-to-clipboard binding must capture through the managed
 `dwm-screenshot` helper. On X11, the helper must use `maim` to capture without
@@ -232,7 +236,10 @@ but X11/EWMH behavior remains the compatibility boundary for this project.
 The supported installation flow must:
 
 1. Read `/etc/os-release`, require `ID=arch`, and reject every other identity
-   before making changes. Require `pacman`.
+   before making changes. Require `pacman`. If standard input is not a
+   terminal, refuse before any change unless `--non-interactive` or
+   `--dry-run` was given; a redirected standard output never changes the
+   interaction mode.
 2. Resolve Arch package names from one maintained dependency map.
 3. Show required and optional packages before installing them. The plan,
    including the system upgrade in step 4, appears in `--dry-run` output.
@@ -1018,13 +1025,14 @@ Arch has no release number, so every validation record must state:
 - every path that was not tested.
 
 A record against the pinned snapshot does not prove behavior against current
-repositories. Drift against current repositories is caught separately and
-reported as such.
+repositories. No automated job checks current repositories yet: drift is found
+by a manual run against live mirrors, recorded as such, and tracked as a
+follow-up in `TASKS.md`.
 
 ## 10. Current Gap
 
-The port from Fedora to Arch Linux following
-`.github/plans/arch-linux-port.md` is complete. Fedora feature history
+The port from Fedora to Arch Linux following the decisions in
+`docs/ARCH-PORT-DECISIONS.md` is complete. Fedora feature history
 (Phases 1-8 and the 0.7.2 work) is archived in
 `docs/COMPLETED-ROADMAP-20260911.md`, the `docs/P*-*.md` evidence files, and
 `CHANGELOG.md`; it is not a claim about Arch behavior.
@@ -1051,15 +1059,21 @@ says otherwise (Section 9.4):
   machine with a fresh Arch installation, and display managers other than
   LightDM;
 - the `startx` path with the manual `pam_gnome_keyring.so` login PAM change;
+- in a real or nested X11 login session: Dolphin's "Open With" menu outside
+  Plasma (`XDG_MENU_PREFIX=arch-` and `kbuildsycoca6`), Dolphin following the
+  `qt6ct` palette, and `quickshell --no-duplicate` staying near idle with the
+  launcher closed (the automated suites measure shell idle CPU only under
+  Xvfb);
 - the `--enable-aur` install path and the optional `aur` Update Center
   provider against the live AUR with a real `paru` or `yay`;
 - validation against current repositories rather than the pinned archive
   snapshot.
 
-Two automated checks are known to fail intermittently: the nested-X11 Picom
-test (`tests/test-picom-xvfb.py`) and the time-reconciliation scenario in
-`tests/test-quickshell-system-management-xvfb.sh`. They are tracked as
-follow-ups, and an intermittent failure is not reported as passing coverage.
+Intermittent failures in the automated suites must be investigated rather than
+reported as passing coverage. The races found during the port (the Picom
+renderer probe, deferred Settings panes, and several QML test checks) are
+fixed; a timeout that occurs only when several heavy suites share one loaded
+host is recorded as such.
 
 Arch Linux x86_64 and X11 are the supported scope.
 

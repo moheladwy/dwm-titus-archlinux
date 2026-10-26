@@ -8,8 +8,8 @@ fork of `ChrisTitusTech/dwm-titus` that replaces Fedora with Arch Linux. The
 product is a complete desktop installed onto an existing Arch Linux system with
 `./install.sh`. Arch Linux is the sole supported distribution.
 
-The approved port plan is `.github/plans/arch-linux-port.md`. Its decisions
-D1-D14 are final unless the owner changes them.
+The approved port decisions D1-D14 are recorded in
+`docs/ARCH-PORT-DECISIONS.md`. They are final unless the owner changes them.
 
 Read `SPEC.md` before making product, platform, installer, dependency, or
 packaging changes. Treat `SPEC.md` as the source of truth for project scope and
@@ -58,7 +58,8 @@ no signing keys. Fedora is not supported by this fork.
 - `ROADMAP.md`: ordered desktop-environment outcomes.
 - `TASKS.md`: implementation work for the active roadmap phase only.
 - `docs/`: user, contributor, and release documentation.
-- `.github/plans/`: approved multi-phase plans, such as the Arch port.
+- `docs/ARCH-PORT-DECISIONS.md`: the approved Arch port decisions (D1-D14)
+  and phase map.
 
 ## Planning Workflow
 

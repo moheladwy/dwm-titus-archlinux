@@ -198,6 +198,12 @@ EOF
 cat >"$work/bin/systemctl" <<'EOF'
 #!/bin/sh
 printf '%s\t%s\n' "${XDG_CURRENT_DESKTOP:-}" "$*" >>"${TEST_STATE:?}/systemctl.log"
+case $* in
+*import-environment*)
+	printf '%s\t%s\n' "${XDG_MENU_PREFIX-<unset>}" "$*" \
+		>>"${TEST_STATE:?}/systemctl-menu-prefix.log"
+	;;
+esac
 printf 'systemctl\t%s\n' "$*" >>"${TEST_STATE:?}/events.log"
 printf '%s\n' "${XDG_DATA_DIRS:-}" >>"${TEST_STATE:?}/data-dirs.log"
 case $* in
@@ -211,6 +217,9 @@ EOF
 
 cat >"$work/bin/dbus-update-activation-environment" <<'EOF'
 #!/bin/sh
+if [ -n "${TEST_STATE:-}" ]; then
+	printf '%s\t%s\n' "${XDG_MENU_PREFIX-<unset>}" "$*" >>"$TEST_STATE/dbus-menu-prefix.log"
+fi
 exit 0
 EOF
 
@@ -256,7 +265,7 @@ exec /usr/bin/chmod "$@"
 EOF
 /usr/bin/chmod +x "$work/bin/chmod"
 
-for name in feh picom dwm-status dwm-lock-watch dwm-migrate-update-center-window-rule light-locker dex dex-autostart; do
+for name in feh picom dwm-status dwm-lock-watch dwm-migrate-update-center-window-rule light-locker dex dex-autostart kbuildsycoca6; do
 	make_mock_command "$name"
 done
 
@@ -922,6 +931,87 @@ run_dex_fallback_case() {
 	test ! -e "$state/dex-autostart.count"
 }
 
+# Run one session with an optional fixture menu directory and an optional
+# user-set XDG_MENU_PREFIX ("-" leaves it unset).
+run_xdg_menu_prefix_session() {
+	case_name=$1
+	menus_dir=$2
+	user_prefix=$3
+	home="$work/menu-prefix-$case_name/home"
+	state="$work/menu-prefix-$case_name/state"
+	mkdir -p "$home" "$state"
+	: >"$state/polkit-mate-authentication-agent-1.running"
+
+	set -- env -u XDG_MENU_PREFIX
+	[ "$user_prefix" = - ] || set -- env XDG_MENU_PREFIX="$user_prefix"
+	"$@" HOME="$home" \
+		TEST_STATE="$state" \
+		TEST_SYSTEMD_START_FAIL=1 \
+		PATH="$work/bin:/usr/bin:/bin" \
+		XDG_CONFIG_HOME="$home/.config" \
+		DWM_AUTOSTART_NO_SETSID=1 \
+		DWM_TEST_MODE=1 \
+		DWM_TEST_XDG_MENUS_DIR="$menus_dir" \
+		sh "$repo_dir/scripts/autostart.sh"
+}
+
+# Assert the prefix value seen by both environment import calls, and that both
+# calls name XDG_MENU_PREFIX so systemd and D-Bus activation receive it.
+assert_imported_menu_prefix() {
+	expected_prefix=$1
+	awk -F '\t' -v expected="$expected_prefix" '
+		/--user import-environment/ {
+			found = 1
+			if ($1 != expected || index(" " $2 " ", " XDG_MENU_PREFIX ") == 0) bad = 1
+		}
+		END { exit !(found && !bad) }
+	' "$state/systemctl-menu-prefix.log"
+	awk -F '\t' -v expected="$expected_prefix" '
+		index($2, "--systemd ") == 1 {
+			found = 1
+			if ($1 != expected || index(" " $2 " ", " XDG_MENU_PREFIX ") == 0) bad = 1
+		}
+		END { exit !(found && !bad) }
+	' "$state/dbus-menu-prefix.log"
+}
+
+run_xdg_menu_prefix_case() {
+	menus="$work/menu-prefix-fixture/menus"
+	mkdir -p "$menus" "$work/menu-prefix-fixture/empty"
+	: >"$menus/arch-applications.menu"
+
+	# Arch's menu file selects the arch- prefix and refreshes the KDE cache.
+	run_xdg_menu_prefix_session arch "$menus" -
+	assert_imported_menu_prefix arch-
+	wait_for_marker "$state/kbuildsycoca6.running"
+
+	# A prefix the user already set is preserved.
+	run_xdg_menu_prefix_session user "$menus" kf6-
+	assert_imported_menu_prefix kf6-
+
+	# Without the menu file nothing is exported.
+	run_xdg_menu_prefix_session missing "$work/menu-prefix-fixture/empty" -
+	assert_imported_menu_prefix '<unset>'
+	sleep 0.1
+	test ! -e "$state/kbuildsycoca6.count"
+
+	# Outside test mode the fixture directory is ignored.
+	home="$work/menu-prefix-production/home"
+	state="$work/menu-prefix-production/state"
+	mkdir -p "$home" "$state"
+	: >"$state/polkit-mate-authentication-agent-1.running"
+	if [ -f /etc/xdg/menus/arch-applications.menu ]; then
+		production_prefix=arch-
+	else
+		production_prefix='<unset>'
+	fi
+	env -u XDG_MENU_PREFIX HOME="$home" TEST_STATE="$state" \
+		TEST_SYSTEMD_START_FAIL=1 PATH="$work/bin:/usr/bin:/bin" \
+		XDG_CONFIG_HOME="$home/.config" DWM_AUTOSTART_NO_SETSID=1 \
+		DWM_TEST_XDG_MENUS_DIR="$menus" sh "$repo_dir/scripts/autostart.sh"
+	assert_imported_menu_prefix "$production_prefix"
+}
+
 run_missing_optional_case() {
 	home="$work/missing/home"
 	state="$work/missing/state"
@@ -1044,6 +1134,7 @@ run_stale_quickshell_case
 run_delayed_quickshell_case
 run_hung_quickshell_case
 run_dex_fallback_case
+run_xdg_menu_prefix_case
 run_missing_optional_case
 run_theme_resume_retry_case
 run_input_watcher_fallback_case

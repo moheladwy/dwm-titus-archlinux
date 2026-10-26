@@ -443,7 +443,13 @@ export QT_QPA_PLATFORM=xcb
 unset WAYLAND_DISPLAY
 # KDE applications such as Dolphin resolve "Open With" handlers through an XDG
 # applications menu. Outside Plasma, Arch provides it as arch-applications.menu.
-if [ -z "${XDG_MENU_PREFIX:-}" ] && [ -f /etc/xdg/menus/arch-applications.menu ]; then
+# A user-set prefix is preserved. Tests may point at a fixture menu directory,
+# but only in test mode.
+xdg_menus_dir=/etc/xdg/menus
+if [ "${DWM_TEST_MODE:-0}" = 1 ] && [ -n "${DWM_TEST_XDG_MENUS_DIR:-}" ]; then
+	xdg_menus_dir=$DWM_TEST_XDG_MENUS_DIR
+fi
+if [ -z "${XDG_MENU_PREFIX:-}" ] && [ -f "$xdg_menus_dir/arch-applications.menu" ]; then
 	export XDG_MENU_PREFIX=arch-
 fi
 

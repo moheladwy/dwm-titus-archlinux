@@ -627,6 +627,9 @@ check-quickshell-settings-xvfb: all
 check-lightdm-config:
 	tests/test-lightdm-config.sh
 
+check-nvidia-suspend-test:
+	tests/test-nvidia-suspend-test.sh
+
 check-arch-platform:
 	@$(call run_managed_test,tests/test-arch-platform.sh)
 
@@ -843,6 +846,7 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-test-runner
 	$(MAKE) check-test-runner-podman
 	$(MAKE) check-lightdm-config
+	$(MAKE) check-nvidia-suspend-test
 	$(MAKE) release-check
 
 .PHONY: check-update-center check-update-center-terminal check-update-center-window-rule check-quickshell-update-center-model check-quickshell-update-center check-quickshell-update-center-xvfb install-files install-user-files install-system-files clean all check check-desktop-update check-picom check-picom-xvfb check-accessibility check-appearance check-phase5-optional-components check-build-config check-build-deps check-default-apps check-xdg-autostart check-dev-sync-install \
@@ -853,5 +857,5 @@ check: check-picom check-picom-xvfb
 	check-display-profile check-display-setup check-arch-packages check-arch-platform check-format check-install \
 	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-lock \
 	check-session-guards check-session-migration check-screenshot check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
-	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-terminal check-xvfb-runtime install install-system install-user \
+	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-nvidia-suspend-test check-terminal check-xvfb-runtime install install-system install-user \
 	install-cursors install-app-themes check-app-themes native release release-check uninstall uninstall-files

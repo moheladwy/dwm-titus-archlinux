@@ -456,6 +456,69 @@ class RunnerTests(Environment):
             with self.subTest(path=path), self.assertRaisesRegex(PermissionError, "not allowlisted"):
                 self.api["trusted_native_command"](path)
 
+    def resolve_native(self, path, *, overrides=None, links=None):
+        """Resolve an allowlisted command against a fake filesystem of (uid, mode) entries."""
+        from types import SimpleNamespace
+        import stat
+        entries = {"/": (0, stat.S_IFDIR | 0o755), "/usr": (0, stat.S_IFDIR | 0o755),
+                   "/usr/bin": (0, stat.S_IFDIR | 0o755), "/usr/bin/pacman": (0, stat.S_IFREG | 0o755),
+                   "/usr/bin/sudo": (0, stat.S_IFREG | 0o4755), "/opt": (0, stat.S_IFDIR | 0o755),
+                   "/opt/private": (0, stat.S_IFDIR | 0o755), "/opt/private/pacman": (0, stat.S_IFREG | 0o755),
+                   "/usr/bin/pacman.real": (0, stat.S_IFREG | 0o755)}
+        entries.update(overrides or {})
+        links = links or {}
+
+        def metadata(candidate):
+            candidate = str(candidate)
+            if candidate not in entries:
+                raise FileNotFoundError(candidate)
+            uid, mode = entries[candidate]
+            return SimpleNamespace(st_uid=uid, st_mode=mode)
+
+        with patch.object(os, "lstat", side_effect=metadata), patch.object(os, "stat", side_effect=metadata), \
+                patch.object(os, "readlink", side_effect=lambda candidate: links[str(candidate)]), \
+                patch.object(os, "access", return_value=True):
+            return self.api["trusted_native_command"](path)
+
+    def test_native_command_accepts_fully_trusted_paths(self):
+        import stat
+        for path in ("/usr/bin/pacman", "/usr/bin/sudo"):
+            with self.subTest(path=path):
+                self.assertEqual(self.resolve_native(path), path)
+        # A symlink's own 0777 mode is harmless when it and its target are trusted.
+        resolved = self.resolve_native("/usr/bin/pacman", overrides={"/usr/bin/pacman": (0, stat.S_IFLNK | 0o777)},
+                                       links={"/usr/bin/pacman": "pacman.real"})
+        self.assertEqual(resolved, "/usr/bin/pacman.real")
+
+    def test_native_command_rejects_nonroot_or_writable_hops(self):
+        import stat
+        for path in ("/usr/bin/pacman", "/usr/bin/sudo"):
+            for hop in ("/", "/usr", "/usr/bin", path):
+                kind = stat.S_IFDIR if hop != path else stat.S_IFREG
+                cases = (("nonroot", (1000, kind | 0o755)), ("group-writable", (0, kind | 0o775)),
+                         ("world-writable", (0, kind | 0o757)))
+                for label, entry in cases:
+                    with self.subTest(path=path, hop=hop, case=label), self.assertRaises(PermissionError):
+                        self.resolve_native(path, overrides={hop: entry})
+
+    def test_native_command_rejects_symlink_to_untrusted_target(self):
+        import stat
+        link = {"/usr/bin/pacman": (0, stat.S_IFLNK | 0o777)}
+        target = {"/usr/bin/pacman": "/opt/private/pacman"}
+        # The trusted target resolves, so each rejection below comes from one unsafe hop.
+        self.assertEqual(self.resolve_native("/usr/bin/pacman", overrides=link, links=target), "/opt/private/pacman")
+        unsafe = (
+            {"/usr/bin/pacman": (1000, stat.S_IFLNK | 0o777)},
+            {"/opt/private": (1000, stat.S_IFDIR | 0o755)},
+            {"/opt/private": (0, stat.S_IFDIR | 0o777)},
+            {"/opt": (0, stat.S_IFDIR | 0o775)},
+            {"/opt/private/pacman": (1000, stat.S_IFREG | 0o755)},
+            {"/opt/private/pacman": (0, stat.S_IFREG | 0o757)},
+        )
+        for override in unsafe:
+            with self.subTest(override=override), self.assertRaises(PermissionError):
+                self.resolve_native("/usr/bin/pacman", overrides={**link, **override}, links=target)
+
     def test_unread_news_requires_explicit_continue_and_records_acknowledgement(self):
         feed = self.news_feed(("Manual intervention for foo", "https://archlinux.org/news/foo/",
                                "Tue, 01 Oct 2026 10:00:00 +0000"),
@@ -628,7 +691,7 @@ class RunnerTests(Environment):
             self.assertIn(marker, output)
         self.assertEqual(len(answered), 2)
 
-    def run_aur(self, action="update", *, euid=1000, helper="/usr/bin/paru", status=0, answers=""):
+    def run_aur(self, action="update", *, euid=1000, helper="/usr/bin/paru", status=0, answers="", pending=False):
         receipt = {"operation": self.operation, "detail": "Recovery reserved; last known result: paru failed"}
         calls = []
 
@@ -637,9 +700,15 @@ class RunnerTests(Environment):
             calls.append((argv, options))
             return status
 
+        def updates_pending():
+            if isinstance(pending, BaseException):
+                raise pending
+            return pending
+
         output = io.StringIO()
         with patch.dict(self.api["CENTER"], active_operation=lambda: receipt, aur_helper=lambda: helper,
                         update_operation=lambda operation, **changes: receipt.update(changes)), \
+                patch.dict(self.api["execute_aur"].__globals__, system_updates_pending=updates_pending), \
                 patch("os.geteuid", return_value=euid), patch.object(subprocess, "call", native):
             value = self.api["execute_aur"](self.operation, action, input_stream=io.StringIO(answers), output=output)
         return value, calls, output.getvalue()
@@ -658,6 +727,37 @@ class RunnerTests(Environment):
         self.assertIn("paru -Sua", text)
         value, calls, _ = self.run_aur("recover", answers="y\n")
         self.assertEqual(calls[0][0], ["/usr/bin/paru", "-Sua"])
+
+    def test_aur_update_waits_for_system_upgrade(self):
+        # Pending repository updates make an AUR build a partial upgrade.
+        value, calls, text = self.run_aur(pending=True)
+        self.assertEqual(calls, [])
+        self.assertEqual((value["outcome"], value["phase"]), ("failed", "failed"))
+        self.assertIn("Update system packages first", value["detail"])
+        self.assertIn("Update system packages first", text)
+        value, calls, _ = self.run_aur("recover", answers="y\n", pending=True)
+        self.assertEqual(calls, [])
+        self.assertIn("Update system packages first", value["detail"])
+        value, calls, _ = self.run_aur(pending=RuntimeError("Could not read pending system updates"))
+        self.assertEqual(calls, [])
+        self.assertEqual((value["outcome"], value["phase"]), ("failed", "failed"))
+
+    def test_pending_updates_ignore_held_packages(self):
+        pending = self.api["system_updates_pending"]
+        cases = (
+            (1, "", False),
+            (0, "linux 6.18.1-1 -> 6.18.2-1\n", True),
+            (0, "linux 6.18.1-1 -> 6.18.2-1 [ignored]\n", False),
+            (0, "linux 6.18.1-1 -> 6.18.2-1 [ignored]\nglibc 2.42-1 -> 2.42-2\n", True),
+        )
+        for code, stdout, expected in cases:
+            with self.subTest(stdout=stdout), patch.object(
+                    subprocess, "run", return_value=subprocess.CompletedProcess(["pacman", "-Qu"], code, stdout)) as run:
+                self.assertIs(pending(), expected)
+                self.assertEqual(run.call_args.args[0], ["/usr/bin/pacman", "-Qu"])
+        with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess(["pacman", "-Qu"], 2, "")), \
+                self.assertRaisesRegex(RuntimeError, "Could not read pending system updates"):
+            pending()
 
     def test_aur_never_runs_as_root_or_through_sudo(self):
         with self.assertRaisesRegex(PermissionError, "never run as root"):

@@ -10,7 +10,7 @@ source of truth for scope and acceptance criteria. This file adds only
 commands and cross-file architecture notes.
 
 This fork is **Arch Linux-only** (`ID=arch`; derivatives are rejected). The
-port from Fedora (`.github/plans/arch-linux-port.md`) is complete, and the
+port from Fedora (decisions in `docs/ARCH-PORT-DECISIONS.md`) is complete, and the
 project ships no installer images. Never run tests, installers, or package
 operations on the host; use the Arch container or a VM.
 
