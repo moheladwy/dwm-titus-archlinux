@@ -22,27 +22,29 @@ Usage: ./install.sh [options]
 Options:
   --profile PROFILE      Install profile: core, recommended, or full.
                          Defaults to DWM_INSTALL_PROFILE or full.
-  --non-interactive      Use unattended defaults and do not prompt.
+  --non-interactive      Use unattended defaults and do not prompt; pacman
+                         runs with --noconfirm. Required when standard
+                         input is not a terminal.
   --yes                  Accept the interactive install summary.
   --install-herdr        Install verified Herdr as an optional workspace.
   --skip-herdr           Do not install Herdr.
-  --enable-fedora-gaming-repos
-                         Approve the Gamescope COPR and RPM Fusion nonfree.
+  --enable-aur           Install the optional AUR packages with an existing
+                         paru or yay helper, run as the invoking user.
   --dry-run              Print the resolved plan and exit before changes.
   -h, --help             Show this help.
 EOF
 }
 
 case "$DISTRO_FAMILY" in
-fedora)
-	command -v dnf &>/dev/null || {
-		err "Fedora was detected, but dnf was not found."
+arch)
+	command -v pacman &>/dev/null || {
+		err "Arch Linux was detected, but pacman was not found."
 		exit 1
 	}
 	;;
 *)
 	err "Unsupported distribution: $DISTRO_NAME"
-	err "dwm-titus supports Fedora only."
+	err "dwm-titus supports Arch Linux only."
 	exit 1
 	;;
 esac
@@ -54,12 +56,11 @@ MESLO_SHA256="13b502ac8c2bd9d3161018064560e23cd42b175bb730780a270975265a19ad57"
 NORDIC_THEME_URL="https://github.com/EliverLara/Nordic.git"
 NORDIC_THEME_REF="master"
 ARCH="$(uname -m)"
-FEDORA_GAMING_COPR="christitustech/copr-fedora"
 INSTALL_PROFILE="${DWM_INSTALL_PROFILE:-full}"
 HERDR_INSTALL_MODE="${DWM_INSTALL_HERDR:-false}"
 NON_INTERACTIVE=false
 ASSUME_YES=false
-FEDORA_GAMING_REPOS_APPROVED=false
+AUR_APPROVED=false
 DRY_RUN=false
 
 while (($# > 0)); do
@@ -93,8 +94,8 @@ while (($# > 0)); do
 		HERDR_INSTALL_MODE=false
 		shift
 		;;
-	--enable-fedora-gaming-repos)
-		FEDORA_GAMING_REPOS_APPROVED=true
+	--enable-aur)
+		AUR_APPROVED=true
 		shift
 		;;
 	--dry-run)
@@ -144,9 +145,14 @@ auto)
 	;;
 esac
 
-if [[ ! -t 0 || ! -t 1 ]]; then
-	NON_INTERACTIVE=true
-	ASSUME_YES=true
+# Only an explicit --non-interactive selects unattended defaults and adds
+# --noconfirm to pacman. Redirected output, such as `./install.sh | tee log`,
+# never changes the mode. Without a terminal on stdin the prompts cannot be
+# answered, so refuse rather than silently switching to unattended mode.
+if [[ ! -t 0 && $NON_INTERACTIVE != true && $DRY_RUN != true ]]; then
+	err "Standard input is not a terminal, so the installer cannot ask for confirmation."
+	err "Run it from a terminal, or pass --non-interactive for an unattended install."
+	exit 1
 fi
 
 if [[ $EUID -eq 0 && $DRY_RUN != true ]]; then
@@ -177,105 +183,27 @@ install_herdr_profile() {
 	[[ $HERDR_INSTALL_MODE == true ]] && herdr_arch_supported
 }
 
-fedora_gaming_profile() {
-	[[ $DISTRO_ID == "fedora" && $INSTALL_PROFILE == "full" && $ARCH == "x86_64" ]]
-}
-
-confirm_fedora_gaming_repositories() {
+confirm_aur_packages() {
 	local answer
 
-	if ! fedora_gaming_profile || [[ $FEDORA_GAMING_REPOS_APPROVED == true ]]; then
+	if [[ $AUR_APPROVED == true ]]; then
 		return
 	fi
-	if [[ $NON_INTERACTIVE == true ]]; then
-		warn "Skipping Fedora gaming packages because third-party repositories were not approved."
-		warn "Re-run with --enable-fedora-gaming-repos to approve the Gamescope COPR and RPM Fusion nonfree."
+	if [[ $NON_INTERACTIVE == true || $DRY_RUN == true ]] || ! dwm_aur_helper >/dev/null; then
 		return
 	fi
 
-	printf 'Enable the %s COPR and RPM Fusion nonfree for Fedora gaming packages? [y/N] ' \
-		"$FEDORA_GAMING_COPR"
+	printf 'Install optional AUR packages (%s) with %s? [y/N] ' \
+		"$(package_line aur-optional)" "$(dwm_aur_helper)"
 	read -r answer
 	case "$answer" in
 	y | Y | yes | YES)
-		FEDORA_GAMING_REPOS_APPROVED=true
+		AUR_APPROVED=true
 		;;
 	*)
-		warn "Fedora gaming repositories declined; skipping Steam, Gamescope, GameMode, and MangoHud."
+		info "Skipping optional AUR packages."
 		;;
 	esac
-}
-
-configure_fedora_gaming_repositories() {
-	local fedora_release
-	local plugin_package
-	local rpmfusion_release_url
-
-	if [[ $DISTRO_ID != "fedora" || $INSTALL_PROFILE != "full" || $ARCH != "x86_64" ]]; then
-		return 1
-	fi
-	if [[ $FEDORA_GAMING_REPOS_APPROVED != true ]]; then
-		return 1
-	fi
-
-	if ! dnf copr --help &>/dev/null; then
-		info "Installing the DNF COPR plugin..."
-		for plugin_package in dnf5-plugins dnf-plugins-core; do
-			if install_packages "$plugin_package"; then
-				break
-			fi
-		done
-		if ! dnf copr --help &>/dev/null; then
-			warn "Could not install a working DNF COPR plugin; skipping Fedora gaming packages."
-			return 1
-		fi
-	fi
-
-	if ! command -v rpm &>/dev/null; then
-		warn "rpm is unavailable; cannot determine the Fedora release for RPM Fusion."
-		return 1
-	fi
-	fedora_release=$(rpm -E '%fedora')
-	case "$fedora_release" in
-	'' | *[!0-9]*)
-		warn "Could not determine the numeric Fedora release for RPM Fusion."
-		return 1
-		;;
-	esac
-	rpmfusion_release_url="https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${fedora_release}.noarch.rpm"
-	info "Enabling RPM Fusion nonfree for Steam..."
-	if ! sudo dnf install -y "$rpmfusion_release_url"; then
-		warn "Could not enable RPM Fusion nonfree; skipping Fedora gaming packages."
-		return 1
-	fi
-
-	info "Enabling the $FEDORA_GAMING_COPR COPR for the patched Gamescope package..."
-	if ! sudo dnf copr enable -y "$FEDORA_GAMING_COPR"; then
-		warn "Could not enable $FEDORA_GAMING_COPR; skipping Fedora gaming packages."
-		return 1
-	fi
-}
-
-configure_fedora_gamemode_access() {
-	local target_user
-
-	if [[ $DISTRO_ID != "fedora" || $INSTALL_PROFILE != "full" ]]; then
-		return
-	fi
-	if ! getent group gamemode >/dev/null 2>&1; then
-		warn "GameMode was not installed; skipping privileged tuning access."
-		return
-	fi
-
-	target_user=$(id -un)
-	if id -nG "$target_user" | tr ' ' '\n' | command grep -Fxq gamemode; then
-		ok "$target_user already has GameMode tuning access."
-		return
-	fi
-
-	info "Adding $target_user to the gamemode group..."
-	sudo usermod -aG gamemode "$target_user"
-	warn "Log out and back in before using GameMode privileged tuning."
 }
 
 package_line() {
@@ -305,6 +233,7 @@ print_install_summary() {
 	printf '  Package manager: %s\n' "$PKG_CMD"
 	printf '  Profile: %s\n' "$INSTALL_PROFILE"
 	printf '  Mode: %s\n' "$([[ $NON_INTERACTIVE == true ]] && echo non-interactive || echo interactive)"
+	printf '  System upgrade: sudo pacman -Syu (runs first; Arch does not support partial upgrades)\n'
 	print_summary_profile "Required packages" required
 	if install_recommended_profile; then
 		print_summary_profile "Recommended packages" recommended
@@ -314,18 +243,15 @@ print_install_summary() {
 	fi
 	if install_optional_profile; then
 		print_summary_profile "Optional extras" optional
-		if fedora_gaming_profile; then
-			print_summary_profile "Fedora gaming packages" gaming
-			if [[ $FEDORA_GAMING_REPOS_APPROVED == true ]]; then
-				printf '  Third-party repositories: approved\n'
-			else
-				printf '  Third-party repositories: require separate confirmation\n'
-			fi
-		fi
 	else
 		printf '  Optional extras: skipped\n'
 	fi
 	print_summary_profile "Terminal candidates" terminal
+	if [[ $AUR_APPROVED == true ]]; then
+		print_summary_profile "AUR packages (via $(dwm_aur_helper || echo 'no helper found'))" aur-optional
+	else
+		printf '  AUR packages: skipped (optional; use --enable-aur with paru or yay)\n'
+	fi
 	if install_herdr_profile; then
 		printf '  Herdr workspace: verified user install from https://herdr.dev/install.sh\n'
 	elif [[ $HERDR_INSTALL_MODE == true ]]; then
@@ -529,30 +455,27 @@ detect_display_manager() {
 }
 
 install_lightdm_config() {
-	local lightdm_config="/etc/lightdm/lightdm.conf"
-	local lightdm_seat_section="SeatDefaults"
-	local lightdm_greeter_session="lightdm-slick-greeter"
-	local lightdm_session_wrapper="/etc/lightdm/Xsession"
-	local lightdm_logind_check=false
+	# Install /etc/lightdm/lightdm.conf.d/50-dwm-titus.conf, which selects
+	# lightdm-slick-greeter and the dwm session. lightdm.conf is never touched:
+	# it keeps Arch's /etc/lightdm/Xsession wrapper and any local settings such
+	# as autologin, and LightDM reads it after drop-ins, so its values win.
+	sudo make -C "$REPO_DIR/lightdm" install
+}
 
-	lightdm_seat_section="Seat:*"
-	lightdm_greeter_session="slick-greeter"
-	lightdm_session_wrapper=""
-	lightdm_logind_check=true
+# Dolphin's "Open Terminal Here" action reads the terminal from kdeglobals.
+# kdeglobals is user-owned KDE configuration, so only seed a missing file.
+seed_kde_terminal() {
+	local terminal_command=$1
+	local kdeglobals="${XDG_CONFIG_HOME:-$HOME/.config}/kdeglobals"
 
-	sudo make -C "$REPO_DIR/lightdm" \
-		LIGHTDM_SEAT_SECTION="$lightdm_seat_section" \
-		LIGHTDM_GREETER_SESSION="$lightdm_greeter_session" \
-		LIGHTDM_SESSION_WRAPPER="$lightdm_session_wrapper" \
-		LIGHTDM_LOGIND_CHECK="$lightdm_logind_check" \
-		install
-	if command -v restorecon &>/dev/null; then
-		sudo restorecon \
-			"$lightdm_config" \
-			/etc/lightdm/slick-greeter.conf \
-			/usr/share/pixmaps/dwm-titus.jpg \
-			/usr/share/pixmaps/dwm-titus-logo.png
+	[[ -n $terminal_command ]] || return 0
+	if [[ -e $kdeglobals || -L $kdeglobals ]]; then
+		ok "Preserving existing $kdeglobals."
+		return 0
 	fi
+	mkdir -p "$(dirname "$kdeglobals")"
+	printf '[General]\nTerminalApplication=%s\n' "$terminal_command" >"$kdeglobals"
+	ok "Dolphin will open $terminal_command for terminal actions."
 }
 
 echo ""
@@ -564,8 +487,24 @@ info "Distribution: $DISTRO_NAME"
 info "Family: $DISTRO_FAMILY"
 info "Package manager: $PKG_CMD"
 info "Install profile: $INSTALL_PROFILE"
+# Ask the optional AUR question first so the confirmed summary is the real plan.
+confirm_aur_packages
 confirm_install_summary
-confirm_fedora_gaming_repositories
+
+if [[ $NON_INTERACTIVE == true ]]; then
+	DWM_PACKAGE_NONINTERACTIVE=1
+fi
+
+# ── System upgrade ───────────────────────────────────────
+# Installing packages against stale sync databases is a partial upgrade, which
+# Arch does not support. Upgrade the whole system once, visibly, before any
+# package installation.
+info "Upgrading the system with pacman -Syu before installing packages..."
+if ! dwm_system_upgrade; then
+	err "System upgrade failed or was declined; no dwm-titus packages were installed."
+	exit 1
+fi
+ok "System is up to date."
 
 if [[ $NON_INTERACTIVE != true ]]; then
 	"$REPO_DIR/scripts/configure-build.sh"
@@ -611,27 +550,23 @@ fi
 
 # ── Optional desktop extras ──────────────────────────────
 if install_optional_profile; then
-	if fedora_gaming_profile; then
-		if [[ $FEDORA_GAMING_REPOS_APPROVED != true ]]; then
-			warn "Fedora gaming packages were skipped because their repositories were not approved."
-		elif configure_fedora_gaming_repositories; then
-			info "Installing Fedora gaming packages..."
-			if ! dwm_install_available_package_profile gaming; then
-				warn "Some Fedora gaming packages were unavailable in the approved repositories."
-			fi
-			configure_fedora_gamemode_access
-		else
-			warn "Fedora gaming repository setup failed; no gaming packages were installed."
-		fi
-	fi
-	# Path is available from the COPR enabled above with explicit approval.
-	info "Installing optional desktop extras..."
+	info "Installing optional desktop extras, including the Dolphin file manager..."
 	if ! dwm_install_available_package_profile optional; then
 		warn "Some optional desktop extras were unavailable in enabled repositories."
 	fi
 	ok "Optional desktop extras processed."
 else
 	warn "Skipping optional desktop extras for $INSTALL_PROFILE profile."
+fi
+
+# ── Optional AUR packages ────────────────────────────────
+if [[ $AUR_APPROVED == true ]]; then
+	info "Installing optional AUR packages as $(id -un)..."
+	if dwm_install_aur_profile aur-optional; then
+		ok "Optional AUR packages installed."
+	else
+		warn "Optional AUR packages were not installed; the desktop works without them."
+	fi
 fi
 
 # ── Qt / GTK theming ─────────────────────────────────────
@@ -746,13 +681,11 @@ sudo make install \
 	XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}" \
 	XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}" \
 	XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
-# Install a low-priority DNF5 default without replacing administrator settings.
-# The main /etc/dnf/dnf.conf and later drop-ins keep precedence.
-info "Installing DNF5 defaults while preserving administrator settings."
-dnf_defaults_helper=$(make -s --no-print-directory print-dnf-defaults-helper)
-sudo /usr/bin/python3 -I "$dnf_defaults_helper" install --source "$REPO_DIR/config/dnf/40-dwm-titus.conf"
 # Seed before Gear Lever creates its AppImage MIME preference file.
 bash "$REPO_DIR/scripts/seed-default-apps.sh"
+if install_optional_profile && command -v dolphin &>/dev/null; then
+	seed_kde_terminal "$terminal"
+fi
 if install_recommended_profile; then
 	info "Setting up Gear Lever for AppImage management..."
 	if "$REPO_DIR/scripts/install-gearlever"; then
@@ -782,5 +715,5 @@ echo "  SUPER+/   keybind viewer     SUPER+X  terminal"
 echo "  SUPER+F1  control center     SUPER+R  app launcher"
 echo "  SUPER+Q   close window"
 echo ""
-echo "  Full reference: https://dwm.christitus.com/keybinds.html or SUPER+/ in dwm"
+echo "  Full reference: docs/src/content/keybinds.md or SUPER+/ in dwm"
 echo ""

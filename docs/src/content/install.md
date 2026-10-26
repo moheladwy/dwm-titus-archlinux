@@ -1,227 +1,208 @@
 ---
-title: Fedora Installation
-description: Install the complete dwm-titus Fedora X11 desktop from an image or onto an existing Fedora system.
+title: Arch Linux Installation
+description: Install the dwm-titus X11 desktop onto an existing Arch Linux system with the repository installer.
 navLabel: Installation
 eyebrow: Start here
 ---
 
-# Fedora Installation
+# Arch Linux Installation
 
-> **dwm-titus is Fedora-only.** Fedora Linux with Xorg is required for every
-> supported installation, package, test, and release path.
+> **dwm-titus supports Arch Linux only.** Arch Linux x86_64 with Xorg is the
+> sole supported platform for installation, runtime behavior, package
+> resolution, and testing.
+
+The installer reads `/etc/os-release` and accepts only `ID=arch`. `ID_LIKE` is
+ignored, so Arch derivatives such as EndeavourOS, CachyOS, Manjaro, and Arch
+Linux ARM are rejected, as is every other distribution. The check runs before
+any package installation or system change, and there is no override flag.
+
+dwm-titus ships no installer images, ISOs, downloads, or package repositories.
+You install Arch Linux yourself, then add the desktop with `./install.sh`.
 
 ## Dependencies
 
 See [Desktop Dependencies](/dependencies.html) for a component-by-component
 breakdown of the window manager, shell, services, applications, build tools,
-and the differences between installation profiles and image variants.
+and the differences between installation profiles.
 
-## Fedora ISO (Recommended for a New Installation)
+## 1. Install Arch Linux
 
-The current offline images install a complete Fedora 44 x86_64
-desktop from a compressed system image. Packages are included, so installation
-works without an Internet connection or software selection.
+Install Arch Linux with the official [Arch ISO](https://archlinux.org/download/),
+either by hand following the
+[installation guide](https://wiki.archlinux.org/title/Installation_guide) or
+with `archinstall`. A minimal install with a user account, `sudo`, and network
+access is enough. You do not need to install a desktop environment or display
+manager first.
 
-| Image | Download |
+## 2. Run the Installer
+
+Log in as your normal user (not root) and run the installer from a checkout of
+[this repository](https://github.com/moheladwy/dwm-titus-archlinux):
+
+```bash
+sudo pacman -Syu --needed git
+git clone https://github.com/moheladwy/dwm-titus-archlinux.git
+cd dwm-titus-archlinux
+
+./install.sh --dry-run --non-interactive --profile recommended
+./install.sh --profile recommended
+```
+
+The dry run prints the resolved package and installation plan and exits
+before anything changes. Interactive runs print the same plan and ask before
+continuing. The installer refuses to run as root; it invokes `sudo` only for
+package installation and system-wide files.
+
+### System Upgrade First
+
+Arch does not support partial upgrades. Before it installs any package, the
+installer runs one visible `sudo pacman -Syu`:
+
+- it is listed in the `--dry-run` plan;
+- it uses pacman's own confirmation prompt;
+- `--noconfirm` is added only with `--non-interactive`;
+- if the upgrade fails or you decline it, the installation stops and no
+  dwm-titus packages are installed.
+
+Packages are then installed from the official repositories with
+`sudo pacman -S --needed --`. The installer does not edit `/etc/pacman.conf`,
+enable `multilib`, or add third-party repositories.
+
+### Profiles
+
+Select a profile with `--profile` or `DWM_INSTALL_PROFILE`. The default is
+`full`.
+
+- `core`: required build packages, the X11 session runtime, GNOME Keyring,
+  Celluloid, mpv, sxiv, and one terminal (Alacritty, with a fallback to an
+  installed or installable supported terminal). `minimal` is accepted as an
+  alias.
+- `recommended`: `core` plus the complete everyday desktop: Quickshell, Picom,
+  Feh, Dex, a polkit agent, audio, Bluetooth, power, and brightness tools,
+  Flatpak with the GTK portal, fonts, icons, the available GTK themes, the
+  first available Qt theme tool (`qt6ct`, then `qt5ct`), and the
+  system-management prerequisites (`pyalpm`, `pacman-contrib`,
+  `python-gobject`, AccountsService, CUPS, and the printer configuration
+  tool). It also adds Flathub for the target user, installs Gear Lever as the
+  AppImage manager, and installs the Nordic GTK theme system-wide for the
+  default Nord theme. `maim` is attempted; if it is unavailable, installation
+  continues and reports that the screenshot hotkeys remain disabled.
+- `full`: `recommended` plus the Dolphin file manager (`dolphin`, `ark`,
+  thumbnailers, `kio-admin`, and `archlinux-xdg-menu`), `gvfs`,
+  `xdg-user-dirs`, NetworkManager, `rsync`, both Qt theme tools, the optional account
+  administration tool, the Nord wallpaper collection, and LightDM. There is no
+  gaming profile.
+
+When no display manager is detected, `full` installs and enables LightDM with
+`lightdm-slick-greeter`. An existing GDM or SDDM is retained. When LightDM is
+present, the installer deploys the project's greeter configuration with
+Arch's `/etc/lightdm/Xsession` session wrapper.
+
+Fresh accounts receive Celluloid audio/video and sxiv image defaults for their
+advertised formats, and open folders in Dolphin (`org.kde.dolphin.desktop`)
+when it is installed. Existing MIME preference files are preserved; change
+these in Settings > Defaults on an existing account.
+
+To add a broader profile's packages to an older installation, rerun the
+installer with that profile. A dry run previews the added packages first. The
+installer does not remove packages.
+
+### Installer Options
+
+| Option | Effect |
 | --- | --- |
-| Standard | [Download standard ISO](https://downloads.christitus.com/iso/dwm-titus.iso) |
-| NVIDIA | [Download NVIDIA ISO](https://downloads.christitus.com/iso/dwm-titus-nvidia.iso) |
-| Checksums | [Download SHA256SUMS](https://downloads.christitus.com/iso/SHA256SUMS) |
+| `--profile PROFILE` | `core`, `recommended`, or `full`. Defaults to `DWM_INSTALL_PROFILE` or `full`. |
+| `--non-interactive` | Use unattended defaults and do not prompt. Adds `--noconfirm` to pacman. Required when standard input is not a terminal. |
+| `--yes` | Accept the interactive install summary. pacman still shows its own prompt. |
+| `--install-herdr` | Install the verified Herdr terminal workspace. |
+| `--skip-herdr` | Do not install Herdr (the default). |
+| `--enable-aur` | Install the optional AUR packages with an existing `paru` or `yay`. |
+| `--dry-run` | Print the resolved plan, including the system upgrade, and exit before changes. |
 
-The download URLs always serve the current builds. Download a fresh checksum
-file with your selected ISO. If a build changes while you have a partial
-download, start again instead of resuming the older file. The build manifest
-records the version, size and SHA-256 of each current image.
-
-Use the standard image unless you need the proprietary NVIDIA driver packages.
-Both include LightDM, dwm, Quickshell, Brave Origin, Celluloid, mpv, sxiv, Path, Thunar,
-Alacritty, Starship, Herdr, fonts, Papirus icons, Gear Lever, and `maim` with region capture and
-clipboard dependencies. Fresh accounts use Brave Origin for web browsing,
-Celluloid for its supported audio/video formats, sxiv for its supported image
-formats, Path for folders (with Thunar also available), and Alacritty for the terminal. Existing application
-preferences are preserved; use Settings > Defaults to change them. Internet
-access is needed for later updates and additional software.
-
-### Verify the Download
-
-Save your selected ISO and `SHA256SUMS` in the same directory. On Linux, run:
-
-```sh
-sha256sum --ignore-missing -c SHA256SUMS
-```
-
-Your selected ISO must report `OK`; do not continue with a mismatch. For a
-resumable standard-image download from the command line:
-
-```sh
-curl --fail --location --continue-at - --remote-name \
-  https://downloads.christitus.com/iso/dwm-titus.iso
-curl --fail --location --remote-name \
-  https://downloads.christitus.com/iso/SHA256SUMS
-sha256sum --ignore-missing -c SHA256SUMS
-```
-
-For NVIDIA, use the NVIDIA ISO link from the table with the same checksum file.
-
-### Install from USB
-
-1. Write the ISO as a disk image to an **8 GB or larger USB drive** using a USB
-   image writer. This erases the USB drive; copying the ISO file onto it is not
-   the same as writing the image.
-2. Boot the USB and use the default media-test/install entry. Qualification used
-   Secure Boot disabled; Secure Boot support is not verified.
-3. Select your language and keyboard, time zone, installation disk and partition
-   layout. Create your user account and select administrator access.
-4. Review the proposed disk changes and choose **Begin Installation**. The
-   compressed image provides the package set; there is no installation-source
-   or software-selection step and no network connection is required.
-5. Once installation finishes, reboot and remove the USB. Log in through LightDM
-   using the **dwm** session. The desktop is already installed; you do not need to
-   run the existing-system installer below.
-
-`Super` is usually the Windows key. Open the default file manager with `Super+E`, open a terminal
-with `Super+X`, take a full
-screenshot with `Super+P`, select a region with `Super+Shift+P`, or copy a region
-to the clipboard with `Super+Ctrl+P`.
-
-For the current version, checksums, build validation and hardware qualification
-limits, see the [build notes](https://downloads.christitus.com/iso/BUILD-NOTES.md)
-and [build manifest](https://downloads.christitus.com/iso/BUILD-MANIFEST.json).
-Check those notes before installing, especially for NVIDIA hardware, Secure Boot
-and firmware combinations that may not have been qualified.
-
-## Existing Fedora System: Quick Install
-
-The easiest way is via [Linutil](https://christitus.com/linux):
-
-```bash
-curl -fsSL https://christitus.com/linux | sh
-```
-
-In the TUI, press `v` to multi-select, then select **dwm**, **bash prompt**,
-and **alacritty**. Press `Enter` to install.
-
-Herdr is optional. To add its checksum-verified helper after the Linutil path,
-run:
-
-```bash
-install-herdr
-```
-
-![The dwm-titus applications menu in Linutil](/images/linutil-applications.png)
-
-## Manual Install
-
-### 1. Dependencies
-
-The supported dependency path is the installer because it resolves Fedora
-package names from the shared map:
+For CI, packaging checks, or scripted validation:
 
 ```bash
 ./install.sh --dry-run --non-interactive --profile core
-./install.sh --profile full
+./install.sh --non-interactive --yes --profile recommended
+./install.sh --non-interactive --yes --profile full --enable-aur
 ```
 
-Use `core` for the required build/X11/session packages, Alacritty, and media applications,
-`recommended` for the complete desktop layer, or `full` for optional extras
-such as file-manager integration, wallpapers, and
-display-manager setup. On x86_64 Fedora, `full` can also install Steam,
-Gamescope, GameMode, and MangoHud after repository approval.
-Every profile includes GNOME Keyring and its PAM module for credential storage
-and support for automatic unlock at password login. Unlock also requires the
-display manager's PAM stack to load `pam_gnome_keyring.so` and matching account
-and keyring passwords; installing the packages does not configure PAM services.
-The installer separately asks before enabling the `christitustech/copr-fedora`
-COPR for patched Gamescope and RPM Fusion nonfree for Steam. Declining skips the
-gaming subset without affecting other full-profile extras.
+### Optional AUR Packages
 
-### Optional Path File Manager
+Every required package comes from the official Arch repositories. A few
+optional extras exist only in the AUR: `xkbset` (used by the AccessX input
+controls) and the Arc, Numix, Yaru, and Bluebird GTK themes.
 
-[Path](https://github.com/ChrisTitusTech/Path) is packaged as `path` in the
-[christitustech/copr-fedora COPR](https://copr.fedorainfracloud.org/coprs/christitustech/copr-fedora/).
-To install it explicitly on Fedora x86_64:
+They are installed only when you pass `--enable-aur`, or answer yes to the
+interactive `[y/N]` question (default No) that appears when a supported helper
+is found. The installer uses an AUR helper you already have (`paru` or
+`yay`) and runs it as your user, never as root. It never installs an AUR
+helper, and official packages never go through it. `--non-interactive`
+without `--enable-aur` never uses the AUR. Without these packages, the AccessX
+controls report as unavailable and everything else works.
+
+### Dolphin File Manager
+
+The `full` profile installs Dolphin as the managed file manager. Thunar and
+Path are not part of this fork. `archlinux-xdg-menu` supplies the
+applications menu that Dolphin's "Open With" needs outside Plasma.
+
+Dolphin's terminal action reads the terminal from `~/.config/kdeglobals`. When
+that file is absent, the installer seeds it with the selected terminal. An
+existing `kdeglobals` is preserved. To select Dolphin on an existing account,
+use Settings > Default Applications or:
 
 ```bash
-sudo dnf copr enable christitustech/copr-fedora
-sudo dnf install path
+dwm-default-apps set-role file-manager org.kde.dolphin.desktop
 ```
 
-The full installer attempts Path after its existing gaming-repository approval
-step, or uses an already enabled COPR. If the package is unavailable, it skips
-Path and retains Thunar. The installer does not enable a repository solely for
-Path. The explicit commands above do not require opting into gaming packages.
+### GNOME Keyring
 
-Fresh accounts prefer `pathfm.desktop` for folders when Path is installed,
-otherwise `thunar.desktop`. Existing MIME preferences are preserved. To select
-Path on an existing account, use Settings > Default Applications or:
+Every profile includes `gnome-keyring` for credential storage. On Arch it also
+ships the `pam_gnome_keyring.so` module, and Arch's LightDM PAM configuration
+already loads it. If you start the session with `startx`, automatic unlock at
+password login requires adding the module to `/etc/pam.d/login` yourself; the
+installer never edits PAM files. Unlock also requires matching account and
+keyring passwords, and autologin does not supply a password to this path. See
+[keyring troubleshooting](/troubleshooting.html#login-keyring-asks-for-a-password-every-login).
 
-```bash
-dwm-default-apps set-role file-manager pathfm.desktop
-```
+### What the Installer Preserves
 
-Before removing Path, select Thunar with
-`dwm-default-apps set-role file-manager thunar.desktop`. Seeding does not rewrite
-an existing MIME preference file after removal. File chooser portals continue
-to use GTK: the current Path package opens a chooser but does not implement
-caller cancellation through `org.freedesktop.portal.Request.Close`. Using Path
-for folder browsing does not require its file chooser portal.
+Existing `config.h`, user TOML files, `.xinitrc`, and application configuration
+are preserved. A missing `config.h` is created from guided compile-time
+questions, or from detected defaults for an unattended run. System files are
+installed with `sudo`, while configuration and data under the user's XDG
+directories are installed as that user. The managed
+`${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/` directory is replaced from the
+repository so it matches the installed helpers.
 
-### 2. Clone and Build
-
-```bash
-git clone https://github.com/ChrisTitusTech/dwm-titus.git
-cd dwm-titus
-cp config.def.h config.h
-./scripts/dev-sync-install.sh
-```
-
-For later source-checkout updates, run the same command so the binary,
-installed helpers, managed Quickshell configuration, and data copy stay at one
-revision. Run `./scripts/dev-sync-install.sh --check` after any requested
-session restart to verify the active runtime.
-
-### Automated Installer
-
-```bash
-./install.sh
-```
-
-The script requires `ID=fedora` before handling dependency installation, font
-copying, display-manager integration, or config placement. Every other
-operating-system identity is rejected before changes are made.
-Existing user configuration and `.xinitrc` files are preserved. Upgrades remove
-the known legacy `dwm-graphical-session.service` and
+Upgrades remove the known legacy `dwm-graphical-session.service` and
 `wm-graphical-session.service` early-start configuration so XDG applications
-start only after the X11 display environment is available; customized user
+start only after the X11 display environment is available. Customized user
 units are disabled from early startup but otherwise preserved.
 
-System files are installed with `sudo`, while configuration and data under the
-user's XDG directories are installed as that user.
+When matching vendor XDG entries exist for Picom, the polkit agent, or Light
+Locker, the installer copies each entry to the user autostart directory and
+adds only the dwm session exclusion. Original commands and vendor session
+guards remain intact, no entry is created when the vendor entry is absent, and
+existing user entries are preserved.
 
-If a v0.6.0 Fedora image left the default XDG parents owned by root, first
-verify that none of them is a symbolic link, then repair only those parents and
-rerun the installer:
+The session portal preference is
+`~/.config/xdg-desktop-portal/dwm-portals.conf`, which applies only to the dwm
+session. A user install removes the old desktop-wide `portals.conf` only when
+it is unmodified from the previous seed; edited copies are kept.
 
-```bash
-xdg_parents=()
-for path in "$HOME/.local" "$HOME/.local/share" "$HOME/.config"; do
-    test ! -L "$path" || {
-        printf 'Refusing symbolic link: %s\n' "$path" >&2
-        exit 1
-    }
-    test -e "$path" || continue
-    test -d "$path" || { printf 'Refusing non-directory: %s\n' "$path" >&2; exit 1; }
-    xdg_parents+=("$path")
-done
-((${#xdg_parents[@]} == 0)) || sudo chown "$(id -u):$(id -g)" -- "${xdg_parents[@]}"
-./install.sh
-```
+Arch's `/etc/xdg/picom.conf` uses Picom's newer `rules` syntax. The installer's
+Quickshell tooltip opacity tweak recognizes only the legacy `opacity-rule`
+entry, so it leaves the file unchanged and prints a warning.
 
-This repair is intentionally non-recursive so it does not change unrelated
-user files.
+Meslo Nerd Font comes from the `ttf-meslo-nerd` package. The installer's
+checksum-verified Meslo download runs only when that font is not detected.
 
-Every profile and Fedora image defaults to Alacritty without Herdr. With the
-explicit `--install-herdr` option, the repository downloads the official
+### Herdr
+
+Every profile defaults to Alacritty without Herdr. With `--install-herdr` (or
+`DWM_INSTALL_HERDR=true`), the repository downloads the official
 `https://herdr.dev/install.sh` into an isolated staging directory and verifies
 repository-pinned SHA-256 checksums for both that installer and its resulting
 Herdr binary before copying it into `~/.local/bin`. A checksum mismatch or
@@ -231,78 +212,9 @@ matching `integration install` command so native Codex and Claude Code sessions
 can be restored. Integration failures are reported separately from binary
 installation failures.
 
-When matching vendor XDG entries exist for Picom, the polkit agent, or Light
-Locker, the installer copies each entry to the user autostart directory and
-adds only the dwm session exclusion. Original commands and vendor session
-guards remain intact, no entry is created when the vendor entry is absent, and
-existing user entries are preserved.
-
-Installer package profiles are selected with `DWM_INSTALL_PROFILE`:
-
-- `core`: required build packages, X11/session runtime, Alacritty, Celluloid, mpv,
-  and sxiv. Fresh accounts receive Celluloid audio/video and sxiv image defaults
-  for their advertised formats. Existing MIME preference files are preserved;
-  change these in Settings > Defaults when updating an existing account. Herdr is
-  skipped unless `--install-herdr` is provided.
-- `recommended`: `core` plus the recommended desktop layer such as Quickshell,
-  Picom, Feh, Dex, fonts, theming, screenshot, audio, Bluetooth control and
-  tray tools, brightness tools, Flatpak, the GTK desktop portal, PackageKit,
-  AccountsService, CUPS, and the Fedora printer configuration tool. These
-  system services are prerequisites for the planned Phase 6 Settings update,
-  account-summary, and printer entry points. The profile also adds Flathub for
-  the target user, installs Gear Lever as the default AppImage manager, installs
-  the available Fedora GTK theme packages, and installs Nordic system-wide for
-  the default Nord theme. Source-checkout synchronization does not infer this
-  profile from independently installed programs. Existing installations must
-  rerun the recommended or full installer to add the Phase 6 PackageKit,
-  Python RPM binding, AccountsService, CUPS, and printer-tool packages.
-- `full`: `recommended` plus optional extras such as Thunar with SMB-share
-  browsing, network tray utilities,
-  wallpapers, and display-manager setup. x86_64 Fedora full installs also
-  include Steam, Gamescope, and 64-bit and 32-bit GameMode and MangoHud support
-  after separate repository approval.
-  The installer enables the `christitustech/copr-fedora` COPR for Gamescope and
-  RPM Fusion nonfree for Steam, then adds the invoking user to the `gamemode`
-  group; log out and back in before using its privileged tuning helpers.
-
-The default is `full` to preserve the historical automated installer behavior.
-Existing source-checkout installations upgrading into Phase 6 should rerun
-`./install.sh --profile recommended` (or `full`) to install the new system
-management packages; a dry run previews the added packages first. The update
-does not remove packages or alter the host SELinux policy.
-If `maim` is unavailable in the enabled Fedora repositories, the installer
-skips that add-on instead of failing the desktop install and reports that the
-screenshot hotkeys are unavailable.
-
-For a minimal install:
-
-```bash
-DWM_INSTALL_PROFILE=core ./install.sh
-```
-
-The same profile can be selected with a flag:
-
-```bash
-./install.sh --profile core
-```
-
-Interactive runs print the resolved package plan before prompting. For CI,
-packaging checks, or scripted validation, use the non-interactive flags:
-
-```bash
-./install.sh --dry-run --non-interactive --profile core
-./install.sh --non-interactive --yes --profile recommended
-./install.sh --non-interactive --yes --profile full --enable-fedora-gaming-repos
-```
-
-Without `--enable-fedora-gaming-repos`, unattended Fedora full installs skip
-Steam, Gamescope, GameMode, and MangoHud rather than changing repository trust.
-
-Herdr is skipped for every profile unless `--install-herdr` or
-`DWM_INSTALL_HERDR=true` is provided. Its published Linux binaries support
-x86_64 and aarch64. Installation alone does not change the terminal default;
-set `DWM_HERDR=1` and run `dwm-terminal` to enter the optional workspace.
-Herdr can also be installed or repaired separately:
+Installation alone does not change the terminal default; set `DWM_HERDR=1` and
+run `dwm-terminal` to enter the optional workspace. Herdr can also be installed
+or repaired separately:
 
 ```bash
 install-herdr
@@ -314,14 +226,39 @@ its `terminal` variable to `dwm-terminal`, set it to `alacritty` to adopt the
 current direct-terminal default. The installer does not overwrite that
 user-owned choice.
 
+## First Login
+
+`Super` is usually the Windows key. Open the file manager with `Super+E`, open
+a terminal with `Super+X`, take a full screenshot with `Super+P`, select a
+region with `Super+Shift+P`, or copy a region to the clipboard with
+`Super+Ctrl+P`.
+
+## Package Updates
+
+Settings > System package updates and the Update Center system provider are
+still Fedora code and report an unsupported state on Arch. Update the system in
+a terminal and review pacman's prompts before confirming:
+
+```bash
+sudo pacman -Syu
+```
+
+Never run `pacman -Sy` on its own. The first-boot initial update belonged to
+the upstream Fedora images and does not apply to Arch installations.
+
 ## Source Updates and Recovery
 
-Settings > System now offers **Desktop updates** above Fedora updates. It checks
-official `main`, detects stale managed files, and installs a confirmed update
-with progress and recovery records. Existing installations use the source
-procedure below once to install that support. See
-[Desktop updates and recovery](https://github.com/ChrisTitusTech/dwm-titus/blob/main/docs/DESKTOP-UPDATES.md) for the update
-contract, restart behavior, and interrupted-operation recovery.
+Settings > System offers **Desktop updates** above the system package section.
+It checks `main` of this fork (`github.com/moheladwy/dwm-titus-archlinux`),
+detects stale managed files, and installs a confirmed update with progress and
+recovery records. Missing dependencies are checked with `pacman -T` and
+installed with `pacman -S --needed` only when no system updates are pending;
+otherwise the update stops with "Update system packages first". Run
+`sudo pacman -Syu`, then try again. An installation recorded from upstream
+`ChrisTitusTech/dwm-titus` is not trusted by the updater; reinstall from this
+repository with `./install.sh` to record the new source. See
+[Desktop updates and recovery](https://github.com/moheladwy/dwm-titus-archlinux/blob/main/docs/DESKTOP-UPDATES.md)
+for the update contract, restart behavior, and interrupted-operation recovery.
 
 Before a source update, save the current checkout and user configuration. Run
 this from the checkout as your regular user in Bash, with desktop settings
@@ -367,7 +304,7 @@ printf 'Recovery backup: %s\n' "$backup_dir"
 
 The source archive includes your `config.h` and Git state. Keep the backup
 private: application configuration can contain credentials. This backs up
-source and configuration, not Fedora packages or all personal data. The user
+source and configuration, not Arch packages or all personal data. The user
 archive records the effective XDG paths, symlink layout, and the contents of
 referenced writable targets, including dotfiles outside the checkout. A missing
 or read-only link target stops the recipe; resolve it or back it up separately
@@ -378,10 +315,11 @@ For a clean tracked checkout, update and synchronize the installed files:
 ```bash
 git status --short
 git pull --ff-only || exit 1
-./install.sh --non-interactive --yes --profile recommended || exit 1
+./install.sh --yes --profile recommended || exit 1
 ./scripts/dev-sync-install.sh
 ```
 
+The installer starts with its full `sudo pacman -Syu` and pacman's own prompt.
 Resolve local source changes before pulling. The installer preserves existing
 user TOML files, `config.h`, `.xinitrc`, and application configuration. It
 replaces the managed Quickshell directory to match the installed helpers.
@@ -394,8 +332,9 @@ dwm-diagnostics
 
 If an update is interrupted, retain its log and rerun the same installer and
 synchronization commands after fixing the reported cause. Do not interrupt an
-active RPM transaction as a recovery technique. If the desktop is unusable,
-switch to a TTY with Ctrl+Alt+F3 and log in as the same user.
+active pacman transaction or delete the pacman lock as a recovery technique.
+If the desktop is unusable, switch to a TTY with Ctrl+Alt+F3 and log in as the
+same user.
 
 To restore a backup, set `backup_dir` to the exact path printed above. Close the
 desktop session first. The following restores the saved configuration and link targets over their
@@ -409,15 +348,25 @@ tar -C "$restore_dir" -xpf "$backup_dir/source.tar" || exit 1
 tar -C / --keep-directory-symlink -xpf "$backup_dir/user.tar" || exit 1
 source "$backup_dir/xdg.env"
 cd "$restore_dir" || exit 1
-./install.sh --non-interactive --yes --profile recommended || exit 1
+./install.sh --yes --profile recommended || exit 1
 ./scripts/dev-sync-install.sh
 ```
 
 Log in again and run `./scripts/dev-sync-install.sh --check` from the restored
 checkout. Keep both directories until runtime verification passes. This
-procedure does not downgrade RPMs, remove files created after the backup, or
-undo external service and firmware changes. Package update recovery is a
-separate operation in Settings; follow its recorded transaction guidance.
+procedure does not downgrade packages, remove files created after the backup,
+or undo external service and firmware changes. pacman owns package recovery;
+desktop rollback does not uninstall packages.
+
+### Development Checkouts
+
+`scripts/dev-sync-install.sh` builds the checkout and synchronizes the binary,
+installed helpers, managed Quickshell configuration, and data copy into the
+live installation at one revision. Use it after the first `./install.sh` run;
+it does not install a profile. When source-update dependencies are missing, it
+installs them together with a full upgrade (`sudo pacman -Syu --needed`). Run
+`./scripts/dev-sync-install.sh --check` after any requested session restart to
+verify the active runtime.
 
 ## Starting dwm
 
@@ -474,9 +423,10 @@ dwm-settings-input reset DEVICE SETTING
 
 Input discovery and per-device actions require `xinput`; keyboard layout and
 modifier operations also require `setxkbmap`; session-wide XKB accessibility
-controls require `xkbset`; stable hardware identity and hotplug watching use
-`udevadm`, and the session watcher uses `flock` from `util-linux` to prevent
-duplicate replay workers. Kept values default to
+controls require `xkbset`, which is AUR-only and installed only with
+`--enable-aur`; stable hardware identity and hotplug watching use `udevadm`,
+and the session watcher uses `flock` from `util-linux` to prevent duplicate
+replay workers. Kept values default to
 `${XDG_CONFIG_HOME:-$HOME/.config}/dwm-titus/input-settings.conf`. Set
 `DWM_INPUT_SETTINGS_FILE` to use a different file. The normal session startup
 invokes `apply-saved` idempotently and runs `watch-apply` to debounce input
@@ -491,8 +441,8 @@ The provided `.xinitrc` disables screen blanking, starts the configured Quickshe
 
 ## Minimal Session Profile
 
-The minimal supported profile is useful for lean Fedora systems, recovery
-sessions, and minimal Fedora qualification. It keeps only:
+The minimal supported profile is useful for lean Arch systems and recovery
+sessions. It keeps only:
 
 - an X11 server and either a display-manager session or `startx`
 - D-Bus session support
@@ -533,31 +483,16 @@ The default binding opens Alacritty directly. A plain `dwm-terminal` also opens
 the selected emulator directly unless `DWM_HERDR=1` explicitly enables Herdr.
 Commands such as `dwm-terminal -e sh -c 'command'` always bypass Herdr.
 
-### Flatpak prerequisites
+### Flatpak Prerequisites
 
-Recommended and full installs install the Fedora Flatpak package before
+Recommended and full installs install the Arch `flatpak` package before
 configuring the official Flathub remote for the target user. Gear Lever
 setup verifies the remote matching an existing app, or prepares the user remote
-before a new installation. Preinstalled system apps use the existing system
-remote so fresh image account setup remains offline. Factory images
-perform the same checks in system scope before installing Flatpak apps. Repeated
-setup preserves existing apps and remotes; an unreadable, disabled, or conflicting
-Flathub remote stops dependent installs with an error.
+before a new installation. Repeated setup preserves existing apps and remotes;
+an unreadable, disabled, or conflicting Flathub remote stops dependent installs
+with an error. Flathub is the only third-party repository the installer adds.
 
 After resolving a setup failure, retry `scripts/install-gearlever` from the
 source checkout. To prepare the user remote independently, run
 `scripts/dwm-flatpak-setup --user`. If Flatpak is missing, rerun
 `./install.sh --profile recommended` first.
-
-### Default image storage layout
-
-Both Fedora image variants default to regular partitions with `/home` as an
-ordinary directory on the root (`/`) filesystem, sharing its free space. The XFS root partition grows to use the selected
-drive's available capacity after boot partitions, without the Fedora Server
-automatic-layout size cap. Anaconda
-creates the boot partitions required by BIOS or UEFI. Select the intended
-installation drive in Anaconda and review any destructive storage changes before
-confirming. Fedora Anaconda may initially select every attached disk when
-loading Kickstart: deselect all drives you do not intend to install onto. The
-public profiles do not authorize disk erasure or bypass storage review. Custom
-partitioning remains available for a different layout.

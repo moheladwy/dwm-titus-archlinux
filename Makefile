@@ -89,7 +89,7 @@ INSTALL_COMMANDS = \
 	scripts/xdg-enable-autostart.sh \
 	scripts/xscreensaver-setup.sh
 INSTALL_COMMAND_NAMES = $(notdir ${INSTALL_COMMANDS})
-PRIVILEGED_HELPERS = scripts/dwm-dnf-defaults scripts/dwm-settings-display-root scripts/dwm-desktop-update-root scripts/dwm-initial-update-root
+PRIVILEGED_HELPERS = scripts/dwm-settings-display-root scripts/dwm-desktop-update-root scripts/dwm-initial-update-root
 PRIVILEGED_HELPER_DIR = ${PREFIX}/libexec/dwm-titus
 
 RELEASE_NAME = dwm-titus-${VERSION}
@@ -218,7 +218,7 @@ install-system-files:
 		--destdir "${DESTDIR}" --prefix "${PREFIX}" --manprefix "${MANPREFIX}" \
 		--xsessions "${XSESSIONSDIR}" --datadir "${DATADIR}" \
 		--commands ${INSTALL_COMMAND_NAMES} --helpers $(notdir ${PRIVILEGED_HELPERS}) \
-		--packages $$("${DESTDIR}${PREFIX}/bin/dwm-packages.sh" fedora build) $$("${DESTDIR}${PREFIX}/bin/dwm-packages.sh" fedora source-update)
+		--packages $$("${DESTDIR}${PREFIX}/bin/dwm-packages.sh" arch build) $$("${DESTDIR}${PREFIX}/bin/dwm-packages.sh" arch source-update)
 
 install-app-themes:
 	@echo "==> Installing application themes..."
@@ -272,9 +272,19 @@ install-user-files:
 	fi
 	@echo "==> Seeding application config without overwriting user files..."
 	mkdir -p ${CFG_DIR}
+	@# Earlier releases seeded a desktop-wide portals.conf that also overrode
+	@# other desktops. Remove it only while it is byte-identical to that seed;
+	@# dwm-portals.conf now applies to the dwm session alone.
+	legacy="${CFG_DIR}/xdg-desktop-portal/portals.conf"; \
+	if [ -f "$$legacy" ] && [ ! -L "$$legacy" ] && \
+		printf '[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.Settings=gtk\n' | \
+		cmp -s - "$$legacy"; then \
+		rm -f "$$legacy"; \
+		echo "  Removed the unmodified legacy $$legacy"; \
+	fi
 	for dir in config/*/; do \
 		b=$$(basename "$$dir"); \
-		if [ "$$b" = quickshell ]; then \
+		if [ "$$b" = quickshell ] || [ "$$b" = dnf ]; then \
 			continue; \
 		fi; \
 		dst=${CFG_DIR}/$$b; \
@@ -610,6 +620,9 @@ check-quickshell-settings-xvfb: all
 check-lightdm-config:
 	tests/test-lightdm-config.sh
 
+check-nvidia-suspend-test:
+	tests/test-nvidia-suspend-test.sh
+
 check-kickstart:
 	for ks in dwm-fedora.ks dwm-fedora-nvidia.ks; do \
 		ksvalidator "$$ks"; \
@@ -629,11 +642,11 @@ check-fedora-iso-builder:
 	/usr/bin/python3 tests/test-image-packagekit.py
 	tests/test-fedora-iso-builder.sh
 
-check-fedora-platform:
-	@$(call run_managed_test,tests/test-fedora-platform.sh)
+check-arch-platform:
+	@$(call run_managed_test,tests/test-arch-platform.sh)
 
-check-fedora-packages:
-	tests/test-fedora-packages.sh
+check-arch-packages:
+	tests/test-arch-packages.sh
 
 check-install: check-install-manifest
 
@@ -657,7 +670,6 @@ check-install-manifest: all
 			usr/libexec/dwm-titus/dwm-settings-display-root \
 			usr/libexec/dwm-titus/dwm-desktop-update-root \
 			usr/libexec/dwm-titus/dwm-initial-update-root \
-			usr/libexec/dwm-titus/dwm-dnf-defaults \
 			usr/share/dwm-titus/desktop-install.json \
 			usr/share/man/man1/dwm.1 \
 			usr/share/xsessions/dwm.desktop; \
@@ -759,7 +771,7 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-shell
 	$(MAKE) check-format
 	$(MAKE) check-build-config
-	$(MAKE) check-fedora-platform
+	$(MAKE) check-arch-platform
 	$(MAKE) check-dev-sync-install
 	$(MAKE) check-default-apps
 	$(MAKE) check-xdg-autostart
@@ -813,13 +825,13 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-webapp-launch
 	$(MAKE) check-screenshot
 	$(MAKE) check-release-helper
-	$(MAKE) check-kickstart
-	$(MAKE) check-fedora-packages
+	$(MAKE) check-arch-packages
 	$(MAKE) check-install
 	$(MAKE) check-install-preservation
 	$(MAKE) check-test-runner
 	$(MAKE) check-test-runner-podman
 	$(MAKE) check-lightdm-config
+	$(MAKE) check-nvidia-suspend-test
 	$(MAKE) release-check
 
 .PHONY: check-update-center check-update-center-terminal check-update-center-window-rule check-quickshell-update-center-model check-quickshell-update-center check-quickshell-update-center-xvfb print-dnf-defaults-helper check-initial-update install-files install-user-files install-system-files clean all check check-desktop-update check-picom check-picom-xvfb check-accessibility check-appearance check-phase5-optional-components check-build-config check-build-deps check-default-apps check-xdg-autostart check-dev-sync-install \
@@ -827,8 +839,8 @@ check: check-picom check-picom-xvfb
 	check-test-runner \
 	check-test-runner-podman \
 	check-update-center-settings \
-	check-display-profile check-display-setup check-fedora-iso-builder check-fedora-packages check-fedora-platform check-format check-install \
+	check-display-profile check-display-setup check-fedora-iso-builder check-arch-packages check-arch-platform check-format check-install \
 	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-kickstart check-lock \
 	check-session-guards check-session-migration check-screenshot check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
-	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-terminal check-xvfb-runtime install install-system install-user \
+	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-nvidia-suspend-test check-terminal check-xvfb-runtime install install-system install-user \
 	install-cursors install-app-themes check-app-themes native release release-check uninstall uninstall-files

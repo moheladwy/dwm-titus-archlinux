@@ -33,18 +33,25 @@ ClickAwayPopup {
     }
 
     function requestSave() {
-        root.saveStatus = "";
         const editor = refreshSpin.contentItem as TextInput;
         const seconds = editor ? refreshSpin.valueFromText(editor.text, refreshSpin.locale) : NaN;
         if (!editor || !editor.acceptableInput || !Number.isInteger(seconds)
                 || seconds < refreshSpin.from || seconds > refreshSpin.to) {
+            root.saveStatus = "";
             root.updateCenterModel.settingsError = "Refresh interval must be an integer from 300 to 21600 seconds";
             return;
         }
         root.updateCenterModel.draftRefreshSeconds = seconds;
         updateCard.forceActiveFocus();
+        // Replace the status line instead of clearing it while saving. Collapsing
+        // it shrinks an overflowing settings viewport, which clamps contentY and
+        // leaves Save clipped once the result line reappears.
+        root.saveStatus = "Saving preferences";
         root.savePending = true;
-        if (!root.updateCenterModel.saveSettings()) root.savePending = false;
+        if (!root.updateCenterModel.saveSettings()) {
+            root.savePending = false;
+            root.saveStatus = "";
+        }
     }
 
     visible: panelWindow !== null && panelWindow.screen !== null && updateCenterModel.visible
@@ -344,7 +351,8 @@ ClickAwayPopup {
                         Layout.fillWidth: true
                         visible: root.updateCenterModel.settingsError.length > 0 || root.saveStatus.length > 0
                         text: root.updateCenterModel.settingsError.length > 0 ? root.updateCenterModel.settingsError : root.saveStatus
-                        color: root.updateCenterModel.settingsError.length > 0 ? Theme.danger : Theme.success
+                        color: root.updateCenterModel.settingsError.length > 0 ? Theme.danger
+                            : root.savePending ? Theme.menuMutedText : Theme.success
                         wrapMode: Text.Wrap
                         Accessible.role: Accessible.AlertMessage
                     }

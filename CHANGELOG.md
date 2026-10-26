@@ -6,7 +6,25 @@ versions from `config.mk`.
 
 ## [Unreleased]
 
+This fork (`moheladwy/dwm-titus-archlinux`) now supports Arch Linux only.
+Fedora is no longer supported. See the migration notes under Changed and the
+port decisions in `docs/ARCH-PORT-DECISIONS.md`. Entries below that mention
+Fedora, DNF, PackageKit, Path, or images describe upstream work that predates
+the port.
+
 ### Added
+
+- Support Arch Linux (`ID=arch`) as the only platform. The installer rejects
+  every other identity, including Arch derivatives such as EndeavourOS,
+  CachyOS, and Manjaro, before making any change.
+- Add `--enable-aur` to install optional AUR-only extras (`xkbset` and the
+  Arc, Numix, Yaru, and Bluebird GTK themes) through an already-installed
+  `paru` or `yay`, run as the invoking user. No AUR helper is ever installed,
+  official packages never go through it, and no required profile depends on
+  the AUR.
+- Add a pinned Arch test container (`tests/containers/arch/Containerfile`,
+  built by `scripts/run-tests-podman` as `localhost/dwm-titus-tests:arch`)
+  that resolves packages from a dated Arch Linux Archive snapshot.
 
 - Integrate Path from `ChrisTitusTech/Path`, available as `path` in the
   `christitustech/copr-fedora` COPR. Full installs attempt it after approved
@@ -34,9 +52,68 @@ versions from `config.mk`.
 
 ### Changed
 
+- The installer runs one visible `sudo pacman -Syu` before installing any
+  package, because Arch does not support partial upgrades. It is listed in the
+  `--dry-run` plan, uses pacman's own prompt, adds `--noconfirm` only with
+  `--non-interactive`, and stops the installation if it fails.
+- Dolphin replaces Thunar as the managed file manager in the `full` profile,
+  and fresh accounts open folders in Dolphin. Existing MIME preferences are
+  unchanged.
+- LightDM integration adds the drop-in
+  `/etc/lightdm/lightdm.conf.d/50-dwm-titus.conf` (`lightdm-slick-greeter`,
+  the `dwm` session, and the logind graphical check) and never rewrites
+  `/etc/lightdm/lightdm.conf`, so existing settings such as autologin are kept
+  and Arch's packaged session wrapper applies. Installs where an earlier
+  version replaced `lightdm.conf` keep that file and its `.dwm-titus.*.bak`
+  backup; the drop-in repeats the same values harmlessly.
+- The installer no longer switches to non-interactive mode, or adds
+  `--noconfirm`, because standard input or output is not a terminal. Without a
+  terminal on standard input it refuses unless `--non-interactive` (or
+  `--dry-run`) is given, and a piped standard output, such as `| tee`, keeps
+  the interactive prompts.
+- `nvidia-suspend-test.sh` reads `/etc/mkinitcpio.conf.d/*.conf` drop-ins in
+  mkinitcpio's order and finds the NVIDIA module with `modinfo`, so DKMS
+  modules outside `extramodules` are checked.
+- The keyring dependency is `gnome-keyring`, which ships the PAM module on
+  Arch. Using it with `startx` requires a manual `/etc/pam.d/login` edit; the
+  installer never edits PAM files.
+- Quickshell 0.3.0 or newer from Arch `extra` is required, and QML lint uses
+  the Qt 6 `qmllint` (`/usr/lib/qt6/bin/qmllint`).
+- Make targets `check-fedora-platform` and `check-fedora-packages` are now
+  `check-arch-platform` and `check-arch-packages`.
+- Desktop source updates track this fork
+  (`https://github.com/moheladwy/dwm-titus-archlinux`) instead of upstream.
+  An installation recorded from upstream is no longer trusted by the updater;
+  reinstall from this repository with `./install.sh` to record the new source.
+- The session portal preference moves from a desktop-wide
+  `~/.config/xdg-desktop-portal/portals.conf` to `dwm-portals.conf`, so it no
+  longer overrides other desktops on the same account. User installs remove
+  the old file only when it is byte-identical to the previous seed; edited
+  copies are kept.
+- The Quickshell Picom opacity tweak recognizes only the legacy
+  `opacity-rule` tooltip entry. Arch's `/etc/xdg/picom.conf` uses the newer
+  `rules` syntax, so the installer leaves it unchanged and reports that the
+  rule was not found.
+- Migration: this fork no longer supports Fedora. Fedora users should stay on
+  upstream `ChrisTitusTech/dwm-titus`. To move to this fork, install Arch Linux
+  from the official ISO or `archinstall`, then run `./install.sh` from a
+  checkout of this repository. Personal TOML files, `config.h`, and
+  `.xinitrc` are preserved as before. Until the update stack is ported,
+  package updates in Settings and the Update Center report an unsupported
+  state on Arch; update with `sudo pacman -Syu` in a terminal.
 - Reuse existing non-interactive sudo authorization for confirmed desktop
   updates and recovery, falling back to polkit when unavailable. Passwords and
   authorization policy are not stored or changed by the updater.
+
+### Removed
+
+- Remove the gaming profile (Steam, Gamescope, GameMode, MangoHud), the
+  `--enable-fedora-gaming-repos` flag and prompt, and the `gamemode` group
+  step. `multilib` is not required.
+- Drop Path from the package map and default applications. Path has no Arch
+  package; Dolphin replaces it.
+- Drop the Fedora ISO install path from the documentation. This fork ships no
+  installer images, package repositories, or signing keys.
 
 ### Fixed
 

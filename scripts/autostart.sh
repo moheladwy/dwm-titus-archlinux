@@ -441,6 +441,17 @@ export DESKTOP_SESSION="${DESKTOP_SESSION:-dwm}"
 export XDG_SESSION_TYPE=x11
 export QT_QPA_PLATFORM=xcb
 unset WAYLAND_DISPLAY
+# KDE applications such as Dolphin resolve "Open With" handlers through an XDG
+# applications menu. Outside Plasma, Arch provides it as arch-applications.menu.
+# A user-set prefix is preserved. Tests may point at a fixture menu directory,
+# but only in test mode.
+xdg_menus_dir=/etc/xdg/menus
+if [ "${DWM_TEST_MODE:-0}" = 1 ] && [ -n "${DWM_TEST_XDG_MENUS_DIR:-}" ]; then
+	xdg_menus_dir=$DWM_TEST_XDG_MENUS_DIR
+fi
+if [ -z "${XDG_MENU_PREFIX:-}" ] && [ -f "$xdg_menus_dir/arch-applications.menu" ]; then
+	export XDG_MENU_PREFIX=arch-
+fi
 
 # Export display and theme env to systemd/dbus in parallel (both are IPC round-trips).
 systemctl_import_pid=
@@ -450,7 +461,7 @@ if command -v systemctl >/dev/null 2>&1; then
 		systemctl --user unset-environment WAYLAND_DISPLAY
 		systemctl --user import-environment \
 			DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP DESKTOP_SESSION XDG_DATA_DIRS \
-			XDG_SESSION_TYPE QT_QPA_PLATFORM QT_QPA_PLATFORMTHEME \
+			XDG_SESSION_TYPE QT_QPA_PLATFORM QT_QPA_PLATFORMTHEME XDG_MENU_PREFIX \
 			XCURSOR_THEME XCURSOR_SIZE
 	} &
 	systemctl_import_pid=$!
@@ -460,13 +471,18 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
 		dbus-update-activation-environment WAYLAND_DISPLAY=
 		dbus-update-activation-environment --systemd \
 			DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP DESKTOP_SESSION XDG_DATA_DIRS \
-			XDG_SESSION_TYPE QT_QPA_PLATFORM QT_QPA_PLATFORMTHEME \
+			XDG_SESSION_TYPE QT_QPA_PLATFORM QT_QPA_PLATFORMTHEME XDG_MENU_PREFIX \
 			XCURSOR_THEME XCURSOR_SIZE
 	} 2>/dev/null &
 	dbus_import_pid=$!
 fi
 [ -z "$systemctl_import_pid" ] || wait "$systemctl_import_pid"
 [ -z "$dbus_import_pid" ] || wait "$dbus_import_pid"
+
+# Refresh the KDE service cache for the menu above without blocking startup.
+if [ -n "${XDG_MENU_PREFIX:-}" ] && command -v kbuildsycoca6 >/dev/null 2>&1; then
+	kbuildsycoca6 >/dev/null 2>&1 &
+fi
 
 # An older updater cannot stage this rule migration. Complete that first upgrade
 # at login, preserving a recovery copy and the live configuration directory.
@@ -497,7 +513,7 @@ if [ -f "$QUICKSHELL_CONFIG" ]; then
 		quickshell_compatible=1
 		start_managed_quickshell "$QUICKSHELL_CONFIG"
 	else
-		printf '%s\n' 'dwm-titus: compatible Quickshell 0.3.0 or Fedora 44 snapshot is required' >&2
+		printf '%s\n' 'dwm-titus: Quickshell 0.3.0 or newer is required' >&2
 	fi
 	if [ "$quickshell_compatible" -eq 1 ]; then
 		wait_for_quickshell_tray "$QUICKSHELL_CONFIG" || true

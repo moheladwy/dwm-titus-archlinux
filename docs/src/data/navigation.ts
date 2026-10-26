@@ -13,6 +13,6 @@ export const navigation = [
 ] as const;
 
 export const projectLinks = [
-  { href: "https://github.com/ChrisTitusTech/dwm-titus", label: "GitHub" },
-  { href: "https://github.com/ChrisTitusTech/dwm-titus/releases/latest", label: "Latest release" }
+  { href: "https://github.com/moheladwy/dwm-titus-archlinux", label: "GitHub" },
+  { href: "https://github.com/moheladwy/dwm-titus-archlinux/releases/latest", label: "Latest release" }
 ] as const;

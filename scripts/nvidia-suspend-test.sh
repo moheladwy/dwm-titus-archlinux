@@ -32,6 +32,102 @@ warn() {
 info() { echo -e "  ${CYAN}[INFO]${RESET} $1"; }
 header() { echo -e "\n${BOLD}=== $1 ===${RESET}"; }
 
+# Print the mkinitcpio configuration files in the order mkinitcpio reads them:
+# the main file, then each readable *.conf drop-in from "<config>.d" in
+# version order (LC_ALL=C.UTF-8 sort -V, symlinks to files included).
+mkinitcpio_config_files() {
+	local config=${1:-/etc/mkinitcpio.conf}
+	local dropin_dir="${config}.d"
+	local name
+
+	printf '%s\0' "$config"
+	[[ -d $dropin_dir ]] || return 0
+	while IFS= read -r -d '' name; do
+		if [[ -r $dropin_dir/$name ]]; then
+			printf '%s\0' "$dropin_dir/$name"
+		fi
+	done < <(LC_ALL=C.UTF-8 find "$dropin_dir" -maxdepth 1 -xtype f -name '*.conf' -print0 |
+		sed -z 's/.*\///' | LC_ALL=C.UTF-8 sort -zVu)
+}
+
+# The configuration is shell code. Evaluate only files that no other
+# unprivileged user could have written: owned by root or the current user and
+# not writable by group or others.
+mkinitcpio_file_trusted() {
+	local owner mode
+
+	read -r owner mode < <(stat -L -c '%u %a' -- "$1" 2>/dev/null) || return 1
+	[[ $owner == 0 || $owner == "$EUID" ]] || return 1
+	if ((8#$mode & 8#022)); then
+		return 1
+	fi
+	return 0
+}
+
+# Print the effective MODULES and HOOKS as "module<TAB>name" and
+# "hook<TAB>name" lines. Like mkinitcpio, concatenate the main file and its
+# drop-ins and source the result once, so later assignments override earlier
+# ones and MODULES+=() appends. Sourcing happens in a clean, isolated shell.
+mkinitcpio_effective_config() {
+	local config=${1:-/etc/mkinitcpio.conf}
+	local files=() file merged status=0
+
+	mapfile -t -d '' files < <(mkinitcpio_config_files "$config")
+	for file in "${files[@]}"; do
+		if ! mkinitcpio_file_trusted "$file"; then
+			printf 'untrusted\t%s\n' "$file"
+			return 2
+		fi
+	done
+	merged=$(mktemp) || return 1
+	if cat -- "${files[@]}" >"$merged"; then
+		# shellcheck disable=SC2016
+		env -i PATH=/usr/bin:/bin bash --noprofile --norc -c '
+			. "$1" >/dev/null 2>&1 </dev/null || exit 1
+			# Split legacy string values into words, as mkinitcpio does,
+			# without expanding the "?" optional-module suffix as a glob.
+			set -f
+			for item in ${MODULES[@]+${MODULES[@]}}; do
+				printf "module\t%s\n" "$item"
+			done
+			for item in ${HOOKS[@]+${HOOKS[@]}}; do
+				printf "hook\t%s\n" "$item"
+			done
+		' mkinitcpio-config "$merged" || status=1
+	else
+		status=1
+	fi
+	rm -f -- "$merged"
+	return "$status"
+}
+
+# Print the path of the nvidia module for a kernel. modinfo resolves it through
+# modules.dep wherever the package or DKMS placed it; fall back to the Arch
+# extramodules location when modinfo is unavailable or cannot resolve it.
+nvidia_module_path() {
+	local kernel=$1
+	local modules_root=${2:-/usr/lib/modules}
+	local path candidate
+
+	if command -v modinfo &>/dev/null &&
+		path=$(modinfo -k "$kernel" -n nvidia 2>/dev/null) && [[ -n $path ]]; then
+		printf '%s\n' "$path"
+		return 0
+	fi
+	for candidate in nvidia.ko.zst nvidia.ko.xz nvidia.ko.gz nvidia.ko; do
+		if [[ -f $modules_root/$kernel/extramodules/$candidate ]]; then
+			printf '%s\n' "$modules_root/$kernel/extramodules/$candidate"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# Tests source this file for the helpers above without running the checks.
+if [[ ${BASH_SOURCE[0]} != "$0" ]]; then
+	return 0
+fi
+
 # ─── GPU & Driver ───────────────────────────────────────────────────────────────
 header "GPU & Driver Info"
 
@@ -214,29 +310,48 @@ fi
 header "Initramfs (Early KMS)"
 
 if [[ -f /etc/mkinitcpio.conf ]]; then
-	MODULES_LINE=$(grep "^MODULES=" /etc/mkinitcpio.conf 2>/dev/null | head -1)
-	info "mkinitcpio MODULES: ${MODULES_LINE}"
+	MKINITCPIO_MODULES=()
+	MKINITCPIO_HOOKS=()
+	MKINITCPIO_STATUS=0
+	MKINITCPIO_CONFIG=$(mkinitcpio_effective_config /etc/mkinitcpio.conf) ||
+		MKINITCPIO_STATUS=$?
+	while IFS=$'\t' read -r kind value; do
+		case $kind in
+		module) MKINITCPIO_MODULES+=("${value%\?}") ;;
+		hook) MKINITCPIO_HOOKS+=("$value") ;;
+		esac
+	done <<<"$MKINITCPIO_CONFIG"
 
-	MISSING_MODS=()
-	for mod in nvidia nvidia_modeset nvidia_uvm nvidia_drm; do
-		if echo "$MODULES_LINE" | grep -qw "$mod"; then
-			pass "$mod in MODULES array"
-		else
-			MISSING_MODS+=("$mod")
-			fail "$mod NOT in MODULES array"
-		fi
-	done
+	mapfile -t -d '' MKINITCPIO_FILES < <(mkinitcpio_config_files /etc/mkinitcpio.conf)
+	info "mkinitcpio configuration: ${MKINITCPIO_FILES[*]}"
 
-	if [[ ${#MISSING_MODS[@]} -gt 0 ]]; then
-		info "Fix: Add to MODULES in /etc/mkinitcpio.conf, then run: sudo mkinitcpio -P"
-	fi
-
-	# Check hooks
-	HOOKS_LINE=$(grep "^HOOKS=" /etc/mkinitcpio.conf 2>/dev/null | head -1)
-	if echo "$HOOKS_LINE" | grep -qw "kms"; then
-		pass "kms hook present in HOOKS"
+	if [[ $MKINITCPIO_STATUS -eq 2 ]]; then
+		warn "Skipped evaluating ${MKINITCPIO_CONFIG#*$'\t'}: it is writable by another user"
+	elif [[ $MKINITCPIO_STATUS -ne 0 ]]; then
+		warn "Could not evaluate the mkinitcpio configuration"
 	else
-		warn "kms hook not in HOOKS — early KMS won't start for in-tree drivers"
+		info "mkinitcpio MODULES: (${MKINITCPIO_MODULES[*]})"
+
+		MISSING_MODS=()
+		for mod in nvidia nvidia_modeset nvidia_uvm nvidia_drm; do
+			if [[ " ${MKINITCPIO_MODULES[*]} " == *" $mod "* ]]; then
+				pass "$mod in MODULES array"
+			else
+				MISSING_MODS+=("$mod")
+				fail "$mod NOT in MODULES array"
+			fi
+		done
+
+		if [[ ${#MISSING_MODS[@]} -gt 0 ]]; then
+			info "Fix: Add to MODULES in /etc/mkinitcpio.conf or a /etc/mkinitcpio.conf.d/*.conf drop-in, then run: sudo mkinitcpio -P"
+		fi
+
+		# Check hooks
+		if [[ " ${MKINITCPIO_HOOKS[*]} " == *" kms "* ]]; then
+			pass "kms hook present in HOOKS"
+		else
+			warn "kms hook not in HOOKS — early KMS won't start for in-tree drivers"
+		fi
 	fi
 else
 	info "Not an mkinitcpio system (may use dracut or other initramfs generator)"
@@ -389,14 +504,10 @@ else
 fi
 
 # Check nvidia module matches kernel
-if [[ -d "/usr/lib/modules/${KERNEL}/extramodules" ]]; then
-	if [[ -f "/usr/lib/modules/${KERNEL}/extramodules/nvidia.ko.zst" ]] ||
-		[[ -f "/usr/lib/modules/${KERNEL}/extramodules/nvidia.ko.gz" ]] ||
-		[[ -f "/usr/lib/modules/${KERNEL}/extramodules/nvidia.ko" ]]; then
-		pass "nvidia module exists for running kernel ${KERNEL}"
-	else
-		fail "nvidia module NOT found for running kernel ${KERNEL}"
-	fi
+if NVIDIA_MODULE_PATH=$(nvidia_module_path "$KERNEL"); then
+	pass "nvidia module exists for running kernel ${KERNEL}: ${NVIDIA_MODULE_PATH}"
+else
+	fail "nvidia module NOT found for running kernel ${KERNEL}"
 fi
 
 # ─── USB Autosuspend (common wake issue) ─────────────────────────────────────────

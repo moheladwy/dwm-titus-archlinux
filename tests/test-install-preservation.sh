@@ -209,6 +209,7 @@ mkdir -p \
 	"$XDG_CONFIG_HOME/dwm-titus" \
 	"$XDG_CONFIG_HOME/picom" \
 	"$XDG_CONFIG_HOME/Thunar" \
+	"$XDG_CONFIG_HOME/xdg-desktop-portal" \
 	"$XDG_CONFIG_HOME/quickshell" \
 	"$XDG_CONFIG_HOME/autostart" \
 	"$XDG_CONFIG_HOME/systemd/user/default.target.wants" \
@@ -223,6 +224,10 @@ printf '%s\n' '# existing themes marker' >>"$XDG_CONFIG_HOME/dwm-titus/themes.to
 printf '%s\n' '# existing rules marker' >"$XDG_CONFIG_HOME/dwm-titus/window-rules.toml"
 printf '%s\n' '# existing picom marker' >"$XDG_CONFIG_HOME/picom/picom.conf"
 printf '%s\n' '<!-- existing Thunar actions marker -->' >"$XDG_CONFIG_HOME/Thunar/uca.xml"
+# The unmodified legacy desktop-wide portal seed is removed; any user edit
+# keeps the file.
+printf '[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.Settings=gtk\n' \
+	>"$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf"
 printf '%s\n' '# unrelated user service marker' >"$XDG_CONFIG_HOME/systemd/user/custom.service"
 cat >"$XDG_CONFIG_HOME/autostart/picom.desktop" <<'EOF'
 [Desktop Entry]
@@ -322,6 +327,25 @@ assert_preserved window-rules "$XDG_CONFIG_HOME/dwm-titus/window-rules.toml" "$W
 assert_preserved picom "$XDG_CONFIG_HOME/picom/picom.conf" "$WORK_DIR/picom.before"
 assert_preserved thunar-uca "$XDG_CONFIG_HOME/Thunar/uca.xml" \
 	"$WORK_DIR/thunar-uca.before"
+if [ -e "$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf" ]; then
+	printf 'Install kept the unmodified legacy portals.conf.\n' >&2
+	exit 1
+fi
+cmp "$TEST_REPO/config/xdg-desktop-portal/dwm-portals.conf" \
+	"$XDG_CONFIG_HOME/xdg-desktop-portal/dwm-portals.conf"
+printf '[preferred]\ndefault=kde\n' >"$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf"
+snapshot_file "$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf" "$WORK_DIR/portals.before"
+if [[ $(id -u) -eq 0 ]]; then
+	chown "$OWNER:$OWNER_GROUP" "$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf"
+fi
+run_as_owner env HOME="$TEST_HOME" make -C "$TEST_REPO" install-user \
+	USER_HOME="$TEST_HOME" \
+	OWNER="$OWNER" \
+	XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+	XDG_CONFIG_DIRS="$XDG_CONFIG_DIRS" \
+	XDG_DATA_HOME="$XDG_DATA_HOME" >/dev/null
+assert_preserved edited-portals "$XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf" \
+	"$WORK_DIR/portals.before"
 assert_preserved picom-autostart "$XDG_CONFIG_HOME/autostart/picom.desktop" \
 	"$WORK_DIR/picom-autostart.before"
 assert_preserved custom-service "$XDG_CONFIG_HOME/systemd/user/custom.service" "$WORK_DIR/custom-service.before"
@@ -390,13 +414,20 @@ run_as_owner env HOME="$FRESH_HOME" make -C "$TEST_REPO" install-user \
 	XDG_CONFIG_DIRS="$FRESH_CONFIG_DIRS" \
 	XDG_DATA_HOME="$FRESH_DATA_HOME"
 
-if [[ $(grep -Fxc -- '-f' "$WORK_DIR/fc-cache.log") -ne 3 ]]; then
+# Two preservation passes, the edited-portal pass, and the fresh install.
+if [[ $(grep -Fxc -- '-f' "$WORK_DIR/fc-cache.log") -ne 4 ]]; then
 	printf 'Expected one font-cache refresh per user install.\n' >&2
 	exit 1
 fi
-cmp "$TEST_REPO/config/Thunar/uca.xml" "$FRESH_CONFIG_HOME/Thunar/uca.xml"
-grep -Fqx '    <command>alacritty --working-directory %f</command>' \
-	"$FRESH_CONFIG_HOME/Thunar/uca.xml"
+# Dolphin replaced Thunar, and the Fedora-only DNF drop-in is never seeded.
+for unexpected in Thunar dnf xdg-desktop-portal/portals.conf; do
+	if [ -e "$FRESH_CONFIG_HOME/$unexpected" ]; then
+		printf 'Fresh install seeded removed configuration: %s\n' "$unexpected" >&2
+		exit 1
+	fi
+done
+cmp "$TEST_REPO/config/xdg-desktop-portal/dwm-portals.conf" \
+	"$FRESH_CONFIG_HOME/xdg-desktop-portal/dwm-portals.conf"
 for user_path in \
 	"$FRESH_HOME/.local" \
 	"$FRESH_DATA_HOME" \

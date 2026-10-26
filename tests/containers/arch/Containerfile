@@ -1,0 +1,65 @@
+FROM docker.io/library/archlinux:base-devel@sha256:3cbf69d2d5958d6a294f3722c5668e6187c4df8e00fa27f72352f0bf83e495e1
+
+# Pin every repository to one Arch Linux Archive snapshot so the package set is
+# reproducible. Bump this date together with the base image digest above.
+ARG ARCH_ARCHIVE_DATE=2026/10/22
+
+# The archive server stalls past pacman's low-speed limit and resets streams
+# under parallel load, so downloads use two connections, no stall timeout, and
+# bounded retries into the package cache before each transaction installs.
+# --noconfirm keeps -Scc's default "no" for cached packages; delete them too.
+# The image's NoExtract rules drop docs, man pages, and locales. Keep only the
+# rule that protects the pinned mirrorlist and pacman.conf, then reinstall the
+# base packages that pacman -Qk reports as missing previously skipped files.
+RUN bash -euo pipefail -c 'retry() { local attempt; \
+        for attempt in 1 2 3 4 5; do "$@" && return 0; \
+            printf "Download attempt %s failed; retrying\n" "$attempt" >&2; \
+            sleep $((attempt * 15)); done; return 1; }; \
+    printf "Server = https://archive.archlinux.org/repos/%s/\$repo/os/\$arch\n" \
+        "$ARCH_ARCHIVE_DATE" >/etc/pacman.d/mirrorlist; \
+    sed -i -e "/^NoExtract.*usr\/share/d" \
+        -e "s/^ParallelDownloads.*/ParallelDownloads = 2/" /etc/pacman.conf; \
+    retry pacman -Syyuuw --noconfirm --disable-download-timeout; \
+    pacman -Suu --noconfirm; \
+    mapfile -t incomplete < <(pacman -Qkq | cut -d " " -f 1 | sort -u); \
+    if ((${#incomplete[@]})); then \
+        retry pacman -Sw --noconfirm --disable-download-timeout "${incomplete[@]}"; \
+        pacman -S --noconfirm "${incomplete[@]}"; fi; \
+    pacman -Scc --noconfirm; find /var/cache/pacman/pkg -mindepth 1 -delete'
+
+COPY scripts/dwm-packages.sh /tmp/dwm-packages.sh
+# Capabilities stay in the product package map. Extra utilities serve existing
+# automated gates: lint, Git staging, GTK/Pillow, and Xauthority fixtures.
+# pykickstart is not in the official repositories, so Kickstart validation is
+# unavailable in this image.
+RUN bash -euo pipefail -c 'retry() { local attempt; \
+        for attempt in 1 2 3 4 5; do "$@" && return 0; \
+            printf "Download attempt %s failed; retrying\n" "$attempt" >&2; \
+            sleep $((attempt * 15)); done; return 1; }; \
+    source /tmp/dwm-packages.sh; \
+    packages=$(for profile in ci-smoke x11 desktop system-management qml-validation; do \
+        dwm_packages arch "$profile"; done); \
+    mapfile -t packages < <(printf "%s\n" "$packages" | sort -u); \
+    packages+=(bash git tar findutils diffutils shellcheck shfmt \
+        rsync python-pillow gtk3 gtk4 xorg-xauth); \
+    # Test-only: the legacy Settings system-management backend and its tests
+    # still load PackageKit GI bindings until the pyalpm provider replaces
+    # them. The product never installs PackageKit on Arch (plan D4).
+    packages+=(libpackagekit-glib); \
+    retry pacman -Sw --noconfirm --needed --disable-download-timeout "${packages[@]}"; \
+    pacman -S --noconfirm --needed "${packages[@]}"; \
+    pacman -Scc --noconfirm; find /var/cache/pacman/pkg -mindepth 1 -delete; \
+    rm /tmp/dwm-packages.sh'
+
+# xkbset is AUR-only and never required by the product, but the Settings
+# runtime test exercises real AccessX controls. Build it from a pinned AUR
+# commit as an unprivileged user; makepkg verifies the PKGBUILD checksums.
+ARG XKBSET_AUR_COMMIT=90f104d04bc4c3ff3b7e343f04672e4da666eb7e
+RUN bash -euo pipefail -c 'useradd -m aurbuild; \
+    runuser -u aurbuild -- bash -euo pipefail -c "git clone https://aur.archlinux.org/xkbset.git ~/xkbset; \
+        cd ~/xkbset; git checkout --detach $XKBSET_AUR_COMMIT; makepkg --noconfirm"; \
+    pacman -U --noconfirm /home/aurbuild/xkbset/xkbset-*.pkg.tar.zst; \
+    userdel -r aurbuild'
+
+# No systemd, host session, or hardware is required by the runner.
+ENV QT_QUICK_BACKEND=software

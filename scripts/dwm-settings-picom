@@ -598,12 +598,12 @@ def private_dir():
 
 
 @contextlib.contextmanager
-def locked():
+def locked(shared=False):
     path = private_dir() / "mutation.lock"
     safe_target(path)
     fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        fcntl.flock(fd, fcntl.LOCK_SH if shared else fcntl.LOCK_EX)
         yield
     finally:
         os.close(fd)
@@ -624,15 +624,20 @@ def session_configuration():
         return NativeConfiguration(path)
 
 
-def launch(config, original=None, previous=None):
-    # Xorg can release a dead client's selection after its process disappears.
-    # A brief startup grace avoids a transient refusal; stopping stays entirely
-    # process-based, including when X authorization is unavailable.
-    deadline = time.monotonic() + 0.5
+def await_selection_release(seconds=2):
+    # Xorg can release a dead client's selection after its process disappears,
+    # and a loaded server can take well over half a second to do so. Picom
+    # refuses to start while the selection is owned, so wait before each
+    # attempt; stopping stays entirely process-based, including when X
+    # authorization is unavailable.
+    deadline = time.monotonic() + seconds
     while owner():
         if time.monotonic() >= deadline:
             raise Error("Another compositor owns this display; it was not stopped")
         time.sleep(0.05)
+
+
+def launch(config, original=None, previous=None):
     previous = previous or []
     if isinstance(config, NativeConfiguration):
         override = os.environ.get("PICOM_BACKEND", "")
@@ -687,6 +692,9 @@ def launch(config, original=None, previous=None):
     log_path = private_dir() / "session.log"
     safe_target(log_path)
     for index, command in enumerate(attempts):
+        # Wait immediately before spawning: a stopped compositor, the failed
+        # attempt, and the renderer probe above can each still hold the selection.
+        await_selection_release()
         launch_id = uuid.uuid4().hex
         with open(log_path, "w" if index == 0 else "a") as log:
             child = subprocess.Popen(
@@ -786,9 +794,11 @@ def status(detect=True):
         result["revision"] = config.revision()
         active, inactive = config.opacity()
         result.update(active=active * 100, inactive=inactive * 100)
-        policy, effective, override, gpu = backend(
-            config, detect and result["installed"]
-        )
+        detect = detect and result["installed"]
+        # While no compositor runs, the --diagnostics probe briefly owns the
+        # compositor selection, so it must never overlap a locked launch.
+        with locked(shared=True) if detect else contextlib.nullcontext():
+            policy, effective, override, gpu = backend(config, detect)
         running = processes()
         actual = option(running[0]["args"], ("--backend",)) if running else ""
         result.update(

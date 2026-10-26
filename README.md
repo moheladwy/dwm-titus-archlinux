@@ -1,9 +1,9 @@
 <div align="center">
-  <img alt="dwm-titus logo" src="./branding/anaconda/usr/share/anaconda/pixmaps/ctt-logo.png" />
-  <p><strong>A fast, focused Fedora X11 desktop built for keyboard-driven work.</strong></p>
+  <img alt="dwm-titus logo" src="./config/quickshell/assets/ctt_logo.png" />
+  <p><strong>A fast, focused Arch Linux X11 desktop built for keyboard-driven work.</strong></p>
   <p>
-    <a href="https://dwm.christitus.com">Documentation</a> |
-    <a href="https://github.com/ChrisTitusTech/dwm-titus/releases/latest">Latest release</a> |
+    <a href="./docs/src/content/getting-started.md">Documentation</a> |
+    <a href="https://github.com/moheladwy/dwm-titus-archlinux/releases/latest">Latest release</a> |
     <a href="./CHANGELOG.md">Changelog</a> |
     <a href="./CONTRIBUTING.md">Contributing</a>
   </p>
@@ -16,10 +16,13 @@ guided installation, and powerful customization. It is designed for people who
 want a responsive keyboard-first workflow without having to assemble every
 part themselves.
 
-**dwm-titus is a Fedora-only distribution.** Fedora Linux is the sole supported
-platform for installation, runtime behavior, package resolution, testing, and
-release qualification. Use either the Fedora desktop image or the
-existing-system installer on Fedora Linux.
+**This fork supports Arch Linux only.** Arch Linux (x86_64, `ID=arch`) is the
+sole supported platform for installation, runtime behavior, package
+resolution, and testing. Arch derivatives such as EndeavourOS, CachyOS,
+Manjaro, and Arch Linux ARM are rejected by the installer, as is every other
+distribution, including Fedora.
+
+This is a fork of [ChrisTitusTech/dwm-titus](https://github.com/ChrisTitusTech/dwm-titus), ported from Fedora to Arch Linux.
 
 ## What You Get
 
@@ -29,100 +32,79 @@ existing-system installer on Fedora Linux.
 | **Everyday essentials** | A polished panel, application launcher, system tray, Control Center, Settings, notifications, screenshots, audio, brightness, and power controls. |
 | **Easy discovery** | An interactive keybind viewer, guided display setup, built-in diagnostics, workstation self-heal, and clear unsupported-feature reporting. |
 | **Personal configuration** | Live-reloading hotkeys, themes, and window rules, with local configuration preserved across upgrades. |
-| **Two installation paths** | A ready-to-install Fedora image or an installer for an existing Fedora system. |
+| **One installation path** | Install Arch Linux, then run one installer that adds the desktop on top. |
 
 > dwm-titus is an X11 desktop. A Wayland-native session is not currently part
 > of the project scope.
 
 ## Install
 
-Choose the path that matches your system:
+dwm-titus does not ship an installer image. Installation has two steps:
 
-| Installation | Best for | What it does |
-| --- | --- | --- |
-| [Fedora ISO](#fedora-iso) | A fresh, dedicated installation | Installs the complete Fedora-only desktop from bootable media. |
-| [Existing system](#existing-system) | A Fedora installation you already use | Installs dependencies, the desktop session, and the selected feature set while preserving local configuration. |
-
-For complete requirements and installation details, see the
-[Installation Guide](https://dwm.christitus.com/install.html).
-
-### Fedora ISO
-
-Download the **current offline images** for Fedora 44 x86_64:
-
-| Image | Download |
-| --- | --- |
-| Standard | [Standard ISO](https://downloads.christitus.com/iso/dwm-titus.iso) |
-| NVIDIA | [NVIDIA ISO](https://downloads.christitus.com/iso/dwm-titus-nvidia.iso) |
-| Verification | [SHA256SUMS](https://downloads.christitus.com/iso/SHA256SUMS) and [release notes](https://github.com/ChrisTitusTech/dwm-titus/releases/latest) |
-
-These stable URLs always serve the current builds. The [build manifest](https://downloads.christitus.com/iso/BUILD-MANIFEST.json)
-records the version, sizes and hashes. Download a fresh checksum file with your
-selected ISO; restart partial downloads if the build changes. In that directory, run:
-
-```sh
-sha256sum --ignore-missing -c SHA256SUMS
-```
-
-Confirm your ISO reports `OK`. Write it as a disk image to an 8 GB or larger USB
-drive, boot it, choose your disk, locale and administrator account in Anaconda,
-then install and reboot into the `dwm` session. Writing the USB erases its contents;
-review Anaconda's disk changes before starting installation.
-
-Packages are already included in the compressed system image. Installation needs
-no Internet connection or software selection. The images include Quickshell,
-Gear Lever, `maim`, region capture and clipboard tools. Internet access is needed
-later for updates and additional software.
-
-Images built from 0.7.2 also include `fastfetch` and offer a visible initial
-package update once repositories are reachable. The flow measures mirrors, asks
-for authorization, and preserves DNF confirmation; Enter accepts and No cancels.
-See [initial updates and DNF defaults](docs/INITIAL-UPDATE.md) for retry and
-configuration overrides.
-
-See the [installation guide](https://dwm.christitus.com/install.html#fedora-iso-recommended-for-a-new-installation)
-and [current build qualification](https://downloads.christitus.com/iso/BUILD-NOTES.md)
-for tested firmware modes and hardware limits, including NVIDIA and Secure Boot.
-Use the Cloudflare links above for the current offline installation images.
-For building images, see [compressed-image builds](docs/COMPRESSED-IMAGES.md).
-
-### Existing System
+1. Install Arch Linux with the official [Arch ISO](https://archlinux.org/download/),
+   either by hand following the [installation guide](https://wiki.archlinux.org/title/Installation_guide)
+   or with `archinstall`. A minimal install with a user account, `sudo`, and
+   network access is enough.
+2. Log in as your normal user (not root) and run the installer from a checkout
+   of this repository:
 
 ```bash
-git clone https://github.com/ChrisTitusTech/dwm-titus.git
-cd dwm-titus
+sudo pacman -Syu --needed git
+git clone https://github.com/moheladwy/dwm-titus-archlinux.git
+cd dwm-titus-archlinux
 
 ./install.sh --dry-run --non-interactive --profile recommended
 ./install.sh --profile recommended
 ```
 
 The dry run shows the dependency and installation plan before anything changes.
-The installer requires Fedora, preserves existing personal configuration, and
-installs the managed desktop components. It accepts only Fedora's
-`/etc/os-release` identity and rejects every other operating-system identity
-before making changes.
+The installer accepts only Arch Linux's `/etc/os-release` identity
+(`ID=arch`) and rejects every other operating-system identity before making
+changes. It preserves existing personal configuration and installs the managed
+desktop components.
+
+Before it installs any package, the installer runs one visible
+`sudo pacman -Syu`, because Arch does not support partial upgrades. This step
+is listed in the dry run and uses pacman's own confirmation prompt. Only
+`--non-interactive` adds `--noconfirm`. If the upgrade fails or you decline it,
+the installation stops.
 
 | Profile | Includes |
 | --- | --- |
 | `core` | The X11 session, required dependencies, and one terminal emulator. |
-| `recommended` | The complete everyday desktop, including Alacritty, Quickshell, Gear Lever for AppImages, theming, screenshots, audio, brightness, and the PackageKit, Python RPM binding, AccountsService, CUPS, and printer-tool prerequisites for Phase 6 system management. |
-| `full` | The recommended desktop plus optional file-manager, wallpaper, display-manager, and supported Fedora gaming integrations. |
+| `recommended` | The complete everyday desktop, including Alacritty, Quickshell, Gear Lever for AppImages, theming, screenshots, audio, brightness, and the pyalpm, AccountsService, CUPS, and printer-tool prerequisites for system management. |
+| `full` | The recommended desktop plus the Dolphin file manager, wallpaper, and LightDM display-manager integration. |
+
+All required packages come from the official Arch repositories. A few optional
+extras exist only in the AUR: `xkbset` (used by the AccessX input controls) and
+the Arc, Numix, Yaru, and Bluebird GTK themes. To install them, pass
+`--enable-aur`. The installer then uses an AUR helper you already have
+(`paru` or `yay`), running it as your user. It never installs an AUR helper for
+you and never sends official packages through it. Without `--enable-aur`, the
+AUR extras are skipped and everything else still works.
 
 `maim` is an optional dependency used only by the screenshot hotkeys. If it is
 unavailable, installation continues and reports that the screenshot hotkeys
 remain disabled; invoking one makes `dwm-screenshot` exit with
 `dwm-screenshot: maim is not installed`. `xclip` and `xdotool` remain required
 runtime dependencies for the X11 desktop and its other managed helpers.
-Every profile includes `gnome-keyring` and `gnome-keyring-pam` for credential
-storage and password-login unlock support. Both Fedora image variants include
-them too. Automatic unlock also requires the display manager's PAM stack to
-load `pam_gnome_keyring.so` and matching account/keyring passwords.
+Every profile includes `gnome-keyring`, which on Arch also ships the
+`pam_gnome_keyring.so` module, for credential storage and password-login
+unlock support. Arch's LightDM PAM configuration already loads that module.
+If you start the session with `startx`, automatic unlock requires adding the
+module to `/etc/pam.d/login` yourself; the installer never edits PAM files.
+Unlock also requires matching account and keyring passwords.
+
+Package updates in Settings and the Update Center are still being ported from
+Fedora. Until that work lands, update your system with `sudo pacman -Syu` in a
+terminal.
 
 ## Dependencies
 
-See [Desktop Dependencies](https://dwm.christitus.com/dependencies.html) for the
-packages behind each desktop component, installation-profile differences, and
-build, gaming, and image-specific dependencies.
+See [Desktop Dependencies](docs/src/content/dependencies.md) for the packages
+behind each desktop component, installation-profile differences, and build
+dependencies. The canonical package map is `scripts/dwm-packages.sh`. Some
+pages under `docs/src/content/` still describe Fedora and are being updated.
 
 ## First Login
 
@@ -182,13 +164,14 @@ backend policy selects GLX for accelerated Intel/AMD graphics and falls back to 
 on NVIDIA or software rendering, with manual GLX, XRender, and EGL overrides available.
 Edits preserve custom comments and includes with up to ten automatic recovery backups.
 All 15 shipped presets include offline `Dwm-<preset>` application themes,
-including `Dwm-dracula`, for Thunar and other native GTK 2/3/4 applications.
+including `Dwm-dracula`, for native GTK 2/3/4 applications.
 The system install places their files under `${DATADIR}/themes` (normally
 `/usr/share/themes` with the supported installer); source updates install and
 verify them too.
 Qt applications using qt5ct or qt6ct receive the matching installed palette,
 also listed in those tools from `${DATADIR}/qt5ct/colors` and
 `${DATADIR}/qt6ct/colors`;
+Dolphin and other Qt 6 applications follow the qt6ct palette.
 Alacritty and Kitty continue to receive the active terminal colors. Restart
 Qt applications if they do not reload their platform theme dynamically.
 These are dwm-titus palette adaptations of GTK's built-in widgets, not the
@@ -207,21 +190,21 @@ after changing the shipped palettes.
 Cursor theme changes in Settings take effect immediately across running X11
 applications via `dwm-cursor-reload`.
 
-See the [Configuration Guide](https://dwm.christitus.com/configuration.html)
-and [Theming Guide](https://dwm.christitus.com/theming.html) for examples and
+See the [Configuration Guide](docs/src/content/configuration.md)
+and [Theming Guide](docs/src/content/theming.md) for examples and
 safe customization paths.
 
 ## Documentation
 
-- [Installation](https://dwm.christitus.com/install.html)
-- [Getting Started](https://dwm.christitus.com/getting-started.html)
-- [Keybindings](https://dwm.christitus.com/keybinds.html)
-- [Configuration](https://dwm.christitus.com/configuration.html)
-- [Theming](https://dwm.christitus.com/theming.html)
-- [Control Center](https://dwm.christitus.com/control-center.html)
-- [Settings](https://dwm.christitus.com/settings.html)
-- [How dwm-titus Works](https://dwm.christitus.com/patches.html)
-- [Troubleshooting](https://dwm.christitus.com/troubleshooting.html)
+- [Installation](docs/src/content/install.md)
+- [Getting Started](docs/src/content/getting-started.md)
+- [Keybindings](docs/src/content/keybinds.md)
+- [Configuration](docs/src/content/configuration.md)
+- [Theming](docs/src/content/theming.md)
+- [Control Center](docs/src/content/control-center.md)
+- [Settings](docs/src/content/settings.md)
+- [How dwm-titus Works](docs/src/content/patches.md)
+- [Troubleshooting](docs/src/content/troubleshooting.md)
 
 The technical guide explains the project architecture, what dwm is, and how
 the maintained enhancements fit together. You do not need to understand or
@@ -229,11 +212,10 @@ apply dwm patches to install and use the desktop.
 
 ## Troubleshooting
 
-**Settings -> System** separates read-only **Reload status** from confirmed
-metadata refresh and package installation. Review all package changes, including
-dependency additions and removals, before confirming. PackageKit owns
-authorization and cancellation; closing Settings does not cancel an operation.
-If discovery or recovery is incomplete, reload status and follow its guidance.
+System package updates in **Settings -> System** and the Update Center are not
+yet ported to Arch and report an unsupported state. Run `sudo pacman -Syu` in a
+terminal instead, and review pacman's prompts before confirming. Never run
+`pacman -Sy` on its own.
 
 The same section provides confirmed account, password, printer, and software-source
 tool launches. Missing tools or stale provider status disable only the affected
@@ -264,10 +246,10 @@ terminal with visible output and authorization prompts.
 
 You can also open **Control Center -> System Health** for a graphical overview.
 If the session does not start, run `startx` from a TTY to see its error output.
-The [Troubleshooting Guide](https://dwm.christitus.com/troubleshooting.html)
+The [Troubleshooting Guide](docs/src/content/troubleshooting.md)
 covers common session, panel, terminal, theme, display, and NVIDIA issues.
 
-If the problem remains, [open an issue](https://github.com/ChrisTitusTech/dwm-titus/issues)
+If the problem remains, [open an issue](https://github.com/moheladwy/dwm-titus-archlinux/issues)
 and include the relevant diagnostic output. Review it first and remove any
 private system information.
 

@@ -17,27 +17,19 @@ if [ -z "$detail" ]; then
 	fi
 fi
 
-case $detail in
-*"dacfa9de829ac7cb173825f593236bf2c21f637e"*) exit 0 ;;
-esac
-
 version=$(printf '%s\n' "$detail" | grep -oE '[0-9]+([.][0-9]+){1,2}' | sed -n '1p')
-if [ "$version" = 0.2.1 ]; then
-	case $detail in
-	0.2.1^git20260209.dacfa9d-*.fc44) exit 0 ;;
-	esac
-fi
 
-if [ -n "$version" ] && awk -F. '
-	{
-		major = $1 + 0
-		minor = $2 + 0
-		patch = $3 + 0
-		exit !(major > 0 || minor > 3 || (minor == 3 && patch >= 0))
-	}
-' <<EOF; then
-$version
-EOF
+# Arch ships Quickshell from extra as a rolling release. 0.3.x is the tested
+# series; newer releases are accepted with a warning so an upgrade cannot
+# lock the desktop out, but they have not been validated.
+version_matches() {
+	printf '%s\n' "$version" | awk -F. "{ major = \$1 + 0; minor = \$2 + 0; exit !($1) }"
+}
+
+if [ -n "$version" ] && version_matches 'major > 0 || minor >= 3'; then
+	if version_matches 'major > 0 || minor > 3'; then
+		printf 'warning: Quickshell %s is newer than the tested 0.3 series\n' "$version" >&2
+	fi
 	exit 0
 fi
 

@@ -811,9 +811,12 @@ class DesktopUpdate(unittest.TestCase):
                 privileged.validate_candidate(candidate, self.manifest)
 
     def test_package_plan_rejects_flags_urls_and_capability_expressions(self):
-        for packages in (["-y"], ["https://example.test/a.rpm"], ["local.rpm"], ["name >= 1"], ["x", "x"], "gcc", [1]):
+        for packages in (["-y"], ["--noconfirm"], ["https://example.test/a.pkg.tar.zst"],
+                         ["local-1.0-1-x86_64.pkg.tar.zst"], ["/tmp/gcc"], ["core/gcc"],
+                         ["name>=1"], ["name >= 1"], ["Gcc"], ["x", "x"], "gcc", [1]):
             with self.subTest(packages=packages), self.assertRaises(RuntimeError):
                 privileged.validate_packages(packages)
+        privileged.validate_packages(["gcc", "lib32-glibc", "python-gobject", "xorg-xset"])
 
     def test_user_owned_manifest_cannot_select_a_privileged_helper(self):
         if os.geteuid() == 0:

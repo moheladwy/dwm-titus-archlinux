@@ -180,7 +180,7 @@ if PATH="$work/empty-bin" /bin/bash "$repo/scripts/dwm-flatpak-setup" --user \
 	printf 'Flatpak setup ignored a missing Flatpak executable.\n' >&2
 	exit 1
 fi
-grep -Fq 'requires the Fedora flatpak package' "$work/missing.out"
+grep -Fq 'requires the flatpak package' "$work/missing.out"
 
 # The shared helper also prepares the factory-image system scope.
 rm -f "$state/user-remote" "$state/system-remote"

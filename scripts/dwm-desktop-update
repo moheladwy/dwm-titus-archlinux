@@ -23,7 +23,7 @@ import tempfile
 import time
 import uuid
 
-SOURCE = "https://github.com/ChrisTitusTech/dwm-titus.git"
+SOURCE = "https://github.com/moheladwy/dwm-titus-archlinux.git"
 UNIT = "dwm-desktop-update.service"
 ACTIVE = {"starting", "downloading", "dependencies", "building", "backing-up", "installing", "verifying", "activating", "recovering"}
 CHECK_SECONDS = 60
@@ -736,8 +736,9 @@ def drift(manifest, user, check_ownership=True):
 
 
 def missing_packages(packages):
+    # pacman -T exits non-zero when the package, or a provider of it, is absent.
     return [package for package in packages if subprocess.run(
-        ["rpm", "-q", "--quiet", "--", package], stdout=subprocess.DEVNULL,
+        ["pacman", "-T", "--", package], stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL, timeout=10).returncode != 0]
 
 
@@ -766,8 +767,8 @@ def check_bounded(force=False):
         try:
             validate_update_paths()
             validate_user_trees()
-            if not re.search(r'^ID=["\']?fedora["\']?$', Path("/etc/os-release").read_text(), re.M):
-                raise RuntimeError("Desktop updates support Fedora only")
+            if not re.search(r'^ID=["\']?arch["\']?$', Path("/etc/os-release").read_text(), re.M):
+                raise RuntimeError("Desktop updates support Arch Linux only")
             manifest_path, manifest = installation()
             user = read_json(state / "installed.json") if (state / "installed.json").exists() else {}
             if not isinstance(user, dict) or (user and not user_receipt_valid(user)):
@@ -1131,7 +1132,7 @@ def worker(operation):
                     raise RuntimeError("Downloaded revision differs from the confirmed update")
                 required = []
                 for profile in ("build", "source-update"):
-                    required.extend(sandbox_run([source / "scripts/dwm-packages.sh", "fedora", profile], readonly=(source,), cwd=source).splitlines())
+                    required.extend(sandbox_run([source / "scripts/dwm-packages.sh", "arch", profile], readonly=(source,), cwd=source).splitlines())
                 if sorted(set(required)) != installed["packages"]:
                     required = sorted(set(required))
                     save_status(state, value, state="dependencies", percent=-1,

@@ -24,21 +24,37 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: fedora_release
+  - type: input
+    id: kernel_version
     attributes:
-      label: Fedora release
-      options:
-        - Fedora 44
-        - Fedora Rawhide
+      label: Kernel version
+      description: Output of `uname -r`.
+      placeholder: "6.12.10-arch1-1"
+    validations:
+      required: true
+
+  - type: input
+    id: pacman_version
+    attributes:
+      label: pacman version
+      description: Output of `pacman -Q pacman`.
+      placeholder: "pacman 7.0.0.r6.gc685ae6-6"
+    validations:
+      required: true
+
+  - type: input
+    id: quickshell_version
+    attributes:
+      label: Quickshell version
+      description: Output of `quickshell --version`.
     validations:
       required: true
 
   - type: input
     id: environment
     attributes:
-      label: Fedora release, architecture, and session
-      placeholder: "Fedora 44, x86_64, X11 via LightDM"
+      label: Architecture and session
+      placeholder: "Arch Linux, x86_64, X11 via LightDM"
     validations:
       required: true
 

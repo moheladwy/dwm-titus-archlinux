@@ -95,7 +95,7 @@ def status():
     result = dict(version=1, available=bool(shutil.which("autorandr")), profiles=[],
                   detected=[], current=[], default="", error="")
     if not result["available"]:
-        result["error"] = "Install the optional Fedora autorandr package for automatic dock layouts."
+        result["error"] = "Install the optional autorandr package for automatic dock layouts."
         return result
     for role, name in ROLES.items():
         entry = dict(role=role, name=name, saved=False, outputs=[], error="")

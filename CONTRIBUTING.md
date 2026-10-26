@@ -1,8 +1,10 @@
 # Contributing
 
 Thanks for helping improve dwm-titus. Changes should preserve the small X11
-window-manager core, existing user workflows, and the Fedora-only desktop
-target. Fedora Linux is the sole supported distribution.
+window-manager core, existing user workflows, and the Arch Linux-only desktop
+target. Arch Linux (`ID=arch`) is the sole supported distribution; this fork
+does not support Fedora or Arch derivatives. The port decisions are recorded
+in `docs/ARCH-PORT-DECISIONS.md`.
 
 ## Before You Start
 
@@ -11,13 +13,14 @@ target. Fedora Linux is the sole supported distribution.
 - Search existing issues and pull requests before starting overlapping work.
 - Keep durable requirements in `SPEC.md`; do not copy future roadmap phases
   into `TASKS.md` before they become active.
-- Do not commit `config.h`, build products, release artifacts, ISO images, or
-  generated Astro output.
+- Do not commit `config.h`, build products, release artifacts, or generated
+  Astro output.
 
 ## Development Setup
 
-On the supported Fedora release, install the repository's Fedora build
-dependencies, then run:
+On Arch Linux, install the build dependencies from the package map
+(`dwm_packages arch build` in `scripts/dwm-packages.sh`) after a full
+`sudo pacman -Syu`, then run:
 
 ```sh
 make clean
@@ -28,6 +31,10 @@ scripts/run-tests
 Use `./install.sh --dry-run --non-interactive --profile core` to inspect the
 dependency plan without changing the system.
 
+Do not run tests that install packages, run the real installer, or change
+system state on your host system. Run them in the Arch test container or a
+virtual machine.
+
 ## Validation
 
 Run the smallest relevant checks while developing and the aggregate gate before
@@ -37,20 +44,26 @@ submitting a pull request.
 | --- | --- |
 | C or build configuration | `scripts/run-tests make clean all`, then `scripts/run-tests` |
 | Shell or installer | `scripts/run-tests make check-shell check-format` and focused tests |
+| NVIDIA suspend helper | `scripts/run-tests make check-nvidia-suspend-test` |
 | X11 behavior | `scripts/run-tests make check-xvfb-runtime check-monitor-tags` |
 | Settings loading, search, and section navigation | `scripts/run-tests make check-quickshell-settings-responsiveness-xvfb` plus the full Settings runtime gate |
 | Quickshell QML | `scripts/run-tests make check-quickshell-qml` plus real or nested X11 runtime validation |
 | System update UI | `scripts/run-tests tests/test-quickshell-update-ui-xvfb.sh` for the focused native fixture, plus configured QML lint |
 | Documentation | `npm --prefix docs ci`, then `npm --prefix docs run build` |
-| Installer or package mapping | `scripts/run-tests make check-fedora-packages` on Fedora 44 |
-| Fedora Kickstart or ISO | `scripts/run-tests make check-kickstart` plus all evidence required by [SPEC.md Section 9.4](SPEC.md#94-fedora-image-validation) |
+| Platform detection | `scripts/run-tests make check-arch-platform` |
+| Installer or package mapping | `scripts/run-tests-podman make check-arch-packages` in the Arch container, plus an installer run in a clean Arch container or VM |
+| Legacy Fedora Kickstart or ISO code | Not part of the product and not validated: its checks need Fedora tools such as `ksvalidator`, which the Arch image cannot provide. Do not modify or extend it; it is removed in Phase 10. |
 | Release automation | `scripts/run-tests make release-check` and a dry run of the release helper |
 
-Fedora package, VM, and X11 checks require their documented host tools. If a
+Arch package, VM, and X11 checks require their documented tools. If a
 required environment is unavailable, state exactly what was not tested in the
-pull request instead of claiming universal validation.
+pull request instead of claiming universal validation. Runtime evidence must
+include the rolling-release record in
+[SPEC.md Section 9.4](SPEC.md#94-rolling-release-validation-record): the test
+date, the archive snapshot, and the pacman, Quickshell, Qt, and kernel
+versions.
 
-For automated Fedora 44 checks from another host, use rootless Podman:
+For automated Arch checks in an isolated container, use rootless Podman:
 
 ```sh
 scripts/run-tests-podman make check-update-center-settings
@@ -58,9 +71,12 @@ scripts/run-tests-podman make clean all
 scripts/run-tests-podman
 ```
 
-The runner builds `localhost/dwm-titus-tests:fedora-44` from the shared package
-map and delegates to `scripts/run-tests`. Fedora 44 is pinned; package versions
-resolve from Fedora 44 repositories at build time. Image/container storage is
+The runner builds `localhost/dwm-titus-tests:arch` from
+`tests/containers/arch/Containerfile` and the shared package map, and delegates
+to `scripts/run-tests`. The base image is pinned by digest, and the mirrorlist
+is pinned to one dated Arch Linux Archive snapshot
+(`https://archive.archlinux.org/repos/YYYY/MM/DD/`), so package versions are
+reproducible. Bump the snapshot date and digest together. Image/container storage is
 the only persistent container-engine state. Both the current worktree and Git
 repository are mounted read-only without SELinux relabeling, using
 nonrecursive binds. The runner requires host `findmnt` and rejects every
@@ -73,7 +89,7 @@ independent disposable clone with a synthetic commit. An unreferenced detached
 HEAD and its history are transferred through a read-only object stream.
 Host-staged ignored files are force-staged from the filtered NUL-delimited
 manifest; other ignored local artifacts and host Git metadata are excluded.
-Tests use private container networking for Fedora repository checks and
+Tests use private container networking for Arch repository checks and
 receive no host D-Bus or display sockets. Source
 mount paths containing commas are rejected because of Podman's mount syntax.
 
@@ -83,10 +99,18 @@ requiring real services or additional VM/image tools remain separate validation.
 Run `scripts/run-tests make check-test-runner-podman` for the runner contract
 without Podman. This target neither launches containers nor extends `check`.
 
+When Podman is not installed, Docker can build and run the same Arch container
+locally from `tests/containers/arch/Containerfile`, with the checkout mounted
+read-only and `scripts/run-tests` as the entry point. State in the pull request
+that Docker was used and which commands ran.
+
 ## Change Guidelines
 
 - Preserve the C99 style and avoid new mandatory dependencies unless they are
-  available on supported Fedora releases.
+  available in the official Arch repositories. AUR packages may only be
+  optional (`aur-optional` profile).
+- Never run `pacman -Sy` on its own, install packages while updates are
+  pending, or run an AUR helper or `makepkg` as root.
 - Keep POSIX scripts under `#!/bin/sh`; use Bash only for scripts that need Bash
   features.
 - Preserve existing `config.h`, XDG user configuration, and `.xinitrc` files.
@@ -99,12 +123,13 @@ without Podman. This target neither launches containers nor extends `check`.
 ## Pull Requests
 
 Use a focused branch and describe the problem, root cause, behavior change,
-validation, Fedora coverage, and remaining risk. Screenshots are useful for
+validation, Arch coverage (with the rolling-release record), and remaining
+risk. Screenshots are useful for
 visible UI changes, but do not replace runtime validation.
 
 ## Local Review Loop
 
-Use the supported Fedora host or a disposable Fedora 44 container. Complete
+Use the disposable Arch test container or an Arch virtual machine. Complete
 validation before pushing so fixes do not require another hosted CI run:
 
 1. Fetch the intended base and integrate it before the final full gate. Run
@@ -149,11 +174,12 @@ required coverage; the new responsiveness target accelerates iteration while
 the existing Settings suite still validates real providers and interactions.
 
 Local validation and independent Codex review are the normal merge gate.
-Hosted CI runs one Fedora desktop smoke job after code changes reach `main`:
+Hosted CI runs one Arch desktop smoke job after code changes reach `main`:
 a clean dwm build, managed Quickshell startup, panel visibility, launcher hotkey,
 and a test application launch. Documentation-only changes skip this job and use
 the documentation workflow. Manual CI dispatch runs the same smoke check.
-The job has a ten-minute ceiling; the runtime step has a two-minute ceiling.
+The job has a twenty-minute ceiling, because the pinned Arch Linux Archive is
+slower than a live mirror; the runtime step has a two-minute ceiling.
 The full desktop, installer, security, QML lint, and alternate-compiler checks
 remain local checks rather than additional hosted CI jobs. CodeQL remains a
 separate workflow.

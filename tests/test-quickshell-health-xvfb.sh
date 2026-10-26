@@ -53,9 +53,8 @@ cp "$repo/scripts/dwm-system-health" "$repo/scripts/dwm-diagnostics" \
 # Fail if the isolated health backend silently loses dependency diagnostics.
 HOME=$home XDG_CONFIG_HOME=$config_home XDG_DATA_HOME=$data_home XDG_RUNTIME_DIR=$runtime \
 	"$data_home/dwm-titus/scripts/dwm-system-health" scan-user >"$work/dependencies.tsv"
-for package in gnome-keyring gnome-keyring-pam; do
-	grep -F "$(printf '\tdependency-package-%s\t' "$package")" "$work/dependencies.tsv" >/dev/null
-done
+grep -F "$(printf '\tdependency-package-gnome-keyring\t')" "$work/dependencies.tsv" >/dev/null
+grep -F "$(printf '\tdependency-pam-gnome-keyring\t')" "$work/dependencies.tsv" >/dev/null
 
 Xvfb "$display" -screen 0 1024x768x24 -nolisten tcp -extension GLX >"$work/xvfb.log" 2>&1 &
 xvfb_pid=$!

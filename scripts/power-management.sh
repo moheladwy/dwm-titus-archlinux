@@ -11,7 +11,7 @@
 #   ./power-management.sh --help      # show this help
 #
 # Hardware: Laptop-oriented Linux systems with ACPI power interfaces
-# OS:       Fedora Linux
+# OS:       Arch Linux
 # =============================================================================
 
 set -euo pipefail
@@ -36,8 +36,8 @@ if $APPLY || $APPLY_TLP; then
 	if [[ -r $OS_RELEASE_FILE ]]; then
 		DISTRO_ID=$(awk -F= '$1 == "ID" { value = substr($0, index($0, "=") + 1); gsub(/^"|"$/, "", value); print value; exit }' "$OS_RELEASE_FILE")
 	fi
-	if [[ $DISTRO_ID != fedora ]]; then
-		echo "ERROR: --apply and --apply-tlp support Fedora only." >&2
+	if [[ $DISTRO_ID != arch ]]; then
+		echo "ERROR: --apply and --apply-tlp support Arch Linux only." >&2
 		exit 1
 	fi
 	if [[ $EUID -ne 0 ]]; then
@@ -69,10 +69,10 @@ read_sys() { cat "$1" 2>/dev/null || echo "N/A"; }
 package_install_hint() {
 	local package=$1
 
-	if command -v dnf &>/dev/null; then
-		printf 'sudo dnf install %s' "$package"
+	if command -v pacman &>/dev/null; then
+		printf 'sudo pacman -Syu --needed %s' "$package"
 	else
-		printf 'install Fedora package: %s' "$package"
+		printf 'install Arch Linux package: %s' "$package"
 	fi
 }
 

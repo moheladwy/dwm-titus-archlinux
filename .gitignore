@@ -36,3 +36,4 @@ program.log
 
 # Local Serena project metadata/cache
 /.serena/
+.github/plans/

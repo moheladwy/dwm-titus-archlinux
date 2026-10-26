@@ -5,12 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 @AGENTS.md
 
 `AGENTS.md` (imported above) is the binding rule set for engineering, Git/PR
-workflow, Fedora policy, Settings safety, and validation. `SPEC.md` is the
+workflow, Arch platform and pacman policy, Settings safety, and validation. `SPEC.md` is the
 source of truth for scope and acceptance criteria. This file adds only
 commands and cross-file architecture notes.
 
-Despite the checkout directory name, the project is **Fedora-only**; there is
-no Arch Linux support path.
+This fork is **Arch Linux-only** (`ID=arch`; derivatives are rejected). It is
+mid-port from Fedora per `docs/ARCH-PORT-DECISIONS.md`; Fedora code that
+is still in the tree (Kickstarts, image tooling, DNF/PackageKit update paths)
+is legacy awaiting removal, not a support path. Never run tests, installers, or
+package operations on the host; use the Arch container or a VM.
 
 ## Commands
 
@@ -27,9 +30,11 @@ scripts/run-tests                      # full gate (= make check)
 scripts/run-tests make check-status    # one Makefile check target
 scripts/run-tests tests/test-dwm-status.sh   # one test script directly
 scripts/run-tests make check-shell check-format   # shellcheck + shfmt
-scripts/run-tests make check-quickshell-qml       # qmllint with correct import roots
+scripts/run-tests make check-quickshell-qml       # Qt6 qmllint with correct import roots
+scripts/quickshell-qmllint --root config/quickshell   # same, directly
+scripts/run-tests make check-arch-platform check-arch-packages   # os-release gate + package map
 scripts/run-tests make check-xvfb-runtime check-monitor-tags   # nested X11 dwm smoke
-scripts/run-tests-podman [make <target>]          # same, inside a Fedora 44 container
+scripts/run-tests-podman [make <target>]          # same, inside localhost/dwm-titus-tests:arch
 scripts/dev-sync-install.sh [--check]  # build + sync this checkout into the live install
 ./install.sh --dry-run --non-interactive --profile recommended   # inspect install plan
 ```
@@ -76,16 +81,18 @@ installed root-owned to `${PREFIX}/libexec/dwm-titus` and invoked via polkit.
 The unprivileged script validates input and calls them; never elevate the repo copy.
 
 **Packages and install.** `scripts/dwm-packages.sh` (`dwm_packages <family>
-<profile>`) is the single Fedora package map, used by `install.sh`,
-`check-deps.sh`, `dev-sync-install.sh`, the CI container, and the Kickstarts.
+<profile>`, family `arch`) is the single package map, used by `install.sh`,
+`check-deps.sh`, `dev-sync-install.sh`, and the CI container. AUR-only names
+live only in the `aur-optional` profile. `install.sh` runs one `sudo pacman
+-Syu` before any package step.
 `install.sh` builds, then runs `sudo make install` with `OWNER`/`USER_HOME`/XDG
 paths. It builds as the owner via `runuser` and installs `install-system-files`
 as root. It then installs `install-user-files` as the owner, never as root, and
 preserves user TOML. The `install-system`/`install-user` targets run each half
 alone, and `DESTDIR` stages an install. All of these go through
 `dwm-desktop-update guard-*-install`.
-`dwm-fedora.ks` / `dwm-fedora-nvidia.ks` plus `scripts/build-dwm-fedora-*`
-produce the ISO images.
+The Fedora Kickstarts and `scripts/build-dwm-fedora-*` are legacy; there are
+no Arch images.
 
 ## Gotchas
 
@@ -93,8 +100,11 @@ produce the ISO images.
   `PRIVILEGED_HELPERS`) in the Makefile. For extensionless scripts, also add
   them to the explicit file lists in `check-shell` and `check-format`; only
   `scripts/*.sh` and `tests/*.sh` are globbed.
-- Plain `qmllint` reports false `Quickshell`/`qs.*` import errors. Use
+- Plain `qmllint` reports false `Quickshell`/`qs.*` import errors, and on Arch
+  `/usr/bin/qmllint` may be Qt5. Use
   `scripts/quickshell-qmllint --root config/quickshell`.
+- Never `pacman -Sy` alone or `pacman -S` while updates are pending; never run
+  an AUR helper or `makepkg` as root.
 - To relaunch the shell after QML changes, use
   `dwm-quickshell-controlcenter action restart-quickshell` (after syncing with
   `scripts/dev-sync-install.sh`), not `quickshell --path config/quickshell`.

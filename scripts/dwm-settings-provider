@@ -30,7 +30,7 @@ platform_family() {
 	id=$1
 
 	case "$id" in
-	fedora) printf '%s\n' fedora ;;
+	arch) printf '%s\n' arch ;;
 	*) printf '%s\n' unknown ;;
 	esac
 }
@@ -749,7 +749,7 @@ discover() {
 		emit_capability system authorization 'Administrative authorization' restricted privileged polkit \
 			'Read-only state remains available; install the trusted system helper for authorized actions'
 	fi
-	emit_capability system administration 'Advanced administration' unsupported delegated fedora-tools \
+	emit_capability system administration 'Advanced administration' unsupported delegated system-tools \
 		'High-risk administration remains delegated to trusted tools'
 }
 
