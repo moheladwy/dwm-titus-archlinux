@@ -193,7 +193,7 @@ Flickable {
             wrapMode: Text.WordWrap
         }
 
-        SectionLabel { label: "Fedora updates" }
+        SectionLabel { label: "System updates" }
 
         SystemUpdateControls {
             id: updateControls
@@ -232,28 +232,21 @@ Flickable {
             objectName: "systemOperationFallback"
             readonly property var operation: root.systemManagementModel.operation.progress
                 || root.systemManagementModel.activeOperation
-            readonly property bool packageOperation: operation !== null
-                && (operation.kind === "update" || operation.kind === "refresh")
-            visible: operation !== null && updateControls.active === null
-            label: packageOperation ? "Update recovery" : operation === null ? "Active operation" : operation.actionId
+            visible: operation !== null
+            label: operation === null ? "Active operation" : operation.actionId
             status: "partial"
             value: operation === null ? "" : operation.percent === "unknown"
                 ? operation.state : operation.state + " / " + operation.percent + "%"
-            detail: packageOperation ? "Live package progress is unavailable. Reload status to recover this operation."
-                : operation === null ? "" : operation.detail
+            detail: operation === null ? "" : operation.detail
         }
 
         StatusCard {
             readonly property var result: root.systemManagementModel.operation.result
             visible: result !== null
-            label: result === null ? "Verified operation result" : result.kind === "update" ? "Package updates"
-                : result.kind === "refresh" ? "Metadata refresh" : result.actionId
+            label: result === null ? "Verified operation result" : result.actionId
             status: result !== null && result.state === "succeeded" ? "available" : "partial"
             value: result === null ? "" : result.state
-            detail: result === null ? "" : (result.kind === "update" || result.kind === "refresh")
-                ? (result.state === "succeeded"
-                    ? (result.kind === "update" ? "Package updates completed." : "Repository metadata refreshed.")
-                    : "The operation " + result.state + ". Review any error or recovery guidance before retrying.") : result.detail
+            detail: result === null ? "" : result.detail
         }
 
         PlainText {
@@ -475,7 +468,7 @@ Flickable {
 
         PlainText {
             Layout.fillWidth: true
-            text: "Reload status reads system providers and recovery state. Metadata refresh and update installation require visible confirmation. Delegated launches also require confirmation; those tools own their internal changes. PackageKit owns update authorization and safe cancellation."
+            text: "Reload status reads system providers and recovery state; package discovery never changes the system databases. Open system update runs the full upgrade in a terminal, where pacman owns authorization, prompts and the result. Regional changes and delegated launches require visible confirmation; delegated tools own their internal changes."
             color: Theme.menuMutedText
             font.pixelSize: Theme.fontCaptionSize
             wrapMode: Text.WordWrap

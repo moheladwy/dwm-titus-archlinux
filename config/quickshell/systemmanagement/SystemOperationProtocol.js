@@ -8,7 +8,7 @@ function create(expectedId, expectedAction) {
         expectedId: expectedId || "", expectedAction: expectedAction || "",
         offset: 0, line: "", remaining: 0, codepoint: 0, minimum: 0,
         header: false, complete: false, ended: false, failure: "",
-        operation: null, audit: null, error: null, records: [], item: null, itemRecords: 0
+        operation: null, audit: null, error: null, records: []
     };
     if ((parser.expectedId && !/^op-[0-9a-f]{32}$/.test(parser.expectedId))
             || (parser.expectedAction && !actionKind(parser.expectedAction)))
@@ -21,9 +21,9 @@ function fail(parser, detail) {
     return false;
 }
 
+// Package updates are not journaled operations: Settings opens the Update
+// Center terminal instead, so only native regional and delegated kinds exist.
 function actionKind(action) {
-    if (action === "updates-refresh") return "refresh";
-    if (action === "updates-install-all") return "update";
     if (action === "timezone-set") return "timezone";
     if (action === "ntp-set") return "ntp";
     if (action === "locale-set") return "locale";
@@ -34,7 +34,6 @@ function actionKind(action) {
 
 function owner(action) {
     const kind = actionKind(action);
-    if (kind === "refresh" || kind === "update") return "updates";
     if (kind === "timezone" || kind === "ntp" || kind === "locale") return "regional";
     if (action === "accounts-open" || action === "password-open") return "accounts";
     if (action === "printers-open") return "printers";
@@ -100,9 +99,7 @@ function acceptLine(parser, line) {
         if (!fieldsFit(fields, 8) || !/^op-[0-9a-f]{32}$/.test(fields[1])
                 || !actionKind(fields[2]) || actionKind(fields[2]) !== fields[3]
                 || !/^(unknown|0|[1-9][0-9]?|100)$/.test(fields[5])
-                || (fields[6] !== "yes" && fields[6] !== "no")
-                || ((fields[6] === "yes" || fields[4] === "cancel-requested")
-                    && fields[3] !== "update" && fields[3] !== "refresh"))
+                || fields[6] !== "no" || fields[4] === "cancel-requested")
             return fail(parser, "Invalid operation fields");
         const previous = parser.operation;
         if ((parser.expectedId && fields[1] !== parser.expectedId)
@@ -123,13 +120,7 @@ function acceptLine(parser, line) {
             state: fields[4], percent: fields[5], cancelable: fields[6] === "yes", detail: fields[7] };
         parser.records.push(parser.operation);
     } else if (type === "package-progress") {
-        if (!fieldsFit(fields, 5) || !parser.operation || fields[1] !== parser.operation.id
-                || ["update", "refresh"].indexOf(parser.operation.kind) < 0
-                || ["running", "cancel-requested"].indexOf(parser.operation.state) < 0
-                || ["working", "downloading", "installing", "updating", "removing", "cleaning"].indexOf(fields[3]) < 0
-                || !/^(unknown|0|[1-9][0-9]?|100)$/.test(fields[4]) || ++parser.itemRecords > 4097)
-            return fail(parser, "Invalid package progress");
-        parser.item = { name: fields[2], phase: fields[3], percent: fields[4] };
+        return fail(parser, "Package progress in a native operation stream");
     } else if (type === "error") {
         if (!fieldsFit(fields, 4) || parser.error || !parser.operation
                 || terminal(parser.operation.state) || fields[1] !== owner(parser.operation.actionId)

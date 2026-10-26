@@ -169,6 +169,34 @@ Alacritty. The default `Super`+`X` binding remains plain Alacritty.
 
 ---
 
+## System Update Problems
+
+System updates run as an interactive `sudo pacman -Syu` in the Update Center
+terminal, opened from the panel update icon or Settings > System **Open system
+update**.
+
+- **The terminal reports a held pacman lock.** `/var/lib/pacman/db.lck`
+  exists, usually because another pacman is running. Find the owner with
+  `sudo fuser -v /var/lib/pacman/db.lck` and let it finish. The desktop never
+  deletes the lock.
+- **Arch news is unavailable.** The news feed could not be fetched. Read
+  [Arch Linux news](https://archlinux.org/news/) yourself before answering
+  the prompt to continue.
+- **An update was interrupted.** pacman does not roll back. Check
+  `/var/log/pacman.log` for what was applied, then choose **Recover** in the
+  Update Center to start a fresh `sudo pacman -Syu`.
+- **Settings shows a network warning.** The remote check failed, so the list
+  comes from cached databases. Reconnect and reopen Settings to check again.
+- **Settings warns that PackageKit is installed.** PackageKit clients can run
+  `pacman -Sy` behind your back, which leads to partial upgrades. Consider
+  removing `packagekit` if nothing else needs it.
+- **No AUR row in the Update Center.** It appears only when `paru` or `yay` is
+  already installed. dwm-titus never installs an AUR helper.
+
+Never run `pacman -Sy` on its own; always use the full `sudo pacman -Syu`.
+
+---
+
 ## Picom / Compositor Artifacts
 
 Restart picom via the Control Center (**Quick Actions → Restart Picom**) or:

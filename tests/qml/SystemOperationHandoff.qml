@@ -13,7 +13,7 @@ ShellRoot {
 
     function target(value) {
         return { id: "op-" + value.toString(16).padStart(32, "0"),
-            actionId: "updates-refresh", kind: "refresh", state: "running",
+            actionId: "sources-open", kind: "delegate", state: "running",
             percent: "30", cancelable: false, detail: "Concurrent fixture" };
     }
 

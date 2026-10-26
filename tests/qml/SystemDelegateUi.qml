@@ -11,6 +11,7 @@ ShellRoot {
     property bool manual: Quickshell.env("DWM_DELEGATE_UI_MANUAL") === "1"
     property int stage: 0
     property int assertions: 0
+    property double revealDeadline: 0
     property bool done: false
     readonly property int accountCount: scenario === "large" ? 256 : 1
     readonly property int repositoryCount: scenario === "large" ? 512 : 1
@@ -73,9 +74,19 @@ ShellRoot {
             stage = 4;
         } else if (stage === 4 && find("prepare-" + action).activeFocus) {
             check(model.nativeConfirmation === null, "Cancel restores focus to the originating control");
+            // Focus reveals the card at once, but removing the confirmation card
+            // relayouts the pane and queues a second reveal (Qt.callLater), so
+            // require the settled position rather than the focus-change instant.
+            revealDeadline = Date.now() + 1000;
+            stage = 41;
+        } else if (stage === 41) {
             const card = find("delegate-card-" + action);
             const position = card.mapToItem(pane, 0, 0);
-            check(position.y >= 0 && position.y + card.height <= pane.height + 1, "Originating card remains fully revealed");
+            const revealed = position.y >= 0 && position.y + card.height <= pane.height + 1;
+            if (!revealed && Date.now() < revealDeadline) return;
+            check(revealed, "Originating card remains fully revealed: y=" + position.y
+                + ", card=" + card.height + ", viewport=" + pane.height + ", scroll=" + pane.contentY);
+            check(find("prepare-" + action).activeFocus, "Originating control keeps focus while revealed");
             click("prepare-" + action);
             stage = 2;
         } else if (stage === 2 && find("discardDelegate").activeFocus) {
@@ -90,9 +101,8 @@ ShellRoot {
                 return;
             }
             click("confirmDelegate");
-            check(!find("cancelUpdate").visible && !model.operation.canCancel,
+            check(item("cancelUpdate", window.contentItem) === null && model.operation["canCancel"] === undefined,
                 "Native launch never exposes update cancellation");
-            check(find("operationOwnerNote").text.indexOf("PackageKit") < 0, "Native busy copy does not misidentify owner");
             model.closeSettings();
             check(model.operation.streamOwned, "Closing preserves operation ownership");
             stage = 3;

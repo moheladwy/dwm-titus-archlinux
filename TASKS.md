@@ -1,78 +1,37 @@
 # Active Tasks
 
-## Arch Linux port, Phases 0-4
+## Arch Linux port, Phase 9
 
-Decisions: [ARCH-PORT-DECISIONS.md](docs/ARCH-PORT-DECISIONS.md). This pull request
-covers plan Phases 0-4 only. No merge or release publication is authorized.
-Tests that install packages or change system state run only in the Arch
-container or a VM, never on the host.
+Decisions: [ARCH-PORT-DECISIONS.md](docs/ARCH-PORT-DECISIONS.md). Phases 0-4 are
+delivered in the first pull request (#1), and Phases 5-8 (the native pacman
+update stack, the optional AUR provider, and the remaining Settings platform
+work) in the update-stack pull request stacked on it. This file covers plan
+Phase 9 only. Phase 10 (retiring Fedora-only, image, and gaming code) must not
+start in the same change. No merge or release publication is authorized.
 
-### Phase 0: Contract change
+### Phase 9: Documentation site and user docs
 
-- [ ] Rewrite `SPEC.md` for Arch: `ID=arch` only, no images or hosting, no
-      gaming, Dolphin, up-front `pacman -Syu`, AUR policy, Qt 6 `qmllint`,
-      Arch dependency map, and the rolling-release validation record.
-- [ ] Replace the Fedora rules in `AGENTS.md` and update `CLAUDE.md`,
-      `README.md`, `CONTRIBUTING.md`, `ROADMAP.md`, `TASKS.md`, and
-      `CHANGELOG.md`.
-
-### Phase 1: Fork endpoints and identity
-
-- [ ] Point `scripts/dwm-desktop-update` and `scripts/dwm-update-center` at
-      this fork, and update the pinned URLs in the desktop-update tests.
-- [ ] Update `.github/CODEOWNERS`, `.github/FUNDING.yml`, `SECURITY.md`, the
-      installer docs URL, the docs-site repository guard, and the bug report
-      template fields (kernel, pacman, and Quickshell versions).
-
-### Phase 2: Platform identity and package map
-
-- [ ] Add `dwm_platform_family` (exact `ID=arch`, `ID_LIKE` ignored) and the
-      pacman install and query commands in `scripts/dwm-utils.sh`.
-- [ ] Add `arch:<profile>` entries and the `aur-optional` profile to
-      `scripts/dwm-packages.sh`; drop PackageKit, `dnfdragora`, Path, Thunar,
-      gaming, and image profiles for Arch.
-- [ ] Replace hardcoded `dwm-packages.sh fedora` callers and the provider
-      guards (`pacman -T power-profiles-daemon`, `pulseaudio` conflict).
-- [ ] Add the platform and package tests (`check-arch-platform`,
-      `check-arch-packages`).
-
-### Phase 3: Test container, CI, and QML lint
-
-- [ ] Add `tests/containers/arch/Containerfile`, pinned by digest and to an
-      Arch Linux Archive snapshot.
-- [ ] Switch `scripts/run-tests-podman` to `localhost/dwm-titus-tests:arch` and
-      update its contract test.
-- [ ] Move CI and CodeQL to the Arch container and the package map.
-- [ ] Make `scripts/quickshell-qmllint` prefer `/usr/lib/qt6/bin/qmllint` and
-      reject a Qt 5 `qmllint`.
-
-### Phase 4: Existing-system installer and runtime
-
-- [ ] Accept Arch in `install.sh`, run one visible `sudo pacman -Syu` before
-      any package step (listed in `--dry-run`), and abort if it fails.
-- [ ] Remove gaming and `dwm-dnf-defaults` from the install path; add
-      `--enable-aur` for an already-installed `paru` or `yay`, run as the user.
-- [ ] Replace Thunar and Path with Dolphin (default apps, menu integration,
-      theming), and remove the Path window rule from the shipped defaults.
-- [ ] Add a LightDM drop-in for `lightdm-slick-greeter` and the `dwm`
-      session without rewriting `/etc/lightdm/lightdm.conf`.
-- [ ] Check `gnome-keyring` and its PAM module; treat `xkbset` as optional.
-- [ ] Port `dev-sync-install.sh`, power, screensaver, health, diagnostics, and
-      Quickshell version and wording helpers to Arch.
-- [ ] Rename the user portal configuration to `dwm-portals.conf` with a safe
-      migration.
-- [ ] Update the affected tests and installer, runtime, and user docs.
+- [ ] Sweep the site pages for Fedora wording:
+      `docs/src/content/{install,dependencies,getting-started,settings,troubleshooting,configuration}.md`,
+      `DocsLayout.astro`, and `pages/development-progress.astro`.
+- [ ] Sweep the reference docs for Fedora wording: `docs/DESKTOP-UPDATES.md`,
+      `docs/SETTINGS-PLATFORM.md`, `docs/SETTINGS-CAPABILITIES.md`, and
+      `lightdm/README.md`.
+- [ ] Add user docs for installing base Arch with the official ISO or
+      `archinstall`, then running `./install.sh`.
+- [ ] Document the AUR policy and how to enable it (`--enable-aur` with an
+      already-installed `paru` or `yay`).
+- [ ] Document the PAM keyring setup for `startx`.
+- [ ] Document the never-partial-upgrade rule.
+- [ ] Add the `CHANGELOG.md` entry for the platform change, with migration
+      notes, covering anything Phases 1-8 did not already record.
 
 ### Validation
 
-- [ ] `scripts/run-tests make clean all` and `scripts/run-tests`.
-- [ ] `scripts/run-tests-podman make clean all` and `scripts/run-tests-podman`
-      on the pinned Arch image (Docker if Podman is unavailable).
-- [ ] Installer `--dry-run` and a real `--profile core` run in a clean Arch
-      container; a staged `DESTDIR` install.
-- [ ] `--profile recommended` with LightDM in a VM with a fresh Arch install.
-- [ ] Nested X11 dwm smoke and a `quickshell --no-duplicate` idle check.
-- [ ] Record the rolling-release evidence and every untested path in the PR.
+- [ ] `npm --prefix docs ci && npm --prefix docs run build`, run in a
+      container, never on the host.
+- [ ] Record every page that still mentions Fedora and why (legacy code that
+      Phase 10 removes, or upstream history).
 
 ### Follow-ups
 

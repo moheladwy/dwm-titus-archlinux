@@ -8,10 +8,11 @@ recorded in [ARCH-PORT-DECISIONS.md](docs/ARCH-PORT-DECISIONS.md).
 Installer images, hosted package repositories, signing keys, and gaming
 integrations are out of scope.
 
-Each phase is one independently testable review boundary. The current pull
-request covers Phases 0-4. Phases 5-10 are future work and must not start in
-that pull request. Merge, release publication, and deployment require explicit
-owner authorization.
+Each phase is one independently testable review boundary. Phases 0-4 are in
+the first pull request (#1). Phases 5-8 are delivered in the update-stack pull
+request stacked on it. Phase 9 is next; Phases 9 and 10 must not start in
+either of those pull requests. Merge, release publication, and deployment
+require explicit owner authorization.
 
 ## Phases
 
@@ -30,18 +31,21 @@ owner authorization.
    `sudo pacman -Syu`, `--enable-aur`, gaming removed, Dolphin replacing
    Thunar and Path, LightDM with `lightdm-slick-greeter`, keyring checks, and
    Arch wording in runtime helpers.
-5. Update stack, read-only discovery: an unprivileged pyalpm provider and a
-   pacman hook replace PackageKit discovery. (Future.)
+5. Update stack, read-only discovery: an unprivileged pyalpm provider in a
+   private database path replaces PackageKit discovery, with inotify events on
+   the pacman database instead of a pacman hook. (Delivered.)
 6. Update stack, mutation: confirmed updates run as interactive
-   `sudo pacman -Syu` in a terminal; PackageKit paths are removed. (Future.)
+   `sudo pacman -Syu` in the Update Center terminal after the Arch news check;
+   PackageKit paths and the standalone refresh are removed. (Delivered.)
 7. Desktop-update dependencies through pacman with a pending-update preflight
    (landed with Phases 0-4, because the Arch gate needed it), and an optional
-   user-scope AUR provider. (AUR provider: future.)
-8. Remaining Settings and system-management platform work. (Future.)
-9. Documentation site and reference-doc sweep. (Future.)
+   user-scope AUR provider for an installed `paru` or `yay`. (Delivered.)
+8. Remaining Settings and system-management platform work: exact `ID=arch`
+   identity, regional actions, delegates, and security rows. (Delivered.)
+9. Documentation site and reference-doc sweep. (Next.)
 10. Retire Fedora-only, image, and gaming code. (Future.)
 
-Exit for the current pull request: Phases 0-4 meet their plan validation, with
+Exit for each pull request: its phases meet their plan validation, with
 evidence that separates host-safe checks, Arch container runs, VM installs, and
 nested X11 runtime checks, and states every path that was not tested.
 

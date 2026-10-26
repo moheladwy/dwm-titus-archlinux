@@ -88,7 +88,7 @@ snapshot)
 		printf '%s\n' "$count" >"$root/scan-count"
 		[ "$count" -ne 1 ] || sleep 0.15
 		if [ "$count" -eq 5 ]; then
-			printf 'update-center-protocol\t1\t0\nprovider\tfedora\tFedora\tavailable\t1\t1\tfresh\t10\tyes\t\tinvalid-nonzero\nitem\tfedora\tupdate\tPackage\t1\t2\tpkg\tsystem\thttps://example.test/release\ncomplete\tsnapshot\n'
+			printf 'update-center-protocol\t1\t0\nprovider\tsystem\tArch Linux\tavailable\t1\t1\tfresh\t10\tyes\t\tinvalid-nonzero\nitem\tsystem\tupdate\tPackage\t1\t2\tpkg\tsystem\thttps://example.test/release\ncomplete\tsnapshot\n'
 			printf '%s\n' 'fixture scan failure' >&2
 			exit 1
 		fi
@@ -96,7 +96,7 @@ snapshot)
 	else
 		detail=cache
 	fi
-	printf 'update-center-protocol\t1\t0\nprovider\tfedora\tFedora\tavailable\t1\t1\tfresh\t10\tyes\t\t%s\nitem\tfedora\tupdate\tPackage\t1\t2\tpkg\tsystem\thttps://example.test/release\ncomplete\tsnapshot\n' "$detail"
+	printf 'update-center-protocol\t1\t0\nprovider\tsystem\tArch Linux\tavailable\t1\t1\tfresh\t10\tyes\t\t%s\nitem\tsystem\tupdate\tPackage\t1\t2\tpkg\tsystem\thttps://example.test/release\ncomplete\tsnapshot\n' "$detail"
 	;;
 active)
 	if [ ! -s "$root/operation" ]; then
@@ -119,10 +119,10 @@ terminal-closed)
 	;;
 launch)
 	case $2 in
-	fedora)
+	system)
 		op=op-00000000000000000000000000000001
-		printf '%s\t%s\t%s\t%s\t%s\n' "$op" fedora update completed succeeded >"$root/operation"
-		emit_operation "$op" fedora update launched pending
+		printf '%s\t%s\t%s\t%s\t%s\n' "$op" system update completed succeeded >"$root/operation"
+		emit_operation "$op" system update launched pending
 		;;
 	dwm-titus)
 		op=op-00000000000000000000000000000002

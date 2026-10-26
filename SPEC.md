@@ -570,34 +570,64 @@ requiring a reboot. The application must use a hybrid integration model:
   capabilities, and code paths not yet ported from Fedora, must expose a clean
   unavailable or unsupported state rather than failing the entire application.
 
-System package updates follow the native pacman contract in Section 5.11. The
-target design (plan Phases 5-8, not yet implemented) is:
+System package updates follow the native pacman contract in Section 5.11:
 
-- Discovery is read-only and unprivileged through pyalpm. It downloads sync
-  databases into a private temporary directory, reads the real local database
-  without modifying it, honors each repository's `SigLevel` and
-  `IgnorePkg`/`IgnoreGroup`, and never refreshes or writes
-  `/var/lib/pacman/sync`.
-- A pacman `PostTransaction` hook signals package-state changes so the UI can
-  react without polling.
-- Confirmed updates run as an interactive `sudo pacman -Syu` in a terminal. The
-  terminal preserves pacman's native output and prompts (replacements,
-  conflicts, provider choices, `.pacnew` notices), reuses existing
-  authorization where possible, and never supplies `--noconfirm` or other
-  automatic consent. Settings "Install all" opens the same terminal flow
-  instead of mutating packages in place.
+- Discovery is read-only and unprivileged through pyalpm.
+  - It works in a private temporary database directory whose `local` entry
+    links to the real local database, which is read, never written.
+  - It downloads the sync databases there, seeded from the real ones and a
+    per-user cache under `${XDG_CACHE_HOME:-$HOME/.cache}/dwm-titus/pacman-sync`,
+    with a remote check at most every five minutes.
+  - It honors each repository's `SigLevel` and `IgnorePkg`/`IgnoreGroup`, and
+    never refreshes or writes `/var/lib/pacman/sync` or its lock.
+- The dependency preview is a pyalpm `sysupgrade` transaction prepared in the
+  same private handle and always released. It is a preview, not an atomic
+  frozen plan; pacman's own prompts in the terminal decide replacements and
+  conflicts.
+- Restart guidance:
+  - A system restart is required when `/usr/lib/modules/$(uname -r)` is
+    missing.
+  - Pending kernels, microcode, `systemd`, `glibc`, and `nvidia*` packages are
+    flagged in the preview.
+  - Undeterminable restart needs are reported as unknown, never as none.
+- Change events are inotify watches on `/var/lib/pacman`, its `local`
+  database, and its `sync` directory. A transaction is reported once the
+  pacman lock is released. Remote availability is re-checked hourly. No pacman
+  hook or system file is installed for this.
+- Confirmed updates run as an interactive `sudo -- /usr/bin/pacman -Syu` in the
+  Update Center terminal.
+  - Before upgrading, the terminal fetches the Arch Linux news feed (HTTPS,
+    size and time bounded, failure tolerant) and shows unacknowledged items.
+    It requires an explicit Continue, and records the acknowledgement under
+    `${XDG_STATE_HOME:-$HOME/.local/state}/dwm-titus/update-center/`.
+  - A held pacman lock is reported with guidance and is never removed.
+  - pacman's native output and prompts (replacements, conflicts, provider
+    choices, `.pacnew` notices) are preserved, and `--noconfirm` or other
+    automatic consent is never supplied.
+  - Recovery reports the last known result and offers a fresh interactive
+    upgrade; pacman does not roll back, and the desktop never claims it did.
+- Settings > System offers "Open system update", which runs
+  `dwm-update-center launch system` to open that same terminal flow. Settings
+  never mutates packages in place, and there is no standalone database refresh.
 - The Update Center's distribution provider is named `system` and takes its
-  label from `os-release` `NAME`.
+  label from `os-release` `NAME`. Cached state and operation receipts recorded
+  under the former `fedora` id are migrated or rescanned, never shown as
+  current Arch data.
+- An optional user-scope `aur` provider appears only when `paru` or `yay` is
+  already installed.
+  - Discovery compares foreign packages (`pacman -Qqm`) against the AUR RPC
+    with `pyalpm.vercmp`, bounded in batch size, response size, and time.
+  - VCS packages (`-git`, `-svn`, `-hg`, `-bzr`) are listed as version unknown
+    and not counted.
+  - Updates run `<helper> -Sua` as the invoking user. It never runs as root or
+    through `sudo` or `pkexec`.
 - PackageKit is not used. Its ALPM backend refreshes the real sync databases
   during discovery and simulation without authorization, which produces the
-  partial-upgrade state described in Section 5.11.
+  partial-upgrade state described in Section 5.11. If PackageKit is installed,
+  Settings reports that its clients can do this.
 
-Until that work lands, the Update Center distribution provider, Settings >
-System package updates, and the first-boot initial update remain Fedora-only
-code. The desktop source updater already uses pacman for its dependency
-install (see "Desktop source updates" below). On Arch they must report an
-unsupported state (or, for the first-boot update, remain inactive) and must
-not attempt a package operation.
+The first-boot initial update is image-only Fedora code. It is never armed on
+Arch and remains inactive until it is removed.
 
 The Settings platform must distinguish:
 
@@ -1014,19 +1044,15 @@ Arch behavior.
 Plan Phases 0-4 deliver this contract, fork endpoints, the Arch platform
 identity and package map, the pinned Arch test container and Qt 6 QML lint,
 and the existing-system installer and runtime integrations, including Dolphin
-and the LightDM defaults.
+and the LightDM defaults. Phases 5-8 deliver the native pacman update stack
+(pyalpm discovery, terminal-only upgrades with the news gate, the `system`
+and optional `aur` Update Center providers) and the remaining Settings platform
+work (Arch identity, regional actions, delegates, and security rows).
 
 The following remain open and are not yet implemented on Arch:
 
-- Phases 5-6: the pyalpm discovery backend, the pacman hook, and terminal-only
-  `sudo pacman -Syu` updates. Until then the Update Center distribution
-  provider and Settings > System package updates are Fedora-only code (DNF and
-  PackageKit) that reports unsupported on Arch.
-- Phase 7: the optional user-scope AUR provider in the Update Center. The
-  desktop source updater's pacman dependency install landed with this port.
-- Phase 8: shared platform identity in system management, the regional
-  actions, delegates, and security information rows. The first-boot initial
-  update is image-only, is never armed on Arch, and is retired in Phase 10.
+- The first-boot initial update is image-only, is never armed on Arch, and is
+  retired in Phase 10.
 - Phase 9: the documentation site and reference docs still describe Fedora in
   places.
 - Phase 10: Fedora-only code, Kickstarts, image tooling, and Fedora tests are

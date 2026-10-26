@@ -104,7 +104,7 @@ helpers and service APIs perform the underlying operations.
 | Notifications | Quickshell, `libnotify` | Desktop. Quickshell displays notifications; libnotify supplies client tools. |
 | Sandboxed applications | `flatpak`, `xdg-desktop-portal-gtk` | Desktop. Flatpak applications and portal integration such as file dialogs. The portal preference is `~/.config/xdg-desktop-portal/dwm-portals.conf`. |
 | AppImage management | Gear Lever (`it.mijorus.gearlever`) | Desktop. Installed through user-scoped Flathub when needed; integrates AppImages with the launcher. |
-| System management | `pyalpm`, `pacman-contrib`, `python-gobject` | Desktop. Prerequisites for the pacman-based package provider. Settings package updates and the Update Center system provider still report an unsupported state on Arch; update with `sudo pacman -Syu`. |
+| System management | `pyalpm`, `pacman-contrib`, `python-gobject` | Desktop. Prerequisites for the pacman-based package provider. Settings > System reads available updates through unprivileged pyalpm without touching the system databases. **Open system update** opens the Update Center terminal, which checks the Arch Linux news feed and then runs an interactive `sudo pacman -Syu`. |
 | User accounts | `accountsservice`; optional `lxqt-admin` | Desktop account-service prerequisites; Full additionally attempts the delegated administration tool. |
 | Printing | `cups`, `system-config-printer` | Desktop. Print service and printer-configuration tools. |
 

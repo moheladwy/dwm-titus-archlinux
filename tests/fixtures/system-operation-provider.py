@@ -37,7 +37,7 @@ def snapshot():
             time.sleep(0.2)
     row("system-management-protocol", "1", "0")
     row("snapshot-generation", "a" * 64)
-    row("provider", "updates", "unsupported", "delegated", "PackageKit", "Isolated fixture")
+    row("provider", "updates", "unsupported", "delegated", "pacman", "Isolated fixture")
     recovery_partial = incomplete or bool(os.environ.get("DWM_OPERATION_FIXTURE"))
     if delayed_snapshot and not captured_handoff:
         recovery_partial = False
@@ -45,8 +45,7 @@ def snapshot():
         "user-session", "dwm-system-management", "Isolated fixture")
     for name in ("update-summary", "update-last-refresh", "update-restart"):
         row("state", name, "unsupported", "unknown", "Isolated fixture")
-    for action in ("updates-refresh", "updates-install-all", "updates-cancel"):
-        row("action", action, "unavailable", "delegated", "updates", action, "Isolated fixture")
+    row("action", "updates-open", "unavailable", "user-session", "updates", "Open system update", "Isolated fixture")
     fixture = os.environ.get("DWM_OPERATION_FIXTURE")
     if incomplete:
         directory = Path(fixture)
@@ -55,16 +54,16 @@ def snapshot():
         row("error", "recovery", "malformed", "Transient journal read failure")
     elif delayed_snapshot:
         if captured_handoff:
-            row("terminal-handoff", f"op-{16:032x}", "updates-refresh", "refresh")
+            row("terminal-handoff", f"op-{16:032x}", "sources-open", "delegate")
     elif fixture:
         directory = Path(fixture)
         scenario = 15 if close_retry else 10
         operation_id = f"op-{scenario:032x}"
         if not (directory / f"ack-operation-{scenario}").exists():
             if (directory / f"finished-{scenario}").exists():
-                row("terminal-handoff", operation_id, "updates-refresh", "refresh")
+                row("terminal-handoff", operation_id, "sources-open", "delegate")
             else:
-                row("active-operation", operation_id, "updates-refresh", "refresh",
+                row("active-operation", operation_id, "sources-open", "delegate",
                     "running", "30", "no", "Restored fixture")
     row("complete", "snapshot")
 
@@ -106,8 +105,8 @@ def main():
         sys.stderr.flush()
         time.sleep(5)
         return 0
-    action = "timezone-set" if scenario == 2 else "updates-refresh"
-    kind = "timezone" if scenario == 2 else "refresh"
+    action = "timezone-set" if scenario == 2 else "sources-open"
+    kind = "timezone" if scenario == 2 else "delegate"
     row("system-management-protocol", "1", "0")
     row("operation", operation_id, action, kind, "pending", "unknown", "no", "Pending fixture")
     time.sleep(0.1)

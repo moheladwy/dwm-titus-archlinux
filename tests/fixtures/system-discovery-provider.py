@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Private event/snapshot fixture; never accesses PackageKit or a host journal."""
+"""Private event/snapshot fixture; never reads pacman state or a host journal."""
 
 import fcntl
 import os
@@ -94,15 +94,14 @@ def main():
         time.sleep(0.5 if mode() == "slow" else 0.1)
         row("system-management-protocol", "1", "0")
         row("snapshot-generation", f"{count:064x}")
-        row("provider", "updates", "available", "delegated", "PackageKit", "Private fixture")
+        row("provider", "updates", "available", "delegated", "pacman", "Private fixture")
         row("provider", "recovery", "available", "user-session", "dwm-system-management", "Empty private journal")
         row("state", "update-summary", "available", "1", "One update")
         row("state", "update-last-refresh", "available", "10", "Recent fixture refresh")
         row("state", "update-restart", "available", "none", "No restart")
-        for action_id in ("updates-refresh", "updates-install-all", "updates-cancel"):
-            row("action", action_id, "unavailable", "delegated", "updates", action_id, "Private fixture")
-        row("update", "alpha;1;x86_64;updates", "security", "installable", "alpha", "1", "Fixture update")
-        row("package-change", "alpha;1;x86_64;updates", "update", "alpha", "1", "Fixture update")
+        row("action", "updates-open", "unavailable", "user-session", "updates", "Open system update", "Private fixture")
+        row("update", "alpha;1-1;x86_64;core", "unknown", "installable", "alpha", "1-1", "Fixture update")
+        row("package-change", "alpha;1-1;x86_64;core", "update", "alpha", "1-1", "Fixture update")
         row("complete", "snapshot")
 
 

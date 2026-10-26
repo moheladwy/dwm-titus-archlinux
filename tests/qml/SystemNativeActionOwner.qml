@@ -62,7 +62,8 @@ ShellRoot {
         check(!model.startNative("updates-refresh", "", ""), "Native entry excludes updates");
         check(model.originArguments("locale-set", "LANG=" + "x".repeat(127), "c".repeat(64)) !== null,
             "Exact service locale length boundary remains eligible for backend membership checks");
-        check(!model.startUpdate(action, generation), "Update entry excludes native actions");
+        check(model["startUpdate"] === undefined && model["requestCancel"] === undefined,
+            "No package update or cancellation entry exists");
         for (const field of ["streamOwned", "controlOwned", "waitingSnapshot", "blocked"]) {
             model[field] = true;
             check(!model.startNative(action, value, generation), field + " blocks origin");
@@ -78,7 +79,6 @@ ShellRoot {
         model.snapshotKnown = true;
         check(model.startNative(action, value, generation), "Fixed native origin accepted");
         check(!model.startNative(action, value, generation), "Pre-output ownership prevents duplicate origin");
-        check(!model.requestCancel(), "Native origin never sends cancellation");
     }
 
     SystemOperationModel {
@@ -92,7 +92,7 @@ ShellRoot {
             root.snapshots++;
             model.acceptSnapshot(model.result === null ? root.identity : null, model.result === null ? null : root.identity);
         }
-        onProgressChanged: root.check(!model.canCancel && !model.requestCancel(), "Live native progress is not cancelable")
+        onProgressChanged: root.check(model.progress === null || !model.progress.cancelable, "Live native progress is not cancelable")
         onStateChanged: {
             if (state === "verifying") {
                 root.verifying = true;

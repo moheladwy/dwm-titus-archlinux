@@ -7,7 +7,7 @@ row=$repo/config/quickshell/updatecenter/ProviderRow.qml
 window=$repo/config/quickshell/updatecenter/UpdateCenterWindow.qml
 model=$repo/config/quickshell/updatecenter/UpdateCenterModel.qml
 
-for asset in dwm-update-center.png fedora.svg dwm-titus.png flatpak.svg mise.svg other.svg; do
+for asset in dwm-update-center.png system.svg aur.svg dwm-titus.png flatpak.svg mise.svg other.svg; do
 	test -s "$assets/$asset"
 done
 test ! -e "$assets/PROVENANCE.md"
@@ -30,7 +30,8 @@ test -f "$row"
 test -f "$window"
 
 for mapping in \
-	'fedora:fedora.svg' \
+	'system:system.svg' \
+	'aur:aur.svg' \
 	'dwm-titus:dwm-titus.png' \
 	'flatpak:flatpak.svg' \
 	'mise:mise.svg' \

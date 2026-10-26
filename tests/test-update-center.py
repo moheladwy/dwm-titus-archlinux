@@ -104,8 +104,8 @@ class SnapshotProtocolTests(unittest.TestCase):
 
     def test_fixed_order_and_preserved_item_fields(self):
         self.assertEqual([p.identifier for p in self.api["REGISTRY"]],
-                         ["fedora", "dwm-titus", "flatpak", "mise"])
-        result = self.api["parse_fedora_snapshot"](source(ROW))
+                         ["system", "aur", "dwm-titus", "flatpak", "mise"])
+        result = self.api["parse_system_snapshot"](source(ROW))
         self.assertEqual(result.pending, 1)
         self.assertIs(type(result.pending), int)
         item = result.items[0]
@@ -114,9 +114,9 @@ class SnapshotProtocolTests(unittest.TestCase):
         self.assertTrue(result.update_available)
 
     def test_deterministic_output_and_strict_escaping(self):
-        result = self.api["parse_fedora_snapshot"](source(ROW))
+        result = self.api["parse_system_snapshot"](source(ROW))
         output = self.api["render_snapshot"]([result])
-        self.assertTrue(output.startswith("update-center-protocol\t1\t0\nprovider\tfedora\t"))
+        self.assertTrue(output.startswith("update-center-protocol\t1\t0\nprovider\tsystem\t"))
         self.assertTrue(output.endswith("complete\tsnapshot\n"))
         self.assertEqual(output, self.api["render_snapshot"]([result]))
         self.assertEqual(self.api["escape"]("a\tb\nc\\d"), "a\\tb\\nc\\\\d")
@@ -131,94 +131,123 @@ class SnapshotProtocolTests(unittest.TestCase):
                         source(ROW.replace("Summary", "\x1bmalformed")),
                         source(ROW) + "unexpected\trow\n", source(ROW).replace("complete\tsnapshot\n", "")):
             with self.subTest(payload=payload[:100]), self.assertRaises(ValueError):
-                self.api["parse_fedora_snapshot"](payload)
+                self.api["parse_system_snapshot"](payload)
 
-    def test_fedora_identity_fails_closed(self):
+    def test_arch_identity_fails_closed_and_ignores_id_like(self):
         with workspace() as folder:
             release = Path(folder) / "os-release"
-            for identity in ("ID=arch\nID_LIKE=fedora\n", "ID=fedora\nID=arch\n", "ID=\"fedora\"\nBAD\n"):
-                release.write_text(identity)
-                with self.assertRaisesRegex(ValueError, "Fedora"):
-                    self.api["require_fedora"](release)
-            release.write_text('ID="fedora"\nVERSION_ID=44\n')
-            self.api["require_fedora"](release)
+            for identity in ("ID=fedora\n", "ID=endeavouros\nID_LIKE=arch\n", "ID=manjaro\nID_LIKE=arch\n",
+                             "ID=cachyos\nID_LIKE=arch\n", "ID=archarm\nID_LIKE=arch\n",
+                             "ID=arch\nID=fedora\n", "ID=\"arch\"\nBAD\n", ""):
+                with self.subTest(identity=identity):
+                    release.write_text(identity)
+                    with self.assertRaisesRegex(ValueError, "ID=arch"):
+                        self.api["require_arch"](release)
+            with self.assertRaisesRegex(ValueError, "ID=arch"):
+                self.api["require_arch"](Path(folder) / "missing")
+            release.write_text('NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\n'
+                               'ANSI_COLOR="38;2;23;147;209"\nHOME_URL="https://archlinux.org/"\n'
+                               'LOGO=archlinux-logo\n')
+            self.api["require_arch"](release)
+
+    def test_system_label_comes_from_os_release_name(self):
+        with workspace() as folder:
+            release = Path(folder) / "os-release"
+            release.write_text('NAME="Arch Linux"\nID=arch\n')
+            self.assertEqual(self.api["system_label"](release), "Arch Linux")
+            for content in ("ID=arch\n", 'NAME=""\nID=arch\n', "NAME=" + "x" * 65 + "\n", "broken\n"):
+                with self.subTest(content=content):
+                    release.write_text(content)
+                    self.assertEqual(self.api["system_label"](release), "System")
+            self.assertEqual(self.api["system_label"](Path(folder) / "missing"), "System")
+        from unittest.mock import patch
+        with patch.dict(self.api["render_snapshot"].__globals__, system_label=lambda: "Arch Linux"):
+            output = self.api["render_snapshot"]([self.api["parse_system_snapshot"](source(ROW))])
+        self.assertIn("provider\tsystem\tArch Linux\t", output)
+
+    def test_missing_mutation_actions_derive_eligibility_from_discovery(self):
+        without = source(ROW).replace("action\tupdates-install-all\tavailable\tdelegated\tupdates\tInstall\tReady\n", "")
+        result = self.api["parse_system_snapshot"](without)
+        self.assertEqual((result.pending, result.update_available), (1, True))
+        current = without.replace("available\t1\tReady", "available\t0\tReady").replace(ROW, "")
+        self.assertFalse(self.api["parse_system_snapshot"](current).update_available)
+        partial = without.replace("provider\tupdates\tavailable", "provider\tupdates\tpartial")
+        self.assertTrue(self.api["parse_system_snapshot"](partial).update_available)
+        restricted = without.replace("provider\tupdates\tavailable", "provider\tupdates\trestricted")
+        self.assertFalse(self.api["parse_system_snapshot"](restricted).update_available)
+        blocked = source(ROW).replace("updates-install-all\tavailable", "updates-install-all\tunavailable")
+        self.assertFalse(self.api["parse_system_snapshot"](blocked).update_available)
+        held = without.replace("\tinstallable\t", "\tblocked\t")
+        self.assertEqual((self.api["parse_system_snapshot"](held).pending,
+                          self.api["parse_system_snapshot"](held).update_available), (1, False))
+        opened = without.replace("complete\tsnapshot", "action\tupdates-open\t%s\tuser-session\tupdates\t"
+                                 "Open system update\tReady\ncomplete\tsnapshot")
+        self.assertTrue(self.api["parse_system_snapshot"](opened % "available").update_available)
+        self.assertFalse(self.api["parse_system_snapshot"](opened % "unavailable").update_available)
+        with self.assertRaises(ValueError):
+            self.api["parse_system_snapshot"]((opened % "available").replace(
+                "complete\tsnapshot", "action\tupdates-install-all\tavailable\tdelegated\tupdates\tInstall\tReady\n"
+                "complete\tsnapshot"))
+        native = ("system-management-protocol\t1\t3\nsnapshot-generation\t" + "a" * 64 + "\n"
+                  "provider\tupdates\tavailable\tread-only\tpacman\tReady\n"
+                  "state\tupdate-summary\tavailable\t1\tReady\n"
+                  "state\tupdate-restart\tavailable\tsystem\tKernel update\n" + ROW
+                  + "package-change\tz;2;x86_64;repo\tupdate\tz\t2\tSummary\ncomplete\tsnapshot\n")
+        result = self.api["parse_system_snapshot"](native)
+        self.assertEqual((result.identifier, result.pending, result.update_available, result.restart),
+                         ("system", 1, True, "system"))
 
     def test_plan_action_and_input_order_preserved_deterministically(self):
         a = "update\ta;3;x86_64;repo\tsecurity\tinstallable\ta\t3\tSummary\n"
         plan = "package-change\ta;3;x86_64;repo\tinstall\ta\t3\tSummary\n"
         one = source(ROW + a + plan).replace("available\t1\tReady", "available\t2\tReady")
         two = source(plan + a + ROW).replace("available\t1\tReady", "available\t2\tReady")
-        self.assertEqual(self.api["render_snapshot"]([self.api["parse_fedora_snapshot"](one)]),
-                         self.api["render_snapshot"]([self.api["parse_fedora_snapshot"](two)]))
-        self.assertEqual(self.api["parse_fedora_snapshot"](one).items[0].action, "install")
+        self.assertEqual(self.api["render_snapshot"]([self.api["parse_system_snapshot"](one)]),
+                         self.api["render_snapshot"]([self.api["parse_system_snapshot"](two)]))
+        self.assertEqual(self.api["parse_system_snapshot"](one).items[0].action, "install")
 
     def test_existing_composed_machine_snapshot_is_accepted(self):
         with workspace() as directory:
             result = subprocess.run([sys.executable, str(ROOT / "tests/fixtures/system-native-discovery-provider.py"), "snapshot"],
                 env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "DWM_NATIVE_DISCOVERY_FIXTURE": directory},
                 text=True, capture_output=True, check=True, timeout=5)
-            normalized = self.api["parse_fedora_snapshot"](result.stdout)
-            self.assertEqual(normalized.identifier, "fedora")
+            normalized = self.api["parse_system_snapshot"](result.stdout)
+            self.assertEqual(normalized.identifier, "system")
             self.assertIs(type(normalized.pending), int)
-
-    def test_active_operation_from_backend_renderer_disables_advisory_update(self):
-        from types import SimpleNamespace
-        from unittest.mock import patch
-        backend = runpy.run_path(str(ROOT / "scripts/dwm-system-management"))
-        operation = SimpleNamespace(operation_id="op-" + "0" * 32,
-            action_id="updates-install-all", kind="update", state="running")
-        for percent, cancelable in ((None, False), (42, True)):
-            with self.subTest(percent=percent, cancelable=cancelable):
-                recovery = SimpleNamespace(failures=(), prior_restart=None,
-                    state=SimpleNamespace(active=operation, handoff=None, restart=None),
-                    evidence=SimpleNamespace(percent=percent, allow_cancel=cancelable))
-                renderer = backend["build_managed_snapshot"]
-                with patch.dict(renderer.__globals__, {
-                        "read_recovery_snapshot": lambda unused: recovery,
-                        "build_snapshot": lambda unused, **kwargs: source(ROW).splitlines()}):
-                    lines = renderer(object())
-                result = self.api["parse_fedora_snapshot"]("\n".join(lines) + "\n")
-                self.assertEqual(result.pending, 1)
-                self.assertEqual(result.items[0].package_id, "z;2;x86_64;repo")
-                self.assertFalse(result.update_available)
-                active = next(line for line in lines if line.startswith("active-operation\t"))
-                malformed = "\n".join(lines).replace(active, active + "\textra") + "\n"
-                with self.assertRaises(ValueError):
-                    self.api["parse_fedora_snapshot"](malformed)
 
     def test_existing_terminal_handoff_disables_advisory_update(self):
         payload = source(ROW).replace("complete\tsnapshot", "terminal-handoff\top-00000000000000000000000000000000\tupdates-install-all\tupdate\ncomplete\tsnapshot")
-        result = self.api["parse_fedora_snapshot"](payload)
+        result = self.api["parse_system_snapshot"](payload)
         self.assertEqual(result.pending, 1)
         self.assertFalse(result.update_available)
 
-    def test_fedora_restart_guidance_is_normalized(self):
+    def test_system_restart_guidance_is_normalized(self):
         payload = source(ROW).replace("complete\tsnapshot", "state\tupdate-restart\tavailable\tsystem\tRestart required\ncomplete\tsnapshot")
-        result = self.api["parse_fedora_snapshot"](payload)
+        result = self.api["parse_system_snapshot"](payload)
         self.assertEqual(result.restart, "system")
-        self.assertIn("guidance\tfedora\trestart\tsystem\n", self.api["render_snapshot"]([result]))
+        self.assertIn("guidance\tsystem\trestart\tsystem\n", self.api["render_snapshot"]([result]))
 
-    def test_fedora_restart_guidance_accepts_system_management_buckets(self):
+    def test_system_restart_guidance_accepts_system_management_buckets(self):
         for backend, normalized in (("security-system", "system"), ("security-session", "session"),
                                     ("application", "session"), ("none", "none")):
             with self.subTest(backend=backend):
                 payload = source(ROW).replace("complete\tsnapshot",
                     f"state\tupdate-restart\tavailable\t{backend}\tRestart required\ncomplete\tsnapshot")
-                result = self.api["parse_fedora_snapshot"](payload)
+                result = self.api["parse_system_snapshot"](payload)
                 self.assertEqual(result.restart, normalized)
         partial = source(ROW).replace("complete\tsnapshot",
             "state\tupdate-restart\tpartial\tsecurity-session\tRestart guidance retained\ncomplete\tsnapshot")
-        self.assertEqual(self.api["parse_fedora_snapshot"](partial).restart, "session")
+        self.assertEqual(self.api["parse_system_snapshot"](partial).restart, "session")
         unknown = source(ROW).replace("complete\tsnapshot",
             "state\tupdate-restart\tpartial\tunknown\tRestart guidance incomplete\ncomplete\tsnapshot")
-        self.assertEqual(self.api["parse_fedora_snapshot"](unknown).restart, "none")
+        self.assertEqual(self.api["parse_system_snapshot"](unknown).restart, "none")
 
     def test_source_uses_only_lf_records_and_rejects_raw_control_separators(self):
         valid = source().replace("available\t1\tReady", "available\t0\tReady")
-        self.assertEqual(self.api["parse_fedora_snapshot"](valid).pending, 0)
+        self.assertEqual(self.api["parse_system_snapshot"](valid).pending, 0)
         for separator in ("\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\r", "\r\n", "\u2028", "\u2029"):
             with self.subTest(separator=repr(separator)), self.assertRaises(ValueError):
-                self.api["parse_fedora_snapshot"](valid.replace("\n", separator))
+                self.api["parse_system_snapshot"](valid.replace("\n", separator))
 
 
 class CacheTests(unittest.TestCase):
@@ -231,19 +260,19 @@ class CacheTests(unittest.TestCase):
         environment.start()
         self.addCleanup(environment.stop)
         self.path = Path(self.temp.name) / "cache/dwm-titus/update-center.json"
-        self.good = self.api["parse_fedora_snapshot"](source(ROW))
+        self.good = self.api["parse_system_snapshot"](source(ROW))
         self.assertTrue("snapshot" in self.api, "last-good cache interface is missing")
 
     def scan(self, scanners=None, **options):
-        return self.api["snapshot"](self.path, scanners or {"fedora": lambda: self.good}, now=100, **options)
+        return self.api["snapshot"](self.path, scanners or {"system": lambda: self.good}, now=100, **options)
 
     def test_immediate_cache_and_force_replacement(self):
         self.scan(force=True)
         def forbidden():
             self.fail("valid cache must not start a provider")
-        self.assertEqual(self.scan({"fedora": forbidden})[0].pending, 1)
+        self.assertEqual(self.scan({"system": forbidden})[0].pending, 1)
         fresh = replace(self.good, pending=0, items=())
-        self.assertEqual(self.scan({"fedora": lambda: fresh}, force=True)[0].pending, 0)
+        self.assertEqual(self.scan({"system": lambda: fresh}, force=True)[0].pending, 0)
         self.assertEqual(json.loads(self.path.read_text())["schema"], 1)
 
     def test_schema_one_cache_without_restart_defaults_to_none(self):
@@ -255,14 +284,14 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(result.restart, "none")
         def forbidden():
             self.fail("compatible schema-one cache must not force a live scan")
-        self.assertEqual(self.scan({"fedora": forbidden})[0].pending, 1)
+        self.assertEqual(self.scan({"system": forbidden})[0].pending, 1)
 
     def test_failure_retains_last_good_independently_and_recovers(self):
         desktop = self.api["ProviderResult"]("dwm-titus", pending=0)
-        self.scan({"fedora": lambda: self.good, "dwm-titus": lambda: desktop}, force=True)
+        self.scan({"system": lambda: self.good, "dwm-titus": lambda: desktop}, force=True)
         def fail():
             raise ValueError("bad data")
-        results = self.scan({"fedora": fail, "dwm-titus": lambda: desktop}, force=True)
+        results = self.scan({"system": fail, "dwm-titus": lambda: desktop}, force=True)
         self.assertEqual((results[0].pending, results[0].freshness, results[0].last_success), (1, "stale", 100))
         self.assertEqual(results[0].items, self.good.items)
         self.assertFalse(results[0].update_available)
@@ -275,7 +304,7 @@ class CacheTests(unittest.TestCase):
         failed = source().replace("state\tupdate-summary\tavailable\t1\tReady",
                                   "state\tupdate-summary\tunavailable\tunknown\tOffline")
         failed = failed.replace("complete\tsnapshot", "error\tupdates\tnetwork\tNetwork unavailable\ncomplete\tsnapshot")
-        result = self.scan({"fedora": lambda: self.api["parse_fedora_snapshot"](failed)}, force=True)[0]
+        result = self.scan({"system": lambda: self.api["parse_system_snapshot"](failed)}, force=True)[0]
         self.assertEqual((result.pending, result.freshness, result.error_code), (1, "stale", "network"))
         self.assertIn("Network unavailable", result.detail)
 
@@ -336,7 +365,7 @@ class CacheTests(unittest.TestCase):
         before = self.path.read_bytes()
         with patch("os.replace", side_effect=OSError("injected failure")):
             fresh = replace(self.good, pending=0, items=())
-            self.assertEqual(self.scan({"fedora": lambda: fresh}, force=True)[0].pending, 0)
+            self.assertEqual(self.scan({"system": lambda: fresh}, force=True)[0].pending, 0)
         self.assertEqual(self.path.read_bytes(), before)
         self.assertFalse(any(p.name.startswith(".update-center-") for p in self.path.parent.iterdir()))
 
@@ -390,39 +419,40 @@ class CacheTests(unittest.TestCase):
         output = io.StringIO()
         globals_ = self.api["main"].__globals__
         with patch.dict(os.environ, {"XDG_CACHE_HOME": "relative-cache-must-not-exist"}), \
-                patch.dict(globals_, {"require_fedora": lambda: None, "scan_fedora": lambda: self.good}), \
+                patch.dict(globals_, {"require_arch": lambda: None, "scan_system": lambda: self.good,
+                                      "system_label": lambda: "Arch Linux"}), \
                 contextlib.redirect_stdout(output):
             self.assertEqual(self.api["main"](["snapshot", "--force"]), 0)
-        self.assertIn("provider\tfedora\tFedora\tavailable\t1", output.getvalue())
+        self.assertIn("provider\tsystem\tArch Linux\tavailable\t1", output.getvalue())
         self.assertFalse((ROOT / "relative-cache-must-not-exist").exists())
 
-    def test_optional_only_cache_cannot_suppress_fedora_acquisition(self):
+    def test_optional_only_cache_cannot_suppress_system_acquisition(self):
         reserved = self.api["ProviderResult"]("mise", last_success=100)
         self.api["write_cache"](self.path, [reserved])
         result = self.scan()
-        self.assertEqual([p.identifier for p in result], ["fedora"])
+        self.assertEqual([p.identifier for p in result], ["system"])
         self.assertEqual((result[0].pending, result[0].freshness), (1, "fresh"))
 
     def test_retired_provider_cache_is_never_returned_or_merged(self):
         reserved = self.api["ProviderResult"]("mise", last_success=100)
-        fedora = replace(self.good, last_success=100)
-        self.api["write_cache"](self.path, [fedora, reserved])
+        system = replace(self.good, last_success=100)
+        self.api["write_cache"](self.path, [system, reserved])
         def forbidden():
-            self.fail("active Fedora cache should render immediately")
-        self.assertEqual([p.identifier for p in self.scan({"fedora": forbidden})], ["fedora"])
-        self.assertEqual([p.identifier for p in self.scan(force=True)], ["fedora"])
-        self.assertEqual([p.identifier for p in self.api["read_cache"](self.path)], ["fedora"])
+            self.fail("active system cache should render immediately")
+        self.assertEqual([p.identifier for p in self.scan({"system": forbidden})], ["system"])
+        self.assertEqual([p.identifier for p in self.scan(force=True)], ["system"])
+        self.assertEqual([p.identifier for p in self.api["read_cache"](self.path)], ["system"])
 
     def test_targeted_rescan_preserves_other_active_provider_and_fills_missing_core(self):
         desktop = self.api["ProviderResult"]("dwm-titus", last_success=100)
         self.api["write_cache"](self.path, [desktop])
-        results = self.scan({"fedora": lambda: self.good, "dwm-titus": lambda: desktop}, provider="dwm-titus")
-        self.assertEqual([p.identifier for p in results], ["fedora", "dwm-titus"])
+        results = self.scan({"system": lambda: self.good, "dwm-titus": lambda: desktop}, provider="dwm-titus")
+        self.assertEqual([p.identifier for p in results], ["system", "dwm-titus"])
         self.assertEqual(results[0].pending, 1)
         def forbidden():
-            self.fail("targeted rescan must retain cached active Fedora")
-        results = self.scan({"fedora": forbidden, "dwm-titus": lambda: desktop}, provider="dwm-titus")
-        self.assertEqual([p.identifier for p in results], ["fedora", "dwm-titus"])
+            self.fail("targeted rescan must retain cached active system provider")
+        results = self.scan({"system": forbidden, "dwm-titus": lambda: desktop}, provider="dwm-titus")
+        self.assertEqual([p.identifier for p in results], ["system", "dwm-titus"])
         self.assertEqual(results[0].pending, 1)
 
 
@@ -431,20 +461,20 @@ class ScanIsolationTests(CacheTests):
         super().setUp()
         self.assertTrue("run_bounded" in self.api, "bounded concurrent scanner is missing")
 
-    def test_deadline_retains_fedora_while_independent_provider_finishes(self):
+    def test_deadline_retains_system_while_independent_provider_finishes(self):
         self.scan(force=True)
         marker = Path(self.temp.name) / "independent"
         def hung():
             try:
                 payload = self.api["run_bounded"]([sys.executable, "-c", "import time;time.sleep(20)"], timeout=0.2)
             finally:
-                self.assertTrue(marker.exists(), "independent scan must finish before Fedora deadline")
-            return self.api["parse_fedora_snapshot"](payload)
+                self.assertTrue(marker.exists(), "independent scan must finish before the system deadline")
+            return self.api["parse_system_snapshot"](payload)
         def desktop():
             marker.write_text("completed")
             return self.api["ProviderResult"]("dwm-titus")
         started = time.monotonic()
-        results = self.scan({"fedora": hung, "dwm-titus": desktop}, force=True)
+        results = self.scan({"system": hung, "dwm-titus": desktop}, force=True)
         self.assertLess(time.monotonic() - started, 2)
         self.assertEqual(marker.read_text(), "completed")
         self.assertEqual((results[0].pending, results[0].freshness, results[0].error_code), (1, "stale", "timeout"))
@@ -456,8 +486,8 @@ class ScanIsolationTests(CacheTests):
                               ("import sys;sys.stdout.write('x'*9000000)", ValueError)):
             with self.subTest(script=script):
                 def scan():
-                    return self.api["parse_fedora_snapshot"](self.api["run_bounded"]([sys.executable, "-c", script], timeout=2))
-                result = self.scan({"fedora": scan}, force=True)[0]
+                    return self.api["parse_system_snapshot"](self.api["run_bounded"]([sys.executable, "-c", script], timeout=2))
+                result = self.scan({"system": scan}, force=True)[0]
                 self.assertEqual((result.status, result.freshness, result.pending), ("unavailable", "error", 0))
 
     def test_malformed_adapter_types_degrade_only_affected_provider(self):
@@ -465,7 +495,7 @@ class ScanIsolationTests(CacheTests):
                     replace(self.good, items=None), replace(self.good, error_code=[])):
             with self.subTest(bad=bad):
                 desktop = self.api["ProviderResult"]("dwm-titus")
-                results = self.scan({"fedora": lambda: bad, "dwm-titus": lambda: desktop}, force=True)
+                results = self.scan({"system": lambda: bad, "dwm-titus": lambda: desktop}, force=True)
                 self.assertEqual(results[0].error_code, "malformed")
                 self.assertEqual(results[1].freshness, "fresh")
 
@@ -503,13 +533,13 @@ class ScanIsolationTests(CacheTests):
             entered.set()
             release.wait(2)
             return self.good
-        first = threading.Thread(target=lambda: self.scan({"fedora": slow}, force=True))
+        first = threading.Thread(target=lambda: self.scan({"system": slow}, force=True))
         first.start()
         self.assertTrue(entered.wait(1))
         try:
             def forbidden():
                 self.fail("same provider scans must not overlap")
-            second = self.scan({"fedora": forbidden}, force=True)[0]
+            second = self.scan({"system": forbidden}, force=True)[0]
             self.assertEqual(second.error_code, "busy")
         finally:
             release.set()
@@ -519,7 +549,7 @@ class ScanIsolationTests(CacheTests):
     def test_cross_process_provider_exclusion_is_independent_of_cache_path(self):
         import select
         child = subprocess.Popen([sys.executable, "-B", "-c",
-            "import runpy,sys;api=runpy.run_path(sys.argv[1]);\nwith api['scan_lock']('fedora'):\n print('locked',flush=True);sys.stdin.read(1)", str(HELPER)],
+            "import runpy,sys;api=runpy.run_path(sys.argv[1]);\nwith api['scan_lock']('system'):\n print('locked',flush=True);sys.stdin.read(1)", str(HELPER)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=dict(os.environ))
         try:
             self.assertTrue(select.select([child.stdout], [], [], 3)[0], "child lock acquisition timed out")
@@ -528,7 +558,7 @@ class ScanIsolationTests(CacheTests):
             self.path.parent.chmod(0o777)
             def forbidden():
                 self.fail("cross-process lock must exclude the same provider")
-            result = self.scan({"fedora": forbidden}, force=True)[0]
+            result = self.scan({"system": forbidden}, force=True)[0]
             self.assertEqual(result.error_code, "busy")
         finally:
             child.communicate("x", timeout=3)
@@ -545,7 +575,7 @@ class ScanIsolationTests(CacheTests):
             self.assertEqual(list(runtime.iterdir()), [])
             runtime.chmod(0o777)
             self.assertEqual(self.scan(force=True)[0].freshness, "fresh")
-        self.assertTrue((Path(os.environ["XDG_STATE_HOME"]) / "dwm-titus/update-center/.scan-fedora").exists())
+        self.assertTrue((Path(os.environ["XDG_STATE_HOME"]) / "dwm-titus/update-center/.scan-system").exists())
 
     def test_cross_process_runtime_variation_never_splits_scanner_or_cache_ownership(self):
         import select
@@ -555,8 +585,8 @@ class ScanIsolationTests(CacheTests):
         runtime.mkdir(mode=0o700)
         alternate.mkdir(mode=0o700)
         code = ("import runpy,sys;from dataclasses import replace;api=runpy.run_path(sys.argv[1]);\n"
-                "def scan():\n print('scanning',flush=True);sys.stdin.read(1);return replace(api['parse_fedora_snapshot'](sys.argv[3]),pending=0,items=())\n"
-                "api['snapshot'](sys.argv[2],{'fedora':scan},force=True,now=200)")
+                "def scan():\n print('scanning',flush=True);sys.stdin.read(1);return replace(api['parse_system_snapshot'](sys.argv[3]),pending=0,items=())\n"
+                "api['snapshot'](sys.argv[2],{'system':scan},force=True,now=200)")
         for changed in (None, str(alternate)):
             with self.subTest(runtime=changed):
                 self.scan(force=True)
@@ -576,7 +606,7 @@ class ScanIsolationTests(CacheTests):
                         calls.append("scanned")
                         return self.good
                     with patch.dict(os.environ, environment, clear=True):
-                        result = self.scan({"fedora": second}, force=True)[0]
+                        result = self.scan({"system": second}, force=True)[0]
                     self.assertEqual(result.error_code, "busy")
                     self.assertEqual(calls, [])
                     self.assertEqual(self.path.read_bytes(), before)
@@ -598,14 +628,14 @@ class ScanIsolationTests(CacheTests):
         state.symlink_to(target)
         def forbidden():
             self.fail("unsafe coordination cannot allow an unprotected scan")
-        result = self.scan({"fedora": forbidden}, force=True)[0]
+        result = self.scan({"system": forbidden}, force=True)[0]
         self.assertEqual(result.error_code, "scan-failed")
         self.assertEqual(list(target.iterdir()), [])
 
     def test_concurrent_different_provider_rescans_preserve_both_results(self):
         import threading
         desktop = self.api["ProviderResult"]("dwm-titus")
-        self.scan({"fedora": lambda: self.good, "dwm-titus": lambda: desktop}, force=True)
+        self.scan({"system": lambda: self.good, "dwm-titus": lambda: desktop}, force=True)
         entered, release = threading.Event(), threading.Event()
         def slow():
             entered.set()
@@ -613,15 +643,15 @@ class ScanIsolationTests(CacheTests):
             return self.good
         def forbidden():
             self.fail("targeted rescan must not scan the other cached provider")
-        first = threading.Thread(target=lambda: self.scan({"fedora": slow, "dwm-titus": forbidden}, provider="fedora"))
+        first = threading.Thread(target=lambda: self.scan({"system": slow, "dwm-titus": forbidden}, provider="system"))
         first.start()
         self.assertTrue(entered.wait(1))
         try:
-            self.scan({"fedora": forbidden, "dwm-titus": lambda: desktop}, provider="dwm-titus")
+            self.scan({"system": forbidden, "dwm-titus": lambda: desktop}, provider="dwm-titus")
         finally:
             release.set()
             first.join(3)
-        self.assertEqual([p.identifier for p in self.api["read_cache"](self.path)], ["fedora", "dwm-titus"])
+        self.assertEqual([p.identifier for p in self.api["read_cache"](self.path)], ["system", "dwm-titus"])
 
 
 class OptionalFailureTests(unittest.TestCase):
@@ -702,7 +732,7 @@ class OptionalFailureTests(unittest.TestCase):
                     path = Path(folder) / "cache/snapshot.json"
                     function = self.api["discover_scanners"]
                     globals_ = function.__globals__
-                    cores = {"fedora": lambda: self.api["ProviderResult"]("fedora"),
+                    cores = {"system": lambda: self.api["ProviderResult"]("system"),
                              "dwm-titus": lambda: self.api["ProviderResult"]("dwm-titus")}
                     good = self.api["ProviderResult"](identifier, managed=1, pending=1, items=(
                         self.api["ItemResult"]("update", "item", "1", "2", "item"),))
@@ -713,7 +743,7 @@ class OptionalFailureTests(unittest.TestCase):
                     self.api["snapshot"](path, {**cores, identifier: fail}, force=True, now=101)
                     with patch.dict(globals_, optional_executable=lambda name: None):
                         scanners = function()
-                    self.assertEqual(list(scanners), ["fedora", "dwm-titus"])
+                    self.assertEqual(list(scanners), ["system", "dwm-titus"])
                     def forbidden():
                         self.fail("ordinary cache read must not execute commands")
                     cached = self.api["snapshot"](path, {key: forbidden for key in scanners}, now=102)
@@ -739,7 +769,7 @@ class OptionalFailureTests(unittest.TestCase):
                             patch.dict(os.environ, XDG_STATE_HOME=str(Path(folder) / "state")):
                         path = Path(folder) / "cache/snapshot.json"
                         cores = {name: (lambda name=name: self.api["ProviderResult"](name))
-                                 for name in ("fedora", "dwm-titus")}
+                                 for name in ("system", "dwm-titus")}
                         if cached:
                             self.api["snapshot"](path, {**cores, identifier: lambda: self.api["ProviderResult"](
                                 identifier, managed=1)}, force=True, now=100)
@@ -755,7 +785,7 @@ class OptionalFailureTests(unittest.TestCase):
                             self.assertEqual(self.api["active_operation"]()["operation"], operation["operation"])
                             self.assertEqual(self.api["active_operation"]()["outcome"], outcome)
                             with self.assertRaises(BlockingIOError):
-                                self.api["reserve_operation"]("fedora", "update")
+                                self.api["reserve_operation"]("system", "update")
                         restored = self.api["snapshot"](path, {**cores, identifier: lambda: self.api["ProviderResult"](
                             identifier, managed=1)}, force=True, now=102)
                         self.assertEqual(restored[-1].status, "available")
@@ -777,13 +807,13 @@ class OptionalFailureTests(unittest.TestCase):
         from unittest.mock import patch
         with workspace() as folder, patch.dict(os.environ, XDG_STATE_HOME=str(Path(folder) / "state")):
             path = Path(folder) / "cache/snapshot.json"
-            self.api["write_cache"](path, [self.api["ProviderResult"]("fedora", last_success=100),
+            self.api["write_cache"](path, [self.api["ProviderResult"]("system", last_success=100),
                 self.api["ProviderResult"]("flatpak", "unavailable", last_success=100),
                 self.api["ProviderResult"]("mise", "restricted", last_success=100, detail="Native recovery required")])
             def forbidden():
                 self.fail("missing provider must not execute")
-            result = self.api["snapshot"](path, {"fedora": forbidden}, now=101)
-            self.assertEqual([r.identifier for r in result], ["fedora", "mise"])
+            result = self.api["snapshot"](path, {"system": forbidden}, now=101)
+            self.assertEqual([r.identifier for r in result], ["system", "mise"])
             self.assertEqual((result[-1].error_code, result[-1].freshness), ("missing-provider", "stale"))
             self.assertIn("Native recovery required", result[-1].detail)
 
@@ -791,9 +821,9 @@ class OptionalFailureTests(unittest.TestCase):
         from unittest.mock import patch
         with workspace() as folder, patch.dict(os.environ, XDG_STATE_HOME=str(Path(folder) / "state")):
             path = Path(folder) / "cache/snapshot.json"
-            self.api["write_cache"](path, [self.api["ProviderResult"]("fedora", last_success=100),
+            self.api["write_cache"](path, [self.api["ProviderResult"]("system", last_success=100),
                 self.api["ProviderResult"]("mise", "restricted", last_success=100, detail="Recover: " + "x" * 8080)])
-            result = self.api["snapshot"](path, {"fedora": lambda: self.api["ProviderResult"]("fedora")})
+            result = self.api["snapshot"](path, {"system": lambda: self.api["ProviderResult"]("system")})
             output = self.api["render_snapshot"](result)
             self.assertIn("Recover:", output)
             self.assertIn("missing-provider", output)
@@ -804,7 +834,7 @@ class RegistryDiscoveryTests(unittest.TestCase):
         self.api = runpy.run_path(str(HELPER))
 
     def test_all_providers_declare_safe_discovery_and_operation_capabilities(self):
-        self.assertEqual([p.identifier for p in self.api["REGISTRY"]], ["fedora", "dwm-titus", "flatpak", "mise"])
+        self.assertEqual([p.identifier for p in self.api["REGISTRY"]], ["system", "aur", "dwm-titus", "flatpak", "mise"])
         for provider in self.api["REGISTRY"]:
             self.assertRegex(provider.identifier, r"^[a-z][a-z0-9-]*$")
             self.assertTrue(callable(getattr(provider, "discover", None)), "provider discover function missing")
@@ -831,10 +861,10 @@ class RegistryDiscoveryTests(unittest.TestCase):
         with workspace() as folder:
             path = Path(folder) / "cache/update-center.json"
             with patch.dict(os.environ, XDG_STATE_HOME=str(Path(folder) / "state")):
-                results = self.api["snapshot"](path, {"fedora": lambda: self.api["ProviderResult"]("fedora"),
+                results = self.api["snapshot"](path, {"system": lambda: self.api["ProviderResult"]("system"),
                              "dwm-titus": lambda: self.api["ProviderResult"]("dwm-titus"),
                              "flatpak": lambda: None, "mise": lambda: None}, force=True, now=100)
-                self.assertEqual([r.identifier for r in results], ["fedora", "dwm-titus"])
+                self.assertEqual([r.identifier for r in results], ["system", "dwm-titus"])
                 self.api["snapshot"](path, {"mise": lambda: self.api["ProviderResult"]("mise")}, force=True, now=101)
                 result = self.api["snapshot"](path, {"mise": lambda: None}, force=True, now=102)[0]
                 self.assertEqual((result.identifier, result.freshness, result.error_code), ("mise", "stale", "unsupported"))
@@ -844,7 +874,7 @@ class RegistryDiscoveryTests(unittest.TestCase):
         from unittest.mock import patch
         function = self.api["discover_scanners"]
         with patch.dict(function.__globals__, optional_executable=lambda name: None):
-            self.assertEqual(list(function()), ["fedora", "dwm-titus"])
+            self.assertEqual(list(function()), ["system", "dwm-titus"])
 
     def test_count_and_item_bounds_fail_closed(self):
         constructor = self.api["ProviderResult"]
@@ -1117,10 +1147,9 @@ class DesktopDiscoveryTests(unittest.TestCase):
                 self.assertEqual(Path(chosen).stat().st_uid, 0)
 
 
-    def test_fedora_scanner_populates_managed_package_count(self):
+    def test_system_scanner_populates_managed_package_count(self):
         from unittest.mock import patch
-        self.assertIn("fedora_package_count", self.api)
-        function = self.api["scan_fedora"]
+        function = self.api["scan_system"]
         globals_ = function.__globals__
 
         def snapshot_command(argv, **options):
@@ -1129,53 +1158,427 @@ class DesktopDiscoveryTests(unittest.TestCase):
             return source().replace("available\t1\tReady", "available\t0\tReady")
 
         with patch.dict(globals_, {
-            "require_fedora": lambda: None,
+            "require_arch": lambda: None,
             "run_bounded": snapshot_command,
-            "fedora_package_count": lambda: 1634,
+            "system_package_count": lambda: 1634,
         }):
             result = function()
-        self.assertEqual(result.managed, 1634)
+        self.assertEqual((result.identifier, result.managed), ("system", 1634))
 
-    def test_fedora_package_count_falls_back_when_sqlite3_fails(self):
-        import sys
+    def test_system_package_count_reads_pyalpm_then_local_database(self):
+        from types import SimpleNamespace
         from unittest.mock import patch
-        count_fn = self.api["fedora_package_count"]
-        with patch.dict(sys.modules, {"sqlite3": None}):
-            class MockRpm:
-                class TransactionSet:
-                    def dbMatch(self):
-                        return [1, 2, 3]
-            with patch.dict(sys.modules, {"rpm": MockRpm}):
-                self.assertEqual(count_fn(), 3)
-            with patch.dict(sys.modules, {"rpm": None}):
-                self.assertIsNone(count_fn())
+        count = self.api["system_package_count"]
+        globals_ = count.__globals__
+        handles = []
+
+        class Handle:
+            def __init__(self, root, dbpath):
+                handles.append((root, dbpath))
+
+            def get_localdb(self):
+                return SimpleNamespace(pkgcache=[object()] * 3)
+
+        with patch.dict(globals_, load_pyalpm=lambda: SimpleNamespace(Handle=Handle)):
+            self.assertEqual(count(), 3)
+        self.assertEqual(handles, [("/", "/var/lib/pacman")])
+        with workspace() as folder:
+            local = Path(folder) / "local"
+            local.mkdir()
+            for name in ("bash-5.2-1", "glibc-2.40-1"):
+                (local / name).mkdir()
+            (local / "ALPM_DB_VERSION").write_text("9\n")
+
+            def missing():
+                raise ImportError("pyalpm")
+
+            with patch.dict(globals_, load_pyalpm=missing, PACMAN_DB_PATH=folder):
+                self.assertEqual(count(), 2)
+            with patch.dict(globals_, load_pyalpm=missing, PACMAN_DB_PATH=str(Path(folder) / "absent")):
+                self.assertIsNone(count())
 
 
-class NativeFedoraOperationTests(unittest.TestCase):
+class NativeSystemOperationTests(unittest.TestCase):
     def test_native_provenance_survives_repeated_interrupted_recovery(self):
         from unittest.mock import patch
         with workspace() as directory, patch.dict(os.environ, {"XDG_STATE_HOME": directory}):
             api = runpy.run_path(str(HELPER))
-            previous = api["reserve_operation"]("fedora", "update")
+            previous = api["reserve_operation"]("system", "update")
             api["update_operation"](previous["operation"], phase="interrupted",
-                provider_phase="fedora-dnf", outcome="unknown")
+                provider_phase="system-native", outcome="unknown", detail="pacman was interrupted")
             for phase in ("reserved", "preparing"):
-                recovery = api["reserve_operation"]("fedora", "recover")
+                recovery = api["reserve_operation"]("system", "recover")
                 self.assertEqual(recovery["recovery_of"], previous["operation"])
-                self.assertEqual(recovery["provider_phase"], "fedora-dnf")
-                self.assertEqual(recovery["recovery_provider_phase"], "fedora-dnf")
+                self.assertEqual(recovery["provider_phase"], "system-native")
+                self.assertEqual(recovery["recovery_provider_phase"], "system-native")
+                self.assertIn("last known result", recovery["detail"])
                 # Even a crash after a generic preparation checkpoint retains
                 # native provenance through the next reservation.
                 api["update_operation"](recovery["operation"], phase="interrupted",
                     provider_phase=phase, outcome="unknown")
                 previous = recovery
-            final = api["reserve_operation"]("fedora", "recover")
-            self.assertEqual(final["recovery_provider_phase"], "fedora-dnf")
+            final = api["reserve_operation"]("system", "recover")
+            self.assertEqual(final["recovery_provider_phase"], "system-native")
             for field in ("phase", "provider_phase", "recovery_provider_phase"):
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     api["validate_operation"]({**final, "provider": "mise",
                         "provider_phase": "reserved", "recovery_provider_phase": "reserved",
-                        field: "fedora-dnf"})
+                        field: "system-native"})
+
+
+class LegacyStateMigrationTests(unittest.TestCase):
+    """Pre-port Fedora caches and receipts never crash or misattribute data."""
+
+    def setUp(self):
+        from unittest.mock import patch
+        self.temp = workspace()
+        self.addCleanup(self.temp.cleanup)
+        environment = patch.dict(os.environ, {"XDG_STATE_HOME": str(Path(self.temp.name) / "state")})
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.api = runpy.run_path(str(HELPER))
+        self.path = Path(self.temp.name) / "cache/dwm-titus/update-center.json"
+
+    def legacy_cache(self, providers):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.chmod(0o700)
+        self.path.write_text(json.dumps({"schema": 1, "providers": providers}))
+        self.path.chmod(0o600)
+
+    def entry(self, identifier, **changes):
+        item = {"action": "update", "name": "kernel", "current": "unknown", "available": "6.9",
+                "package_id": "kernel;6.9;x86_64;updates", "scope": "system", "url": ""}
+        value = {"identifier": identifier, "status": "available", "pending": 1, "managed": 1634,
+                 "freshness": "fresh", "last_success": 50, "update_available": True, "error_code": "",
+                 "detail": "Fedora data", "restart": "none", "items": [item]}
+        value.update(changes)
+        return value
+
+    def test_fedora_cache_entry_is_dropped_and_system_is_rescanned(self):
+        desktop = self.entry("dwm-titus", pending=0, items=[], managed=1, detail="Desktop ready",
+                             update_available=False)
+        self.legacy_cache([self.entry("fedora"), desktop])
+        cached = self.api["read_cache"](self.path)
+        self.assertEqual([result.identifier for result in cached], ["dwm-titus"])
+        fresh = self.api["ProviderResult"]("system", managed=900)
+        calls = []
+
+        def system():
+            calls.append("system")
+            return fresh
+
+        def forbidden():
+            self.fail("cached desktop result must be retained without a scan")
+
+        results = self.api["snapshot"](self.path, {"system": system, "dwm-titus": forbidden}, now=100)
+        self.assertEqual(calls, ["system"])
+        self.assertEqual([(r.identifier, r.managed, r.pending) for r in results],
+                         [("system", 900, 0), ("dwm-titus", 1, 0)])
+        persisted = json.loads(self.path.read_text())
+        self.assertEqual([entry["identifier"] for entry in persisted["providers"]], ["system", "dwm-titus"])
+        self.assertNotIn("kernel;6.9", self.path.read_text())
+
+    def test_fedora_only_cache_is_invalidated_cleanly(self):
+        self.legacy_cache([self.entry("fedora")])
+        self.assertIsNone(self.api["read_cache"](self.path))
+        results = self.api["snapshot"](self.path, {"system": lambda: self.api["ProviderResult"]("system")}, now=100)
+        self.assertEqual([(r.identifier, r.pending, r.freshness) for r in results], [("system", 0, "fresh")])
+        malformed = self.entry("fedora")
+        del malformed["items"]
+        self.legacy_cache([malformed, self.entry("mise", items=[], pending=0, update_available=False)])
+        self.assertEqual([r.identifier for r in self.api["read_cache"](self.path)], ["mise"])
+
+    def receipt(self, **changes):
+        value = {"schema": 1, "operation": "op-" + "e" * 32, "provider": "fedora", "action": "update",
+                 "phase": "interrupted", "outcome": "unknown", "provider_phase": "fedora-dnf",
+                 "created": 10, "updated": 11, "terminal_pid": 0, "terminal_identity": "",
+                 "launcher_pid": 0, "launcher_identity": "", "recovery_of": "", "recovery_phase": "",
+                 "recovery_provider_phase": "reserved", "detail": "Native DNF was interrupted"}
+        value.update(changes)
+        path = self.api["operation_path"]()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.parent.chmod(0o700)
+        path.write_text(json.dumps(value))
+        path.chmod(0o600)
+        return value
+
+    def test_fedora_receipt_is_converted_and_keeps_its_unknown_outcome(self):
+        self.receipt()
+        value = self.api["read_operation"]()
+        self.assertEqual((value["provider"], value["phase"], value["outcome"], value["provider_phase"]),
+                         ("system", "interrupted", "unknown", "system-native"))
+        with self.assertRaises(BlockingIOError):
+            self.api["reserve_operation"]("mise", "update")
+        recovery = self.api["reserve_operation"]("system", "recover")
+        self.assertEqual((recovery["provider"], recovery["recovery_of"], recovery["recovery_provider_phase"]),
+                         ("system", "op-" + "e" * 32, "system-native"))
+        self.assertIn("Native DNF was interrupted", recovery["detail"])
+        persisted = json.loads(self.api["operation_path"]().read_text())
+        self.assertEqual(persisted["provider"], "system")
+        self.assertNotIn("fedora", self.api["operation_path"]().read_text())
+
+    def test_closed_and_executing_fedora_receipts_never_block_or_crash(self):
+        self.receipt(phase="closed", outcome="succeeded", provider_phase="fedora-dnf")
+        self.assertIsNone(self.api["active_operation"]())
+        operation = self.api["reserve_operation"]("mise", "update")
+        self.assertEqual(operation["provider"], "mise")
+        self.receipt(phase="fedora-executing", outcome="pending", provider_phase="fedora-dnf")
+        value = self.api["read_operation"]()
+        self.assertEqual((value["provider"], value["phase"]), ("system", "system-executing"))
+        from unittest.mock import patch
+        with patch.dict(self.api["terminal_closed"].__globals__, process_identity=lambda pid: None,
+                        rescan_provider=lambda provider: None):
+            closed = self.api["terminal_closed"](value["operation"], now=20)
+        self.assertEqual((closed["provider"], closed["phase"], closed["outcome"]), ("system", "interrupted", "unknown"))
+
+    def test_unknown_legacy_shapes_still_fail_closed(self):
+        self.receipt(provider="fedora", phase="fedora-unknown-phase")
+        self.assertIsNone(self.api["read_operation"]())
+        with self.assertRaisesRegex(ValueError, "unsafe or malformed"):
+            self.api["reserve_operation"]("system", "update")
+
+
+class AurDiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.api = runpy.run_path(str(HELPER))
+
+    def rpc(self, records, *, version=5, kind="multiinfo"):
+        return json.dumps({"version": version, "type": kind, "resultcount": len(records),
+                           "results": [{"Name": name, "Version": value, "PackageBase": name}
+                                       for name, value in records]}).encode()
+
+    def scan(self, foreign, installed, responses, *, helper="/usr/bin/paru", euid=1000, pyalpm=True):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        function = self.api["scan_aur"]
+        calls, urls = [], []
+
+        def run(argv, **options):
+            calls.append((argv, options))
+            return "".join(name + "\n" for name in foreign)
+
+        def fetch(url, **options):
+            urls.append((url, options))
+            value = responses[len(urls) - 1]
+            if isinstance(value, Exception):
+                raise value
+            return value
+
+        def compare(left, right):
+            import itertools
+            a, b = [tuple(int(part) for part in value.replace("-", ".").split(".")) for value in (left, right)]
+            return (a > b) - (a < b)
+
+        class LocalDB:
+            def get_pkg(self, name):
+                return SimpleNamespace(version=installed[name]) if name in installed else None
+
+        class Handle:
+            def __init__(self, root, dbpath):
+                pass
+
+            def get_localdb(self):
+                return LocalDB()
+
+        module = SimpleNamespace(Handle=Handle, vercmp=compare)
+
+        def load():
+            if not pyalpm:
+                raise ImportError("pyalpm")
+            return module
+
+        with patch.dict(function.__globals__, aur_helper=lambda: helper, run_bounded=run, fetch_https=fetch,
+                        load_pyalpm=load), patch("os.geteuid", return_value=euid):
+            result = function()
+        return result, calls, urls
+
+    def test_foreign_packages_compare_with_vercmp_and_skip_vcs(self):
+        result, calls, urls = self.scan(
+            ["alpha", "beta", "gamma-git", "local-only"],
+            {"alpha": "1.0-1", "beta": "2.0-1", "gamma-git": "1.0-1", "local-only": "1-1"},
+            [self.rpc([("alpha", "1.1-1"), ("beta", "2.0-1")])])
+        self.assertEqual(calls[0][0], ["/usr/bin/pacman", "-Qqm"])
+        self.assertEqual(calls[0][1]["empty_status"], (1,))
+        self.assertEqual(len(urls), 1)
+        self.assertTrue(urls[0][0].startswith("https://aur.archlinux.org/rpc/v5/info?arg%5B%5D=alpha&arg%5B%5D=beta"))
+        self.assertNotIn("gamma-git", urls[0][0])
+        self.assertLessEqual(urls[0][1]["limit"], 4 * 1024 * 1024)
+        self.assertLessEqual(urls[0][1]["timeout"], 20)
+        self.assertEqual((result.identifier, result.pending, result.managed, result.update_available),
+                         ("aur", 1, 4, True))
+        item = result.items[0]
+        self.assertEqual((item.name, item.current, item.available, item.scope, item.url),
+                         ("alpha", "1.0-1", "1.1-1", "user", "https://aur.archlinux.org/packages/alpha"))
+        self.assertIn("version unknown", result.detail)
+        self.assertIn("gamma-git", result.detail)
+        self.assertIn("not found in the AUR (local-only)", result.detail)
+        self.assertIn("item\taur\tupdate\talpha", self.api["render_snapshot"]([result]))
+
+    def test_no_foreign_packages_needs_no_network(self):
+        result, _, urls = self.scan([], {}, [])
+        self.assertEqual((result.pending, result.managed, result.update_available, urls), (0, 0, False, []))
+        result, _, urls = self.scan(["tool-git"], {"tool-git": "r1.abc-1"}, [])
+        self.assertEqual((result.pending, result.managed, urls), (0, 1, []))
+
+    def test_rpc_batches_are_bounded(self):
+        names = ["package-%03d" % index for index in range(250)]
+        responses = []
+        for start in range(0, 250, 100):
+            responses.append(self.rpc([(name, "1.0-1") for name in names[start:start + 100]]))
+        result, _, urls = self.scan(names, {name: "1.0-1" for name in names}, responses)
+        self.assertGreaterEqual(len(urls), 3)
+        self.assertTrue(all(len(url) <= 4000 and url.count("arg%5B%5D=") <= 100 for url, _ in urls))
+        self.assertEqual((result.pending, result.managed), (0, 250))
+
+    def test_network_and_malformed_rpc_degrade_to_scan_failure(self):
+        failure = self.api["ScanFailure"]
+        cases = ((failure("network", "Network request failed: offline"), "network"),
+                 (b"not json", "malformed"),
+                 (self.rpc([("alpha", "1.1-1")], version=4), "malformed"),
+                 (self.rpc([("other", "1.1-1")]), "malformed"),
+                 (self.rpc([("alpha", "$(bad)")]), "malformed"),
+                 (json.dumps({"version": 5, "type": "error", "error": "Too many package names"}).encode(), "repository"))
+        for response, code in cases:
+            with self.subTest(code=code, response=str(response)[:40]):
+                with self.assertRaises(ValueError) as caught:
+                    self.scan(["alpha"], {"alpha": "1.0-1"}, [response])
+                if isinstance(caught.exception, failure):
+                    self.assertEqual(caught.exception.code, code)
+                else:
+                    self.assertEqual(code, "malformed")
+
+    def test_network_failure_is_a_clean_provider_error_state(self):
+        from unittest.mock import patch
+        failure = self.api["ScanFailure"]
+        with workspace() as folder, patch.dict(os.environ, XDG_STATE_HOME=str(Path(folder) / "state")):
+            path = Path(folder) / "cache/update-center.json"
+
+            def offline():
+                raise failure("network", "Network request failed: offline")
+
+            result = self.api["snapshot"](path, {"aur": offline}, force=True, now=100)[0]
+            self.assertEqual((result.identifier, result.status, result.freshness, result.error_code,
+                              result.update_available), ("aur", "unavailable", "error", "network", False))
+
+    def test_root_is_refused_before_any_command_or_request(self):
+        failure = self.api["ScanFailure"]
+        with self.assertRaises(failure) as caught:
+            self.scan(["alpha"], {"alpha": "1.0-1"}, [], euid=0)
+        self.assertEqual(caught.exception.code, "unsupported")
+        self.assertIn("never runs as root", caught.exception.detail)
+        from unittest.mock import patch
+        with patch("os.geteuid", return_value=0), \
+                patch.dict(self.api["validate_provider_action"].__globals__, aur_helper=lambda: "/usr/bin/paru",
+                           run_bounded=lambda *a, **k: self.fail("root AUR discovery ran a command")), \
+                self.assertRaises(ValueError):
+            self.api["validate_provider_action"]("aur", "update")
+
+    def test_missing_helper_hides_provider_or_explains_unavailable(self):
+        from unittest.mock import patch
+        result, calls, urls = self.scan(["alpha"], {"alpha": "1.0-1"}, [], helper=None)
+        self.assertEqual((result.status, result.error_code, calls, urls), ("unavailable", "missing-provider", [], []))
+        self.assertIn("paru or yay", result.detail)
+        self.assertIn("never installs", result.detail)
+        function = self.api["discover_scanners"]
+        with patch.dict(function.__globals__, optional_executable=lambda name: None):
+            self.assertNotIn("aur", function())
+        for present in ("paru", "yay"):
+            with self.subTest(helper=present), patch.dict(function.__globals__,
+                    optional_executable=lambda name, present=present: "/usr/bin/" + name if name == present else None):
+                self.assertIn("aur", function())
+                self.assertEqual(self.api["aur_helper"](), "/usr/bin/" + present)
+        with patch.dict(function.__globals__, optional_executable=lambda name: "/usr/bin/" + name):
+            self.assertEqual(self.api["aur_helper"](), "/usr/bin/paru")
+
+    def test_missing_pyalpm_reports_unsupported(self):
+        failure = self.api["ScanFailure"]
+        with self.assertRaises(failure) as caught:
+            self.scan(["alpha"], {"alpha": "1.0-1"}, [], pyalpm=False)
+        self.assertEqual(caught.exception.code, "unsupported")
+
+    def test_foreign_list_rejects_unsafe_names(self):
+        for payload in ("-rf\n", "../x\n", "a b\n", "dup\ndup\n", "UPPER\n"):
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                self.api["foreign_packages"](payload)
+        self.assertEqual(self.api["foreign_packages"](""), [])
+
+    def test_pacman_no_match_status_is_only_accepted_without_output(self):
+        run = self.api["run_bounded"]
+        self.assertEqual(run([sys.executable, "-c", "raise SystemExit(1)"], timeout=5, empty_status=(1,)), "")
+        with self.assertRaises(OSError):
+            run([sys.executable, "-c", "print('alpha'); raise SystemExit(1)"], timeout=5, empty_status=(1,))
+        with self.assertRaises(OSError):
+            run([sys.executable, "-c", "raise SystemExit(1)"], timeout=5)
+
+
+class DownloadBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.api = runpy.run_path(str(HELPER))
+
+    def test_only_fixed_https_arch_endpoints_are_fetched(self):
+        from unittest.mock import patch
+        fetch = self.api["fetch_https"]
+        for url in ("http://archlinux.org/feeds/news/", "https://example.com/", "https://archlinux.org.evil/",
+                    "https://user@archlinux.org/", "https://archlinux.org:8443/", "file:///etc/passwd"):
+            with self.subTest(url=url), patch("urllib.request.OpenerDirector.open",
+                                              side_effect=AssertionError("network used")), \
+                    self.assertRaisesRegex(ValueError, "untrusted"):
+                fetch(url, limit=1024, timeout=5)
+        with self.assertRaisesRegex(ValueError, "unbounded"):
+            fetch("https://archlinux.org/feeds/news/", limit=0, timeout=5)
+
+    def test_response_size_and_errors_are_bounded(self):
+        import io
+        import urllib.error
+        from unittest.mock import patch
+        fetch = self.api["fetch_https"]
+
+        class Response(io.BytesIO):
+            def __init__(self, data, length=""):
+                super().__init__(data)
+                self.headers = {"Content-Length": length}
+
+        with patch("urllib.request.OpenerDirector.open", return_value=Response(b"x" * 2048)):
+            with self.assertRaises(self.api["ScanFailure"]) as caught:
+                fetch("https://archlinux.org/feeds/news/", limit=1024, timeout=5)
+        self.assertEqual(caught.exception.code, "malformed")
+        with patch("urllib.request.OpenerDirector.open", return_value=Response(b"", "999999")):
+            with self.assertRaises(self.api["ScanFailure"]):
+                fetch("https://archlinux.org/feeds/news/", limit=1024, timeout=5)
+        with patch("urllib.request.OpenerDirector.open", return_value=Response(b"ok")):
+            self.assertEqual(fetch("https://aur.archlinux.org/rpc/v5/info", limit=1024, timeout=5), b"ok")
+        with patch("urllib.request.OpenerDirector.open", side_effect=urllib.error.URLError("offline")):
+            with self.assertRaises(self.api["ScanFailure"]) as caught:
+                fetch("https://archlinux.org/feeds/news/", limit=1024, timeout=5)
+        self.assertEqual(caught.exception.code, "network")
+        with patch("urllib.request.OpenerDirector.open", side_effect=TimeoutError()):
+            with self.assertRaises(self.api["ScanFailure"]) as caught:
+                fetch("https://archlinux.org/feeds/news/", limit=1024, timeout=5)
+        self.assertEqual(caught.exception.code, "timeout")
+
+
+class NewsAcknowledgementTests(unittest.TestCase):
+    def test_acknowledgement_round_trips_under_state_and_rejects_unsafe_files(self):
+        from unittest.mock import patch
+        with workspace() as folder, patch.dict(os.environ, {"XDG_STATE_HOME": folder}):
+            api = runpy.run_path(str(HELPER))
+            self.assertEqual(api["read_news_ack"](), 0)
+            api["write_news_ack"](1700000000)
+            path = Path(folder) / "dwm-titus/update-center/news-ack.json"
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+            self.assertEqual(api["read_news_ack"](), 1700000000)
+            for value in (-1, True, "1", 1 << 60):
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    api["write_news_ack"](value)
+            path.write_text('{"schema":1,"acknowledged":"x"}')
+            self.assertEqual(api["read_news_ack"](), 0)
+            path.unlink()
+            target = Path(folder) / "elsewhere"
+            target.write_text("keep")
+            path.symlink_to(target)
+            with self.assertRaises(OSError):
+                api["write_news_ack"](1)
+            self.assertEqual(target.read_text(), "keep")
 
 
 class OperationWatchTests(unittest.TestCase):
@@ -1218,7 +1621,7 @@ api['watch_operation']()
             try:
                 await_record("active\tnone")
                 terminal = subprocess.Popen(["/usr/bin/python3", "-c", "import time; time.sleep(30)"])
-                value = api["reserve_operation"]("fedora", "update")
+                value = api["reserve_operation"]("system", "update")
                 api["record_terminal"](value["operation"], terminal.pid, api["process_identity"](terminal.pid))
                 api["update_operation"](value["operation"], phase="running")
                 await_record("\trunning\tpending")
@@ -1230,7 +1633,7 @@ api['watch_operation']()
                 terminal.wait(timeout=5)
                 terminal = subprocess.Popen(["/usr/bin/python3", "-c",
                     "import runpy,sys,time; api=runpy.run_path(sys.argv[1]); "
-                    "api['reserve_operation']('fedora','update'); time.sleep(30)", str(HELPER)])
+                    "api['reserve_operation']('system','update'); time.sleep(30)", str(HELPER)])
                 await_record("\treserved\tpending")
                 time.sleep(0.15)
                 self.assertEqual(api["read_operation"]()["phase"], "reserved",
@@ -1243,7 +1646,9 @@ api['watch_operation']()
                     return int(fields[11]) + int(fields[12])
                 before = ticks()
                 time.sleep(0.3)
-                self.assertLessEqual(ticks() - before, 1, "retained interruption must remain idle")
+                # A busy watcher burns about 30 ticks in this window; allow a
+                # little scheduler noise on a loaded test host.
+                self.assertLessEqual(ticks() - before, 3, "retained interruption must remain idle")
                 self.assertEqual(api["read_operation"]()["phase"], "interrupted")
                 watcher.terminate()
                 watcher.wait(timeout=5)

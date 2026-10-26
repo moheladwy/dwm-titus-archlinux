@@ -57,7 +57,7 @@ FloatingWindow {
 
                 LargeSurfaceHeader {
                     Layout.fillWidth: true
-                    eyebrow: "Fedora workstation diagnostics"
+                    eyebrow: "Workstation diagnostics"
                     title: "System Health"
                     subtitle: root.healthModel.coverageMessage
                     status: root.healthModel.overallLabel()

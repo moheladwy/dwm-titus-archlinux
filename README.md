@@ -95,9 +95,15 @@ If you start the session with `startx`, automatic unlock requires adding the
 module to `/etc/pam.d/login` yourself; the installer never edits PAM files.
 Unlock also requires matching account and keyring passwords.
 
-Package updates in Settings and the Update Center are still being ported from
-Fedora. Until that work lands, update your system with `sudo pacman -Syu` in a
-terminal.
+System package updates use pacman directly. **Settings -> System** shows a
+read-only list of pending updates and a dependency preview, discovered without
+touching the real sync databases. **Open system update** opens the Update
+Center terminal, which first checks the Arch Linux news feed and asks you to
+continue past any unread items. It then runs an interactive
+`sudo pacman -Syu`, with pacman's own prompts and no `--noconfirm`. If `paru`
+or `yay` is already installed, the Update Center also shows an optional AUR
+provider that runs `<helper> -Sua` as your user. Neither path ever runs
+`pacman -Sy` on its own.
 
 ## Dependencies
 
@@ -212,14 +218,21 @@ apply dwm patches to install and use the desktop.
 
 ## Troubleshooting
 
-System package updates in **Settings -> System** and the Update Center are not
-yet ported to Arch and report an unsupported state. Run `sudo pacman -Syu` in a
-terminal instead, and review pacman's prompts before confirming. Never run
-`pacman -Sy` on its own.
+For system package updates, choose **Open system update** in
+**Settings -> System** or **Update** on the Update Center's system row. Both
+open the same terminal: read any unread Arch news it shows, then review
+pacman's prompts before confirming. If the terminal reports a held pacman
+lock, find its owner with `sudo fuser -v /var/lib/pacman/db.lck` and let it
+finish; the desktop never deletes the lock.
+pacman never rolls back, so after an interrupted upgrade check
+`/var/log/pacman.log` and use **Recover** for a fresh `sudo pacman -Syu`. Never
+run `pacman -Sy` on its own.
 
-The same section provides confirmed account, password, printer, and software-source
-tool launches. Missing tools or stale provider status disable only the affected
-entry. Account and repository inventories remain read-only. A successful launch
+The same section provides confirmed account, password, and printer tool
+launches. **Manage software sources** is unsupported on Arch, because there is
+no graphical source manager; repositories come from `/etc/pacman.conf` and are
+listed read-only. Missing tools or stale provider status disable only the
+affected entry. Account and repository inventories remain read-only. A successful launch
 does not mean administration inside the tool completed; authorize and confirm
 those changes in the tool itself. Enter passwords only in the terminal prompt.
 

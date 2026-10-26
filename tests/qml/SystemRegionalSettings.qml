@@ -57,9 +57,6 @@ ShellRoot {
             model.nativeConfirmation = { actionId: "accounts-open" };
             check(!model.regional.requestChoices(kind), "Delegated prompt blocks regional read");
             model.nativeConfirmation = null;
-            model.updateConfirmation = { actionId: "updates-refresh" };
-            check(!model.regional.requestChoices(kind), "Update prompt blocks regional read");
-            model.updateConfirmation = null;
             publicationProbe = true;
             const requested = model.regional.requestChoices(kind);
             if (scenario === "close-claim") {
@@ -68,7 +65,7 @@ ShellRoot {
                 return;
             }
             check(requested, "Explicit catalog read accepted");
-            check(!model.prepareDelegate("accounts-open") && !model.prepareUpdate("updates-refresh")
+            check(!model.prepareDelegate("accounts-open")
                 && !model.regional.requestChoices(kind), "Read owner excludes competing preparations");
             stage = 2;
         } else if (stage === 2) {
@@ -114,7 +111,7 @@ ShellRoot {
         } else if (stage === 3 && model.regional.confirmation !== null && !model.regional.ownsPreparation()) {
             stage = -1;
             check(model.regional.confirmation.preview.generation === "c".repeat(64), "Backend generation preserved");
-            check(!model.prepareDelegate("accounts-open") && !model.prepareUpdate("updates-refresh"), "Regional prompt excludes other origins");
+            check(!model.prepareDelegate("accounts-open"), "Regional prompt excludes other origins");
             const pending = model.regional.confirmation;
             check(!model.regional.matches(Object.assign({}, pending.ticket,
                 { requestGeneration: pending.ticket.requestGeneration + 1 })), "Replaced snapshot identity is stale");
@@ -139,7 +136,8 @@ ShellRoot {
             check(!dispatchProbe && started === (scenario !== "close-dispatch"), "Dispatch rechecks after prompt callbacks");
             check(!model.regional.confirm(), "Duplicate confirmation rejected");
             model.closeSettings();
-            if (started) check(model.operation.streamOwned && !model.operation.canCancel, "Closure retains noncancelable sent operation");
+            if (started) check(model.operation.streamOwned && (model.operation.progress === null
+                || !model.operation.progress.cancelable), "Closure retains noncancelable sent operation");
             stage = started ? 7 : 9;
         } else if (stage === 7 && !model.operation.busy && model.operation.acknowledgedIds.length === 1) {
             check(model.operation.result.state === (scenario === "denied" ? "permission-denied"

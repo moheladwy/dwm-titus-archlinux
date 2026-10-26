@@ -119,7 +119,7 @@ try:
                        ("/org/freedesktop/locale1", localed)):
         registrations.append(bus.register_object(path, info, called, None, None))
     with mock.patch.dict(client_class.run.__globals__,
-                         read_fedora_identity=lambda: {"ID": "fedora"},
+                         read_arch_identity=lambda: {"ID": "arch"},
                          read_locale_choices=lambda: ("C", "en_US.utf8")):
         assert client().run().timezone == "Etc/UTC"
         assert client("ntp-set", "enabled").run().ntp_enabled

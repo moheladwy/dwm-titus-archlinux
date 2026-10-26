@@ -166,8 +166,7 @@ ColumnLayout {
         property string selected: ""
         readonly property string reason: root.regional.actionReason(action)
         readonly property bool canRead: root.confirmation === null && !root.regional.ownsPreparation()
-            && !root.model.dispatchingNative && !root.model.dispatchingUpdate
-            && root.model.nativeConfirmation === null && root.model.updateConfirmation === null
+            && !root.model.dispatchingNative && root.model.nativeConfirmation === null
             && root.regional.contextReason(action, false) === ""
         objectName: "regional-card-" + modelData.kind
         Layout.fillWidth: true

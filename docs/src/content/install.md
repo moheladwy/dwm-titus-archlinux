@@ -235,13 +235,39 @@ region with `Super+Shift+P`, or copy a region to the clipboard with
 
 ## Package Updates
 
-Settings > System package updates and the Update Center system provider are
-still Fedora code and report an unsupported state on Arch. Update the system in
-a terminal and review pacman's prompts before confirming:
+Settings > System lists pending system updates, and the Update Center shows
+them on a system row labeled with your distribution name (for example "Arch
+Linux"). Both are read-only until you start an update: discovery uses pyalpm
+in a private copy of the databases and never refreshes the real sync
+databases, so checking cannot leave the system partially upgraded.
+
+Choose **Open system update** in Settings or **Update** on the Update Center
+system row. Both open the same terminal, which:
+
+1. Stops with `sudo fuser -v /var/lib/pacman/db.lck` guidance if another
+   pacman holds the database lock. The lock is never deleted.
+2. Fetches the Arch Linux news feed and lists unread items. Type `y` or `yes`
+   to continue. Your acknowledgement is saved in
+   `~/.local/state/dwm-titus/update-center/news-ack.json` only when you
+   continue. If the feed cannot be fetched, the terminal says news is
+   unavailable and still asks.
+3. Runs `sudo pacman -Syu` with pacman's own prompts. `--noconfirm` is never
+   added, so review the transaction before confirming.
+
+pacman never rolls back. If an update is interrupted, choose **Recover** in the
+Update Center: it shows the last known result, points to
+`/var/log/pacman.log`, and offers a fresh `sudo pacman -Syu`. You can always
+run the same command in any terminal:
 
 ```bash
 sudo pacman -Syu
 ```
+
+If `paru` or `yay` is already installed, the Update Center also shows an
+optional AUR row. It checks your foreign packages against the AUR and updates
+them with `paru -Sua` or `yay -Sua` as your user, never as root. Packages
+ending in `-git`, `-svn`, `-hg`, or `-bzr` show "version unknown" and are not
+counted. dwm-titus never installs an AUR helper.
 
 Never run `pacman -Sy` on its own. The first-boot initial update belonged to
 the upstream Fedora images and does not apply to Arch installations.

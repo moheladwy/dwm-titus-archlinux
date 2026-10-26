@@ -41,10 +41,10 @@ def geometry(env, window):
 
 
 providers = """[
- { id: "fedora", name: "Fedora", status: "available", pending: 40, managed: 1200,
+ { id: "system", name: "Arch Linux", status: "available", pending: 40, managed: 1200,
    freshness: "fresh", lastSuccess: 30, updateAvailable: true, errorCode: "", detail: "", restart: "none",
    items: Array.from({length: 40}, function(_, index) { return {
-     providerId: "fedora", action: "update", name: "Package with a deliberately long name " + index,
+     providerId: "system", action: "update", name: "Package with a deliberately long name " + index,
      current: "1." + index, available: "2." + index, packageId: "package-" + index,
      scope: "system", url: "https://example.test/package/" + index }; }) },
  { id: "dwm-titus", name: "DWM-Titus", status: "available", pending: 0, managed: 1,
@@ -114,8 +114,8 @@ ShellRoot {{
 
     QtObject {{
         id: highProvider
-        property string id: "fedora"
-        property string name: "High-cardinality Fedora"
+        property string id: "system"
+        property string name: "High-cardinality Arch Linux"
         property string status: "available"
         property int pending: 4096
         property int managed: 4096
@@ -126,7 +126,7 @@ ShellRoot {{
         property string detail: ""
         property string restart: "none"
         property var items: Array.from({{length: 4096}}, function(_, index) {{ return {{
-            providerId: "fedora", action: "update", name: "Package " + index,
+            providerId: "system", action: "update", name: "Package " + index,
             current: "1", available: "2", packageId: "package-" + index,
             scope: "system", url: "https://example.test/package/" + index }}; }})
     }}
@@ -258,7 +258,7 @@ ShellRoot {{
         function accessibleName(): string {{ return probeRow.Accessible.name; }}
         function setProbeRestart(value: string): string {{
             probeRow.provider = {{
-                id: "fedora", name: "Fedora", status: "available", pending: 0, managed: 1200,
+                id: "system", name: "Arch Linux", status: "available", pending: 0, managed: 1200,
                 freshness: "fresh", lastSuccess: 30, updateAvailable: false, errorCode: "",
                 detail: "", restart: value, items: []
             }};
@@ -272,7 +272,7 @@ ShellRoot {{
         function probeHasDetails(): string {{ return String(probeRow.hasDetails); }}
         function setProbeDetail(detail: string): void {{
             probeRow.provider = {{
-                id: "fedora", name: "Fedora", status: "available", pending: 0, managed: 1200,
+                id: "system", name: "Arch Linux", status: "available", pending: 0, managed: 1200,
                 freshness: "fresh", lastSuccess: 30, updateAvailable: false, errorCode: "",
                 detail: detail, restart: "none", items: []
             }};
@@ -399,17 +399,17 @@ with tempfile.TemporaryDirectory(prefix="update-center-xvfb-", dir=tmp_root) as 
         assert call("probeExpand") == "true"
         assert call("probeExpand") == "false", "Provider expansion was not independently reversible"
         assert call("probeDetails") == "Package with a deliberately long name 0 (system)\n1.0 -> 2.0"
-        assert call("probeAction", "update") == "update:fedora"
-        assert call("probeAction", "recover") == "recover:fedora"
+        assert call("probeAction", "update") == "update:system"
+        assert call("probeAction", "recover") == "recover:system"
         assert call("probeAction", "busy") == "", "Busy provider dispatched an action"
         assert call("probeMissingRecovery") == "Recovery required|Restore the missing mise executable, then refresh and choose Recover.|false"
         assert call("probeOpen", "https://example.test/release") == "https://example.test/release"
         assert call("probeOpen", "file:///tmp/untrusted") == ""
         assert call("probeOpen", "javascript:alert(1)") == ""
-        assert call("accessibleName") == "Fedora, 40 pending"
-        assert call("setProbeRestart", "session") == "Fedora, Restart session|Sign out and back in to complete this update."
-        assert call("setProbeRestart", "system") == "Fedora, Restart system|Restart the system to complete this update."
-        assert call("setProbeRestart", "none") == "Fedora, Up to date|"
+        assert call("accessibleName") == "Arch Linux, 40 pending"
+        assert call("setProbeRestart", "session") == "Arch Linux, Restart session|Sign out and back in to complete this update."
+        assert call("setProbeRestart", "system") == "Arch Linux, Restart system|Restart the system to complete this update."
+        assert call("setProbeRestart", "none") == "Arch Linux, Up to date|"
         assert call("probeStatusLabel") == "Up to date"
         call("setProbeScanning", "true")
         assert call("probeStatusLabel") == "Checking"

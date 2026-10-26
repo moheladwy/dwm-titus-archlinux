@@ -75,11 +75,6 @@ cleanup() {
 			stop_process "$helper_pid"
 		done
 	fi
-	if [ -n "${update_action_helper:-}" ]; then
-		for helper_pid in $(pgrep -f "$update_action_helper " 2>/dev/null || true); do
-			stop_process "$helper_pid"
-		done
-	fi
 	if [ -n "${native_action_helper:-}" ]; then
 		for helper_pid in $(pgrep -f "$native_action_helper " 2>/dev/null || true); do
 			stop_process "$helper_pid"
@@ -156,7 +151,6 @@ watch-updates)
 watch-operation | ack-operation)
 	case ${2:-} in
 	op-11111111111111111111111111111111) action=timezone-set; kind=timezone ;;
-	op-22222222222222222222222222222222) action=updates-refresh; kind=refresh ;;
 	op-33333333333333333333333333333333) action=locale-set; kind=locale ;;
 	op-44444444444444444444444444444444) action=printers-open; kind=delegate ;;
 	*) exit 3 ;;
@@ -183,16 +177,14 @@ snapshot() {
 	printf '%b\n' \
 		'system-management-protocol	1	0' \
 		'snapshot-generation	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
-		'provider	updates	partial	delegated	PackageKit	Read-only update state' \
+		'provider	updates	partial	delegated	pacman	Read-only update state' \
 		'provider	recovery	available	user-session	dwm-system-management	Isolated journal recovery' \
 		'state	update-summary	available	1	One update' \
 		'state	update-last-refresh	available	10	Recently refreshed' \
 		'state	update-restart	available	system	Restart required' \
-		'action	updates-refresh	unavailable	delegated	updates	Refresh updates	Unavailable in fixture' \
-		'action	updates-install-all	unavailable	delegated	updates	Install all updates	Unavailable in fixture' \
-		'action	updates-cancel	unavailable	delegated	updates	Cancel update	No operation' \
-		'update	alpha;1;x86_64;updates	security	installable	alpha	1	Security update' \
-		'package-change	alpha;1;x86_64;updates	update	alpha	1	Security update' \
+		'action	updates-open	unavailable	user-session	updates	Open system update	Unavailable in fixture' \
+		'update	alpha;1-1;x86_64;core	unknown	installable	alpha	1-1	Package update' \
+		'package-change	alpha;1-1;x86_64;core	update	alpha	1-1	Package update' \
 		'complete	snapshot'
 }
 
@@ -202,27 +194,19 @@ valid | monitor-failure)
 	;;
 requested-install)
 	snapshot | sed \
-		-e 's/action\tupdates-install-all\tunavailable/action\tupdates-install-all\tavailable/' \
-		-e 's/package-change\talpha;1;x86_64;updates\tupdate/package-change\talpha;1;x86_64;updates\tinstall/'
+		-e 's/action\tupdates-open\tunavailable/action\tupdates-open\tavailable/' \
+		-e 's/package-change\talpha;1-1;x86_64;core\tupdate/package-change\talpha;1-1;x86_64;core\tinstall/'
 	;;
 requested-remove)
 	snapshot | sed \
-		-e 's/action\tupdates-install-all\tunavailable/action\tupdates-install-all\tavailable/' \
-		-e 's/package-change\talpha;1;x86_64;updates\tupdate/package-change\talpha;1;x86_64;updates\tremove/'
+		-e 's/action\tupdates-open\tunavailable/action\tupdates-open\tavailable/' \
+		-e 's/package-change\talpha;1-1;x86_64;core\tupdate/package-change\talpha;1-1;x86_64;core\tremove/'
 	;;
 partial-restart)
 	snapshot | sed 's/state\tupdate-restart\tavailable\tsystem/state\tupdate-restart\tpartial\tsecurity-session/'
 	;;
-cancelable-active)
-	if [ -f "$fixture/ack-op-22222222222222222222222222222222" ]; then
-		snapshot
-	elif [ -f "$fixture/finished-op-22222222222222222222222222222222" ]; then
-		snapshot | sed '/^complete\t/i\terminal-handoff\top-22222222222222222222222222222222\tupdates-refresh\trefresh'
-	else
-		snapshot | sed \
-			-e 's/action\tupdates-cancel\tunavailable/action\tupdates-cancel\tavailable/' \
-			-e '/^complete\t/i\active-operation\top-22222222222222222222222222222222\tupdates-refresh\trefresh\trunning\t45\tyes\tCancelable fixture'
-	fi
+legacy-active)
+	snapshot | sed '/^complete\t/i\active-operation\top-22222222222222222222222222222222\tupdates-refresh\trefresh\trunning\t45\tno\tRemoved in-place owner'
 	;;
 regional-handoff)
 	if [ -f "$fixture/ack-op-11111111111111111111111111111111" ]; then
@@ -257,19 +241,19 @@ invalid-handoff)
 	;;
 bad-plan)
 	snapshot | sed \
-		-e 's/action\tupdates-install-all\tunavailable/action\tupdates-install-all\tavailable/' \
-		-e 's/package-change\talpha;1;x86_64;updates\tupdate\talpha\t1/package-change\tbeta;1;x86_64;updates\tinstall\tbeta\t1/'
+		-e 's/action\tupdates-open\tunavailable/action\tupdates-open\tavailable/' \
+		-e 's/package-change\talpha;1-1;x86_64;core\tupdate\talpha\t1-1/package-change\tbeta;1-1;x86_64;core\tinstall\tbeta\t1-1/'
 	;;
 unsafe-empty)
 	snapshot | sed \
 		-e 's/state\tupdate-summary\tavailable\t1/state\tupdate-summary\tavailable\t0/' \
-		-e 's/action\tupdates-install-all\tunavailable/action\tupdates-install-all\tavailable/' \
+		-e 's/action\tupdates-open\tunavailable/action\tupdates-open\tavailable/' \
 		-e '/^update\t/d' -e '/^package-change\t/d'
 	;;
 unsafe-reinstall)
 	snapshot | awk 'BEGIN { FS = OFS = "\t" }
-		$1 == "action" && $2 == "updates-install-all" { $3 = "available" }
-		$1 == "complete" { print "package-change", "beta;1;x86_64;updates", "reinstall", "beta", "1", "Reinstall" }
+		$1 == "action" && $2 == "updates-open" { $3 = "available" }
+		$1 == "complete" { print "package-change", "beta;1-1;x86_64;core", "reinstall", "beta", "1", "Reinstall" }
 		{ print }'
 	;;
 future-record)
@@ -277,18 +261,20 @@ future-record)
 	;;
 unexpected-update)
 	snapshot | awk 'BEGIN { FS = OFS = "\t" }
-		$1 == "action" && $2 == "updates-install-all" { $3 = "available" }
-		$1 == "complete" { print "package-change", "beta;1;x86_64;updates", "update", "beta", "1", "Unexpected update" }
+		$1 == "action" && $2 == "updates-open" { $3 = "available" }
+		$1 == "complete" { print "package-change", "beta;1-1;x86_64;core", "update", "beta", "1", "Unexpected update" }
 		{ print }'
 	;;
 unavailable-summary)
 	snapshot | sed \
 		-e 's/state\tupdate-summary\tavailable\t1/state\tupdate-summary\tpartial\tunknown/' \
-		-e 's/action\tupdates-install-all\tunavailable/action\tupdates-install-all\tavailable/'
+		-e 's/action\tupdates-open\tunavailable/action\tupdates-open\tavailable/'
 	;;
-unsafe-cancel)
-	snapshot | sed \
-		's/action\tupdates-cancel\tunavailable/action\tupdates-cancel\tavailable/'
+legacy-action)
+	snapshot | sed '/^update\t/i\action\tupdates-install-all\tavailable\tdelegated\tupdates\tInstall all updates\tRemoved'
+	;;
+wrong-open-class)
+	snapshot | sed 's/action\tupdates-open\tunavailable\tuser-session/action\tupdates-open\tavailable\tdelegated/'
 	;;
 too-many-errors)
 	snapshot | sed '/^complete\t/d'
@@ -588,8 +574,8 @@ for discovery_domain in time storage security; do
 
 done
 
-# Run the isolated operation parser on the same nested display before loading
-# the managed shell. This fixture never connects to host PackageKit.
+# Run the isolated update launch UI on the same nested display before loading
+# the managed shell. This fixture never runs pacman or the Update Center.
 mkdir -p "$work/update-ui" "$work/update-ui-data/dwm-titus/scripts" "$work/update-ui-state"
 cp -a "$repo/config/quickshell/core" "$repo/config/quickshell/settings" \
 	"$repo/config/quickshell/systemmanagement" "$repo/config/quickshell/network" "$work/update-ui/"
@@ -1025,82 +1011,6 @@ for native_action in timezone-set ntp-set locale-set accounts-open password-open
 	done
 done
 
-mkdir -p "$work/update-action" "$work/update-action-data/dwm-titus/scripts"
-cp -a "$repo/config/quickshell/core" "$repo/config/quickshell/systemmanagement" "$work/update-action/"
-cp "$repo/tests/qml/SystemUpdateActionOwner.qml" "$work/update-action/shell.qml"
-update_action_helper=$work/update-action-data/dwm-titus/scripts/dwm-system-management
-cp "$repo/tests/fixtures/system-update-action-provider.py" "$update_action_helper"
-chmod +x "$update_action_helper"
-quickshell_binary=$(command -v quickshell)
-assert_action_counter() {
-	counter_name=$1
-	counter_expected=$2
-	counter_file=$action_state/$counter_name
-	if [ "$counter_expected" = absent ]; then
-		[ -e "$counter_file" ] || return 0
-		counter_actual=present
-	else
-		counter_actual=$(sed -n '1p' "$counter_file" 2>/dev/null) || counter_actual=missing
-		[ "$counter_actual" -eq "$counter_expected" ] 2>/dev/null && return 0
-	fi
-	printf 'Update action counter FAILED: %s / %s: expected %s, got %s\n' \
-		"$action_scenario" "$counter_name" "$counter_expected" "$counter_actual" >&2
-	cat "$action_state/log" >&2
-	return 1
-}
-action_scenario=counter-diagnostic
-action_state=$work/counter-diagnostic
-mkdir -p "$action_state"
-printf 'Scenario-specific counter fixture log\n' >"$action_state/log"
-if assert_action_counter updates-refresh 1 >"$action_state/output" 2>&1; then
-	printf 'Missing action counter was accepted\n' >&2
-	exit 1
-fi
-grep -Fq 'counter-diagnostic / updates-refresh: expected 1, got missing' "$action_state/output"
-grep -Fq 'Scenario-specific counter fixture log' "$action_state/output"
-printf 'Update action counter diagnostics: PASS\n'
-for action_scenario in refresh install rejected denied uncertain wrong-exit revoked \
-	cancel-accepted cancel-race cancel-denied cancel-conflict cancel-output \
-	cancel-error-overflow cancel-timeout cancel-recovery cancel-recovery-denied cancel-recovery-failure \
-	cancel-uncertain-recover cancel-pending-snapshot failed-start; do
-	action_state=$work/update-action-$action_scenario
-	mkdir -p "$action_state"
-	action_path=$PATH
-	[ "$action_scenario" != failed-start ] || action_path=$work/no-executables
-	timeout --foreground --kill-after=2s 20s env DISPLAY="$display" HOME="$home" XDG_CONFIG_HOME="$config_home" \
-		XDG_DATA_HOME="$work/update-action-data" XDG_RUNTIME_DIR="$runtime" QT_QPA_PLATFORMTHEME= \
-		DWM_UPDATE_ACTION_FIXTURE="$action_state" DWM_UPDATE_ACTION_SCENARIO="$action_scenario" PATH="$action_path" \
-		"$quickshell_binary" --no-duplicate --path "$work/update-action/shell.qml" \
-		>"$action_state/log" 2>&1 &
-	quickshell_pid=$!
-	action_status=0
-	wait "$quickshell_pid" || action_status=$?
-	quickshell_pid=
-	if [ "$action_status" -ne 0 ] || ! grep -F 'Update action owner native tests: PASS' "$action_state/log" ||
-		grep -Fq 'Update action owner FAILED:' "$action_state/log" || [ -e "$action_state/invalid-arguments" ] ||
-		[ -e "$action_state/control-overlap" ]; then
-		cat "$action_state/log" >&2
-		exit 1
-	fi
-	[ "$action_scenario" != failed-start ] || continue
-	action_command=updates-refresh
-	[ "$action_scenario" != install ] || action_command=updates-install-all
-	assert_action_counter "$action_command" 1
-	if [ "$action_scenario" = rejected ] || [ "$action_scenario" = cancel-recovery-failure ]; then
-		assert_action_counter ack-operation absent
-	else
-		assert_action_counter ack-operation 1
-	fi
-	case $action_scenario in
-	uncertain | wrong-exit | cancel-uncertain-recover) assert_action_counter watch-operation 1 ;;
-	*) assert_action_counter watch-operation absent ;;
-	esac
-	case $action_scenario in
-	cancel-*) assert_action_counter updates-cancel 1 ;;
-	*) assert_action_counter updates-cancel absent ;;
-	esac
-done
-
 mkdir -p "$work/operation-owner" "$work/owner-data/dwm-titus/scripts" "$work/owner-state"
 cp -a "$repo/config/quickshell/core" "$repo/config/quickshell/systemmanagement" "$work/operation-owner/"
 cp "$repo/tests/qml/SystemOperationOwner.qml" "$work/operation-owner/shell.qml"
@@ -1300,7 +1210,9 @@ ipc refresh >/dev/null
 wait_state partial
 [ "$(ipc systemManagementUpdateCount)" -eq 1 ]
 [ "$(ipc systemManagementPackageChangeCount)" -eq 0 ]
-[ "$(ipc systemManagementInstallAvailability)" = unavailable ]
+# A malformed preview is discarded, but the terminal flow stays available:
+# pacman resolves and explains the real transaction itself.
+[ "$(ipc systemManagementInstallAvailability)" = available ]
 
 printf 'bad-plan\n' >"$fixture/mode"
 ipc refresh >/dev/null
@@ -1309,15 +1221,16 @@ wait_state partial
 
 printf 'unsafe-empty\n' >"$fixture/mode"
 ipc refresh >/dev/null
-wait_state partial
+wait_state ready
 [ "$(ipc systemManagementUpdateCount)" -eq 0 ]
+[ "$(ipc systemManagementPackageChangeCount)" -eq 0 ]
 
 printf 'unsafe-reinstall\n' >"$fixture/mode"
 ipc refresh >/dev/null
 wait_state partial
 [ "$(ipc systemManagementUpdateCount)" -eq 1 ]
 [ "$(ipc systemManagementPackageChangeCount)" -eq 2 ]
-[ "$(ipc systemManagementInstallAvailability)" = unavailable ]
+[ "$(ipc systemManagementInstallAvailability)" = available ]
 [ "$(ipc systemManagementErrorCodes)" = unsupported ]
 
 printf 'future-record\n' >"$fixture/mode"
@@ -1348,18 +1261,13 @@ if [ -n "${DWM_SYSTEM_MANAGEMENT_CAPTURE_DIR:-}" ]; then
 	DISPLAY=$display import -window root "$DWM_SYSTEM_MANAGEMENT_CAPTURE_DIR/verified-operation.png"
 fi
 
-printf 'cancelable-active\n' >"$fixture/mode"
+# Package operations are no longer journaled; a stale package owner or a
+# removed in-place action is rejected instead of being observed.
+printf 'legacy-active\n' >"$fixture/mode"
 ipc refresh >/dev/null
-wait_state ready
-[ "$(ipc systemManagementUpdateCount)" -eq 1 ]
-[ -z "$(ipc systemManagementErrorCodes)" ]
-i=0
-while [ "$i" -lt 100 ]; do
-	[ -f "$fixture/ack-op-22222222222222222222222222222222" ] && break
-	i=$((i + 1))
-	sleep 0.05
-done
-[ -f "$fixture/ack-op-22222222222222222222222222222222" ]
+wait_state failure
+[ "$(ipc systemManagementUpdateCount)" -eq 0 ]
+[ ! -e "$fixture/ack-op-22222222222222222222222222222222" ]
 
 for native_mode in regional-active delegate-active; do
 	if [ "$native_mode" = regional-active ]; then
@@ -1397,7 +1305,7 @@ printf 'unexpected-update\n' >"$fixture/mode"
 ipc refresh >/dev/null
 wait_state partial
 [ "$(ipc systemManagementPackageChangeCount)" -eq 0 ]
-[ "$(ipc systemManagementInstallAvailability)" = unavailable ]
+[ "$(ipc systemManagementInstallAvailability)" = available ]
 
 printf 'unavailable-summary\n' >"$fixture/mode"
 ipc refresh >/dev/null
@@ -1405,9 +1313,15 @@ wait_state partial
 [ "$(ipc systemManagementUpdateCount)" -eq 0 ]
 [ "$(ipc systemManagementInstallAvailability)" = missing ]
 
-printf 'unsafe-cancel\n' >"$fixture/mode"
+printf 'legacy-action\n' >"$fixture/mode"
+ipc refresh >/dev/null
+wait_state failure
+[ "$(ipc systemManagementInstallAvailability)" = missing ]
+
+printf 'wrong-open-class\n' >"$fixture/mode"
 ipc refresh >/dev/null
 wait_state partial
+[ "$(ipc systemManagementUpdateCount)" -eq 0 ]
 [ "$(ipc systemManagementInstallAvailability)" = missing ]
 
 printf 'too-many-errors\n' >"$fixture/mode"

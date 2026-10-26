@@ -17,23 +17,21 @@ ShellRoot {
 
     function base() {
         return ["system-management-protocol\t1\t0", "snapshot-generation\t" + "a".repeat(64),
-            "provider\tupdates\tavailable\tdelegated\tPackageKit\tFixture updates",
+            "provider\tupdates\tavailable\tdelegated\tpacman\tFixture updates",
             "provider\trecovery\tavailable\tuser-session\tJournal\tValidated journal",
             "state\tupdate-summary\tavailable\t1\tOne update",
             "state\tupdate-last-refresh\tavailable\t10\tRecent",
             "state\tupdate-restart\tavailable\tnone\tNo restart",
-            "action\tupdates-refresh\tavailable\tdelegated\tupdates\tRefresh\tConfirm first",
-            "action\tupdates-install-all\tavailable\tdelegated\tupdates\tInstall\tConfirm first",
-            "action\tupdates-cancel\tunavailable\tdelegated\tupdates\tCancel\tNo owner",
-            "update\talpha;1;x86_64;updates\tsecurity\tinstallable\talpha\t1\tUpdate",
-            "package-change\talpha;1;x86_64;updates\tupdate\talpha\t1\tUpdate"];
+            "action\tupdates-open\tavailable\tuser-session\tupdates\tOpen system update\tTerminal flow",
+            "update\talpha;1-1;x86_64;core\tunknown\tinstallable\talpha\t1-1\tUpdate",
+            "package-change\talpha;1-1;x86_64;core\tupdate\talpha\t1-1\tUpdate"];
     }
 
     function nativeRows() {
         return ["provider\tregional\tavailable\tdelegated\tsystemd\tRegional state",
             "provider\taccounts\tavailable\tdelegated\tAccountsService\tAccount state",
             "provider\tprinters\tavailable\tdelegated\tCUPS\tPrinter state",
-            "provider\tsources\tavailable\tdelegated\tPackageKit\tSources",
+            "provider\tsources\tavailable\tdelegated\tpacman\tSources",
             "state\ttimezone\tavailable\tAmerica/Chicago\tSystem timezone",
             "state\tntp-enabled\tavailable\tyes\tEnabled",
             "state\tntp-synchronized\tavailable\tno\tNot yet synchronized",
@@ -48,7 +46,7 @@ ShellRoot {
             "action\tprinters-open\tavailable\tdelegated\tprinters\tPrinters\tConfirm launch",
             "action\tsources-open\tavailable\tdelegated\tsources\tSources\tConfirm launch",
             "account\t/opaque/current\tcurrent\tCurrent user\tfixture",
-            "repository\tfedora\tenabled\tFedora"];
+            "repository\tcore\tenabled\thttps://mirror.example.invalid/core"];
     }
 
     function snapshot() {
@@ -98,7 +96,7 @@ ShellRoot {
 
     function informationTests() {
         root.check(root.parse(root.informationSnapshot()), "Minor two retains journal evidence");
-        root.check(model.snapshotState === "ready" && model.actions.length === 11, "All cumulative providers and actions accepted");
+        root.check(model.snapshotState === "ready" && model.actions.length === 9, "All cumulative providers and actions accepted");
         root.check(model.filesystems.length === 1 && model.filesystems[0].sizeBytes === "18446744073709551615", "Filesystem integers remain exact strings");
         root.check(model.nativeStates["memory-total-bytes"].value === "18446744073709551615", "Memory integer stays exact");
         for (const row of root.informationRows()) {
@@ -149,18 +147,19 @@ ShellRoot {
 
     function run() {
         root.check(root.parse(root.snapshot()), "Complete recovery remains known");
-        root.check(model.snapshotState === "ready" && model.actions.length === 10, "Complete cumulative snapshot accepted");
+        root.check(model.snapshotState === "ready" && model.actions.length === 8, "Complete cumulative snapshot accepted");
         root.check(model.nativeStates.locale.detail === "LC_TIME=C", "Full override detail retained");
         root.check(model.accounts.length === 1 && model.repositories.length === 1, "Both native lists retained");
         root.check(model.accounts[0].id === "/opaque/current", "Account object remains opaque display data");
-        root.check(!model.prepareUpdate("timezone-set"), "Native snapshot does not enable a new origin through update controls");
+        root.check(model.updateActionReason("timezone-set") === "This update action is not supported.",
+            "Native snapshot does not enable a new origin through update controls");
         root.parse(root.replaceRow(root.snapshot(), "state\tlocale\t", "state\tlocale\tavailable\t\tnone"));
         root.check(model.snapshotState === "ready" && model.nativeStates.locale.value === "", "Explicit empty LANG remains readable");
         root.check(model.nativeStates.timezone.status === "available" && model.actions.some(action => action.id === "locale-set"),
             "Empty LANG cannot hide timezone state or an independently offered replacement");
 
         root.parse(root.base());
-        root.check(model.snapshotState === "ready" && model.actions.length === 3, "Minor zero remains compatible");
+        root.check(model.snapshotState === "ready" && model.actions.length === 1, "Minor zero remains compatible");
         root.check(Object.keys(model.nativeProviders).length === 0 && Object.keys(model.nativeStates).length === 0
             && model.accounts.length === 0 && model.repositories.length === 0, "Older snapshot clears stale cumulative projections");
 
@@ -194,7 +193,7 @@ ShellRoot {
                 ["state\taccounts-count\t", "state\taccounts-count\tavailable\t2\tWrong count", "accounts"],
                 ["action\taccounts-open\t", "action\taccounts-open\tavailable\tdelegated\tprinters\tWrong owner\tMismatch", "accounts"],
                 ["account\t", "account\t/opaque/current\tcurrent\tName", "accounts"],
-                ["repository\t", "repository\tfedora\tunknown\tWrong enum", "sources"]]) {
+                ["repository\t", "repository\tcore\tunknown\tWrong enum", "sources"]]) {
             root.malformedOwner(root.replaceRow(root.snapshot(), mutation[0], mutation[1]), mutation[2], mutation[0]);
         }
         let lines = root.replaceRow(root.snapshot(), "state\taccounts-count\t", "state\taccounts-count\tpartial\tunknown\tIncomplete inventory");
@@ -202,7 +201,7 @@ ShellRoot {
         root.parse(lines.concat(["error\taccounts\ttimeout\tPartial inventory"]));
         root.check(model.accounts.length === 1 && model.nativeStates["accounts-count"].value === "unknown", "Validated partial account subset retained");
         lines = root.replaceRow(root.snapshot(), "action\tsources-open\t", "action\tsources-open\tunavailable\tdelegated\tsources\tSources\tTool missing");
-        lines = root.replaceRow(lines, "provider\tsources\t", "provider\tsources\tpartial\tdelegated\tPackageKit\tTool missing");
+        lines = root.replaceRow(lines, "provider\tsources\t", "provider\tsources\tavailable\tdelegated\tpacman\tNo graphical tool");
         root.parse(lines);
         root.check(model.repositories.length === 1, "Missing source tool cannot hide repository records");
         lines = root.replaceRow(root.snapshot(), "state\tupdate-summary\t", "state\tupdate-summary\tavailable\tbad\tMalformed updates");
@@ -248,8 +247,9 @@ ShellRoot {
         model.requiredPending = false;
         model.discovery.visible = true;
         model.discovery.ready = true;
-        root.check(model.updateActionReason("updates-refresh").indexOf("Complete recovery") >= 0,
-            "Independent native admission does not bypass update recovery");
+        root.check(model.updateActionReason("updates-open") === "", "Partial recovery does not block the terminal update flow");
+        for (const removed of ["updates-refresh", "updates-install-all", "updates-cancel"])
+            root.check(model.updateActionReason(removed) === "This update action is not supported.", removed + " is not an action");
         model.snapshotOwned = true;
         model.settingsVisible = false;
         model.discovery.visible = false;
@@ -310,7 +310,7 @@ ShellRoot {
         root.check(!model.operation.streamOwned, "Parsing never originates an operation");
         for (const entry of [["timezone-set", 1], ["ntp-set", 1], ["locale-set", 2],
                 ["accounts-open", 3], ["password-open", 3], ["printers-open", 4],
-                ["sources-open", 0], ["updates-refresh", 0], ["updates-install-all", 0], ["unknown", -1]]) {
+                ["sources-open", 0], ["updates-open", -1], ["updates-refresh", -1], ["unknown", -1]]) {
             const monitors = model.discoveryModels();
             for (const monitor of monitors) {
                 monitor.cycle.enabled = true;

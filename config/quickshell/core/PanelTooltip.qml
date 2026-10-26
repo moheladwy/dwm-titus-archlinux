@@ -22,7 +22,7 @@ PopupWindow {
     anchor.rect.x: Math.round(Math.max(0, Math.min(root.anchorWindow.width - root.width,
                                                  root.rightAligned ? root.anchorX - root.width : root.anchorX))) | 0
     anchor.rect.y: root.anchorY
-    // Fedora Quickshell qmltypes omit Edges::Flags. Keep these valid runtime flags.
+    // Some Quickshell qmltypes omit Edges::Flags. Keep these valid runtime flags.
     anchor.edges: Edges.Left | Edges.Top // qmllint disable missing-type
     anchor.gravity: Edges.Right | Edges.Bottom // qmllint disable missing-type
     anchor.onAnchoring: {

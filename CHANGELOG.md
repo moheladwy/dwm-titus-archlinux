@@ -25,6 +25,33 @@ the port.
 - Add a pinned Arch test container (`tests/containers/arch/Containerfile`,
   built by `scripts/run-tests-podman` as `localhost/dwm-titus-tests:arch`)
   that resolves packages from a dated Arch Linux Archive snapshot.
+- Discover system package updates natively and without privileges through
+  pyalpm. Sync databases are downloaded into a private temporary directory,
+  seeded from the system copies and a per-user cache, and checked remotely at
+  most every five minutes; `/var/lib/pacman/sync` and its lock are never
+  touched. Settings shows `IgnorePkg`/`IgnoreGroup` entries as blocked, a
+  read-only `sysupgrade` dependency preview, and restart guidance for kernel,
+  microcode, `systemd`, `glibc`, and `nvidia*` changes. Package changes are
+  picked up from inotify watches on the pacman database once its lock is
+  released, with an hourly remote re-check; no pacman hook or system file is
+  installed. A failed remote check shows cached data with a network warning,
+  and an installed `packagekit` package is reported because its clients can
+  run `pacman -Sy`.
+- Add **Open system update** to Settings > System. It opens the Update Center
+  terminal, which runs an interactive `sudo -- /usr/bin/pacman -Syu` with
+  pacman's own prompts and never `--noconfirm`. A held
+  `/var/lib/pacman/db.lck` is reported with `sudo fuser -v` guidance and never
+  deleted. Recovery shows the last result, states that pacman never rolls back,
+  points to `/var/log/pacman.log`, and offers a fresh `-Syu`.
+- Check the Arch Linux news feed before every system upgrade. Unread items need
+  an explicit yes before pacman starts. If the feed cannot be fetched, the
+  terminal says so and still asks.
+- Add an optional Update Center `aur` provider that appears only when `paru` or
+  `yay` is already installed (`paru` preferred). It compares foreign packages
+  (`pacman -Qqm`) with AUR RPC v5 using `pyalpm.vercmp`, lists VCS packages
+  (`-git`, `-svn`, `-hg`, `-bzr`) as version unknown without counting them,
+  and updates with `<helper> -Sua` as the invoking user. It refuses to run as
+  root.
 
 - Integrate Path from `ChrisTitusTech/Path`, available as `path` in the
   `christitustech/copr-fedora` COPR. Full installs attempt it after approved
@@ -98,9 +125,31 @@ the port.
   upstream `ChrisTitusTech/dwm-titus`. To move to this fork, install Arch Linux
   from the official ISO or `archinstall`, then run `./install.sh` from a
   checkout of this repository. Personal TOML files, `config.h`, and
-  `.xinitrc` are preserved as before. Until the update stack is ported,
-  package updates in Settings and the Update Center report an unsupported
-  state on Arch; update with `sudo pacman -Syu` in a terminal.
+  `.xinitrc` are preserved as before.
+- The Update Center distribution provider is now `system`, labeled from the
+  `os-release` `NAME` (for example "Arch Linux") with "System" as the fallback.
+- Settings > System no longer installs, refreshes, or cancels package updates
+  in place. Its only update action, **Open system update**, runs
+  `dwm-update-center launch system`.
+- Settings > System reports **Manage software sources** as unsupported, with an
+  explanation, because Arch has no `dnfdragora` equivalent. The repository list
+  is read-only and comes from `pacman.conf`.
+- Settings reports SELinux and firewalld as unsupported, falls back to
+  `BUILD_ID` (rolling) for the OS version, and identifies the platform by an
+  exact `ID=arch`. The timezone, network time, and system locale actions work
+  on Arch.
+- Migration: the first upgrade after the Arch news check records the newest
+  acknowledged item in
+  `${XDG_STATE_HOME:-$HOME/.local/state}/dwm-titus/update-center/news-ack.json`.
+  It is written only when you continue, so the next upgrade shows only newer
+  items. Delete the file to see all current news again.
+- Migration: update discovery keeps a per-user sync database cache in
+  `${XDG_CACHE_HOME:-$HOME/.cache}/dwm-titus/pacman-sync` (mode `0700`). It
+  holds only downloaded copies of the sync databases and is recreated if
+  removed.
+- Migration: Update Center cache entries recorded under the old `fedora`
+  provider are dropped and rescanned, and retained `fedora` operation receipts
+  are converted to `system`, so no Fedora data is shown as current Arch state.
 - Reuse existing non-interactive sudo authorization for confirmed desktop
   updates and recovery, falling back to polkit when unavailable. Passwords and
   authorization policy are not stored or changed by the updater.
@@ -114,6 +163,14 @@ the port.
   package; Dolphin replaces it.
 - Drop the Fedora ISO install path from the documentation. This fork ships no
   installer images, package repositories, or signing keys.
+- Remove the PackageKit update backend and its update handoff and recovery
+  paths. Journal records left by it are retired, not replayed. PackageKit's
+  ALPM backend refreshes the real sync
+  databases without authorization, which leaves Arch in a partial-upgrade
+  state.
+- Remove the Settings > System update refresh, install-in-place, and cancel
+  actions. There is no standalone database refresh; the full upgrade runs in
+  the Update Center terminal.
 
 ### Fixed
 

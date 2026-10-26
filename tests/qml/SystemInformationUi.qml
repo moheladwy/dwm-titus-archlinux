@@ -86,7 +86,7 @@ ShellRoot {
             sizeBytes: "18446744073709551615", usedBytes: "1073741824", availableBytes: "2147483648", detail: "Fixture filesystem bytes at this read"}))
         function nativeStateView(identifier) {
             if (identifier === "secure-boot") return {status: "partial", value: "unknown", detail: "Firmware evidence unavailable"};
-            const values = {"os-name": "Fedora Linux 44 (Fixture)", "os-version": "44", "kernel-release": "6.18.fixture",
+            const values = {"os-name": "Arch Linux (Fixture)", "os-version": "rolling", "kernel-release": "6.18.fixture",
                 architecture: "x86_64", "hardware-vendor": "Fixture vendor", "hardware-model": "Fixture workstation",
                 "cpu-model": "Fixture CPU", "logical-cpus": "16", "uptime-seconds": "94231", "selinux": "enforcing",
                 "firewalld": "enabled", "root-encryption": "encrypted", "screen-lock": "enabled"};

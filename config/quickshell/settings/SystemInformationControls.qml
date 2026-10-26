@@ -152,7 +152,7 @@ ColumnLayout {
         }
     }
     PlainText {
-        text: "Read-only mounted filesystem overview. Partitioning, formatting, encryption changes and filesystem repair belong in a trusted Fedora administration tool with a verified backup. Settings does not perform these operations."
+        text: "Read-only mounted filesystem overview. Partitioning, formatting, encryption changes and filesystem repair belong in a trusted administration tool with a verified backup. Settings does not perform these operations."
         color: Theme.menuMutedText
     }
 
@@ -163,7 +163,7 @@ ColumnLayout {
         delegate: StateRow { required property var modelData; definition: modelData }
     }
     PlainText {
-        text: "These indicators describe detected configuration, not a security audit. Firewall service status does not describe firewall rules. Root encryption does not cover every disk. Automatic locking depends on the current X11 session. Review update availability and restart requirements above. Firewall policy and service administration remain in trusted Fedora tools."
+        text: "These indicators describe detected configuration, not a security audit. Firewall service status does not describe firewall rules. Root encryption does not cover every disk. Automatic locking depends on the current X11 session. Review update availability and restart requirements above. SELinux and firewalld are not configured by default on Arch Linux. Firewall policy and service administration remain in trusted system tools."
         color: Theme.menuMutedText
     }
 
@@ -188,7 +188,7 @@ ColumnLayout {
     }
     SectionLabel { label: "Reset guidance" }
     PlainText {
-        text: "For a desktop preference, use the relevant Settings section's reset or revert control and review its scope first. Keep a backup of personal configuration before restoring it. System Health owns its listed desktop repairs; Fedora administration tools own system changes. A factory reset, account deletion, disk erase or operating-system reinstall is not offered here. Back up personal files before those separate recovery procedures."
+        text: "For a desktop preference, use the relevant Settings section's reset or revert control and review its scope first. Keep a backup of personal configuration before restoring it. System Health owns its listed desktop repairs; system administration tools own system changes. A factory reset, account deletion, disk erase or operating-system reinstall is not offered here. Back up personal files before those separate recovery procedures."
         color: Theme.menuMutedText
     }
 }

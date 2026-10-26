@@ -42,10 +42,6 @@ RUN bash -euo pipefail -c 'retry() { local attempt; \
     mapfile -t packages < <(printf "%s\n" "$packages" | sort -u); \
     packages+=(bash git tar findutils diffutils shellcheck shfmt \
         rsync python-pillow gtk3 gtk4 xorg-xauth); \
-    # Test-only: the legacy Settings system-management backend and its tests
-    # still load PackageKit GI bindings until the pyalpm provider replaces
-    # them. The product never installs PackageKit on Arch (plan D4).
-    packages+=(libpackagekit-glib); \
     retry pacman -Sw --noconfirm --needed --disable-download-timeout "${packages[@]}"; \
     pacman -S --noconfirm --needed "${packages[@]}"; \
     pacman -Scc --noconfirm; find /var/cache/pacman/pkg -mindepth 1 -delete; \

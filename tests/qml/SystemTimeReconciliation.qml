@@ -28,6 +28,17 @@ ShellRoot {
         return !model.snapshotOwned && !model.snapshotPending && !model.requiredPending
             && model.discoveryModels().every(item => item.fresh) && model.operation.canStart;
     }
+    function checkUnresolved() {
+        if (done) return;
+        check(model.timeReconciliation.unresolved, "Unresolved reconciliation stays paused");
+        check(model.timeReconciliation.reader.serial === serial + 2, "Reentrant arrivals stop after settling read");
+        check(model.requestGeneration === generation, "Unresolved owner churn does not read unrelated providers");
+        check(!model.regional.prepare("timezone-set", "America/Chicago"), "Unresolved reconciliation rejects mutation");
+        check(model.regional.confirmation === null, "Unresolved reconciliation retires confirmation");
+        injectArrival = false;
+        stage = 5;
+        model.refresh();
+    }
     function advance() {
         if (done) return;
         if (stage === 0 && !model.busy && model.operation.canStart) {
@@ -90,7 +101,7 @@ ShellRoot {
             model.closeSettings();
         } else if (stage === 3 && quiet()) {
             check(model.timeReconciliation.reader.serial === serial + 1, "One scoped reconciliation read");
-            check(model.requestGeneration === generation, "Unchanged owner does not reread PackageKit snapshot");
+            check(model.requestGeneration === generation, "Unchanged owner does not reread the system snapshot");
             check(model.regional.catalogs.timezone === catalog, "Unchanged owner retains catalog identity");
             check(model.regional.confirmation === (scenario === "owner-preview" ? null : prompt),
                 "Only a matching preview retains its identity");
@@ -101,13 +112,11 @@ ShellRoot {
             injectArrival = true;
             model.timeReconciliation.arrived();
         } else if (stage === 4 && model.timeReconciliation.unresolved) {
-            check(model.timeReconciliation.reader.serial === serial + 2, "Reentrant arrivals stop after settling read");
-            check(model.requestGeneration === generation, "Unresolved owner churn does not read unrelated providers");
-            check(!model.regional.prepare("timezone-set", "America/Chicago"), "Unresolved reconciliation rejects mutation");
-            check(model.regional.confirmation === null, "Unresolved reconciliation retires confirmation");
-            injectArrival = false;
-            stage = 5;
-            model.refresh();
+            // The settling read publishes unresolved and queues the preview
+            // retirement (Qt.callLater) in the same turn; this poll can land
+            // between them. A callLater queued now runs after that retirement.
+            stage = 40;
+            Qt.callLater(root.checkUnresolved);
         } else if (stage === 5 && quiet()) {
             check(model.timeReconciliation.failure === "" && !model.timeReconciliation.unresolved,
                 "Explicit refresh recovers reconciliation");
