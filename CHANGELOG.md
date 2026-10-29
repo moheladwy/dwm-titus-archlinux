@@ -213,6 +213,10 @@ the port.
 
 ### Fixed
 
+- Make the shipped RAIL window rule float as intended. It used `float=1`, which
+  dwm ignores; the key is `isfloating=1`. Installs keep an existing
+  `window-rules.toml`, so update that line by hand to pick up the fix.
+
 - Make the brightness keys change the panel that is in use. The default
   bindings ran `brightnessctl` without a device, which picks the first
   backlight it finds; on hybrid-graphics laptops that can be the other GPU's

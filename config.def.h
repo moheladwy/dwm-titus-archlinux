@@ -8,7 +8,7 @@ static const int cursorwarp         = 1;        /* 1 means warp cursor to center
 static const unsigned int snap      = 32;       /* snap pixel */
 static const int swallowfloating    = 0;        /* 1 means swallow floating windows by default */
 /* Window swallowing: when you launch a GUI app from a terminal, the terminal */
-/* hides and the GUI app takes its place. Set isterminal=1 in rules[] for your terminal. */
+/* hides and the GUI app takes its place. Set isterminal=1 in window-rules.toml for your terminal. */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
 #define ICONSIZE                      17        /* icon size */
