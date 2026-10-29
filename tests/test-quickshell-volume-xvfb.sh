@@ -18,9 +18,26 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
-mkdir -p "$work/qml" "$work/home" "$work/state" "$work/runtime" "$work/data"
+mkdir -p "$work/qml" "$work/home" "$work/config/wireplumber/wireplumber.conf.d" \
+	"$work/state" "$work/runtime" "$work/data" "$work/cache"
 chmod 700 "$work/runtime"
-export XDG_RUNTIME_DIR="$work/runtime"
+# Keep the audio daemons off the developer's configuration, saved state and
+# sound hardware: private XDG paths, no device monitors, no state persistence.
+export HOME="$work/home" XDG_CONFIG_HOME="$work/config" XDG_STATE_HOME="$work/state" \
+	XDG_DATA_HOME="$work/data" XDG_CACHE_HOME="$work/cache" XDG_RUNTIME_DIR="$work/runtime"
+cat >"$work/config/wireplumber/wireplumber.conf.d/90-dwm-titus-test.conf" <<'CONF'
+wireplumber.profiles = {
+  main = {
+    hardware.audio = disabled
+    hardware.bluetooth = disabled
+    hardware.video-capture = disabled
+    hooks.device.profile.state = disabled
+    hooks.device.routes.state = disabled
+    hooks.default-nodes.state = disabled
+    hooks.stream.state = disabled
+  }
+}
+CONF
 cp -a "$repo/config/quickshell/core" "$repo/config/quickshell/controls" "$work/qml/"
 cp "$repo/tests/qml/ControlsVolumeUi.qml" "$work/qml/shell.qml"
 
@@ -74,8 +91,7 @@ wait_for '[ -s "$work/display" ]' 'Xvfb display'
 display=$(sed -n '1p' "$work/display")
 
 status=0
-timeout --kill-after=2s 30s env DISPLAY=":$display" HOME="$work/home" \
-	XDG_DATA_HOME="$work/data" XDG_STATE_HOME="$work/state" \
+timeout --kill-after=2s 30s env DISPLAY=":$display" \
 	QT_QPA_PLATFORM=xcb QT_QPA_PLATFORMTHEME= quickshell --no-duplicate --path "$work/qml/shell.qml" \
 	>"$work/ui.log" 2>&1 || status=$?
 if [ "$status" -ne 0 ] || ! grep -Fq 'Controls volume UI: PASS' "$work/ui.log" ||
