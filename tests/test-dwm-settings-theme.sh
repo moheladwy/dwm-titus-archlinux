@@ -1850,6 +1850,43 @@ for linked_folder in kitty gtk-3.0 qt6ct; do
 done
 cmp -s "$work/linked-gtk-applied.ini" "$linked_dotfiles/gtk-3.0/settings.ini"
 cmp -s "$work/linked-kitty-applied.conf" "$linked_dotfiles/kitty/active-theme.conf"
+# Retargeting a linked folder to an identical copy before publication must not
+# redirect the writes there.
+linked_retarget=$work/linked-dotfiles-retarget
+rm -rf "$linked_retarget"
+cp -a "$linked_dotfiles/kitty" "$linked_retarget"
+linked_publish_ready=$work/linked-publish.ready
+linked_publish_release=$work/linked-publish.release
+rm -f "$linked_publish_ready" "$linked_publish_release"
+DWM_TEST_BEFORE_INTEGRATION_PUBLISH=$linked_publish_ready \
+	DWM_TEST_INTEGRATION_PUBLISH_RELEASE=$linked_publish_release \
+	run_theme_real_apply apply gruvbox >"$work/linked-retarget.out" \
+	2>"$work/linked-retarget.err" &
+linked_retarget_pid=$!
+for attempt in {1..100}; do
+	[[ -e $linked_publish_ready ]] && break
+	sleep 0.05
+done
+[[ -e $linked_publish_ready ]]
+ln -sfn "$linked_retarget" "$config_home/kitty"
+: >"$linked_publish_release"
+set +e
+wait "$linked_retarget_pid"
+linked_retarget_status=$?
+set -e
+[[ $linked_retarget_status -eq 1 ]]
+grep -Fq 'changed while publishing the transaction' "$work/linked-retarget.err"
+cmp -s "$work/linked-kitty-applied.conf" "$linked_retarget/active-theme.conf"
+cmp -s "$work/linked-kitty-applied.conf" "$linked_dotfiles/kitty/active-theme.conf"
+run_theme recovery-status | grep -q $'^recovery\tavailable'
+ln -sfn "$linked_dotfiles/kitty" "$config_home/kitty"
+if ! run_theme_real_apply recover >/dev/null 2>"$work/linked-retarget-recover.err"; then
+	cat "$work/linked-retarget-recover.err" >&2
+	exit 1
+fi
+[[ $(active_theme) == dracula ]]
+cmp -s "$work/linked-kitty-applied.conf" "$linked_dotfiles/kitty/active-theme.conf"
+cmp -s "$work/linked-gtk-applied.ini" "$linked_dotfiles/gtk-3.0/settings.ini"
 for linked_folder in kitty gtk-3.0 qt6ct; do
 	rm "$config_home/$linked_folder"
 done

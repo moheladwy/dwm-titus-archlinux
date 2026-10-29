@@ -1170,6 +1170,13 @@ publish_integration_outputs() {
 	integration_path_list_for_count "$count" "${HOME:?HOME is required}" "$config_home" || return 1
 	[[ $count == "${#integration_paths[@]}" ]] || return 1
 	shared_integration_outputs_match "$prefix" "$count" || return 1
+	# A dotfile link retargeted after the baseline was journaled now resolves
+	# elsewhere. Refuse before writing anything, because recovery would reject
+	# the new target and could not restore it.
+	for ((index = 0; index < count; index++)); do
+		path=${integration_paths[index]}
+		[[ $(integration_meta_value "$prefix" "$index" path_hash) == "$(path_hash "$path")" ]] || return 2
+	done
 	for ((index = 0; index < count; index++)); do
 		path=${integration_paths[index]}
 		if prior=$(integration_prior_index "$path" "$index"); then
