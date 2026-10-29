@@ -1,0 +1,68 @@
+#!/bin/sh
+# Change the brightness of the display panel that is actually in use.
+#
+# brightnessctl without a device controls the first backlight it finds. On
+# hybrid-graphics laptops that can belong to the other GPU (for example
+# nvidia_0 while the panel is wired to the integrated GPU's amdgpu_bl*), so the
+# brightness keys changed nothing visible. Prefer the backlight that drives an
+# enabled internal panel connector (eDP, LVDS, DSI), then firmware, platform
+# and raw backlights in the kernel's order, and otherwise let brightnessctl
+# choose.
+set -eu
+
+sysfs=${DWM_BACKLIGHT_SYSFS:-/sys/class/backlight}
+
+usage() {
+	printf 'usage: %s VALUE\n' "${0##*/}" >&2
+	printf 'VALUE is a brightnessctl set value such as 10%%+, 10%%- or 50%%.\n' >&2
+}
+
+# Succeed when the backlight belongs to an enabled internal panel connector,
+# either directly (amdgpu, i915) or through its GPU's connectors (nvidia).
+drives_enabled_panel() {
+	device=$(readlink -f "$1/device" 2>/dev/null) || return 1
+	if [ -r "$device/enabled" ]; then
+		[ "$(cat "$device/enabled")" = enabled ]
+		return
+	fi
+	for connector in "$device"/drm/card*/card*-eDP-* "$device"/drm/card*/card*-LVDS-* \
+		"$device"/drm/card*/card*-DSI-*; do
+		if [ -r "$connector/enabled" ] && [ "$(cat "$connector/enabled")" = enabled ]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+select_backlight() {
+	for type in firmware platform raw; do
+		for backlight in "$sysfs"/*; do
+			[ -r "$backlight/type" ] && [ "$(cat "$backlight/type")" = "$type" ] || continue
+			if drives_enabled_panel "$backlight"; then
+				printf '%s\n' "${backlight##*/}"
+				return 0
+			fi
+		done
+	done
+	return 1
+}
+
+[ $# -eq 1 ] || {
+	usage
+	exit 2
+}
+case $1 in
+'' | *[!0-9%+-]* | *%*%* | [%-]*)
+	usage
+	exit 2
+	;;
+esac
+command -v brightnessctl >/dev/null 2>&1 || {
+	printf 'dwm-brightness: brightnessctl is not installed\n' >&2
+	exit 127
+}
+
+if backlight=$(select_backlight); then
+	exec brightnessctl --quiet --device="$backlight" set "$1"
+fi
+exec brightnessctl --quiet set "$1"

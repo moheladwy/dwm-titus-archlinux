@@ -213,6 +213,16 @@ the port.
 
 ### Fixed
 
+- Make the brightness keys change the panel that is in use. The default
+  bindings ran `brightnessctl` without a device, which picks the first
+  backlight it finds; on hybrid-graphics laptops that can be the other GPU's
+  (for example `nvidia_0` while the panel is on the integrated GPU's
+  `amdgpu_bl*`), so the keys changed nothing visible. The new `dwm-brightness`
+  helper uses the backlight that drives an enabled internal panel and otherwise
+  lets `brightnessctl` choose. Installs keep an existing `hotkeys.toml`: to pick
+  this up, change the two `XF86MonBrightness` commands to
+  `dwm-brightness 10%+` and `dwm-brightness 10%-`.
+
 - Show the real output volume above 100% in the panel and the controls popup.
   `pactl` and the panel's own volume steps can boost past 100%, but the display
   stopped at 100%, so a boosted sink looked unchanged. Volume sliders still set
