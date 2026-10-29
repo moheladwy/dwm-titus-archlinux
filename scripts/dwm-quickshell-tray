@@ -1,0 +1,71 @@
+#!/bin/sh
+# Re-register tray icons that apps still publish after the
+# org.kde.StatusNotifierWatcher name changed owner. That happens whenever
+# Quickshell restarts, and also when kded6 (started by any KDE application)
+# takes the name over. The specification asks items to register again with a
+# new watcher, but many applications (Electron apps, KDE's KGpg) register only
+# once at startup, so their icons vanish from the panel until they restart.
+set -eu
+
+watcher=org.kde.StatusNotifierWatcher
+watcher_path=/StatusNotifierWatcher
+item_path=/StatusNotifierItem
+item_interface=org.kde.StatusNotifierItem
+
+usage() {
+	printf 'usage: %s resync\n' "${0##*/}" >&2
+}
+
+# Print the bus names of the registered items, without their object paths.
+registered_services() {
+	busctl --user --json=short get-property "$watcher" "$watcher_path" "$watcher" \
+		RegisteredStatusNotifierItems 2>/dev/null |
+		jq -r '.data[] | sub("/.*$"; "") | select(length > 0)'
+}
+
+resync() {
+	command -v busctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 0
+	busctl --user status "$watcher" >/dev/null 2>&1 || return 0
+	work=$(mktemp -d)
+	trap 'rm -rf "$work"' EXIT
+	# Each line is a bus name and the unique connection that owns it; a unique
+	# name owns itself. Bus names cannot contain spaces.
+	busctl --user --json=short list --no-pager 2>/dev/null |
+		jq -r '.[] | select((.connection // "") | startswith(":"))
+			| "\(.name) \(.connection)"' >"$work/names"
+	registered_services >"$work/registered"
+	awk 'NR == FNR { owner[$1] = $2; next } { print ($1 in owner) ? owner[$1] : $1 }' \
+		"$work/names" "$work/registered" >"$work/registered-owners"
+	awk '$1 ~ /^:/ && $1 == $2 { print $1 }' "$work/names" >"$work/connections"
+	while IFS= read -r connection; do
+		if grep -Fqx -- "$connection" "$work/registered-owners"; then
+			continue
+		fi
+		busctl --user --timeout=1 get-property "$connection" "$item_path" \
+			"$item_interface" Id >/dev/null 2>&1 || continue
+		# Register the item's well-known name when it has one, as the item
+		# itself would, so a later self-registration does not duplicate it.
+		service=$(awk -v connection="$connection" \
+			'$2 == connection && $1 ~ /^org\.kde\.StatusNotifierItem-/ { print $1; exit }' \
+			"$work/names")
+		[ -n "$service" ] || service=$connection
+		if busctl --user call "$watcher" "$watcher_path" "$watcher" \
+			RegisterStatusNotifierItem s "$service" >/dev/null 2>&1; then
+			printf 'registered\t%s\n' "$service"
+		fi
+	done <"$work/connections"
+}
+
+case ${1:-} in
+resync)
+	[ $# -eq 1 ] || {
+		usage
+		exit 2
+	}
+	resync
+	;;
+*)
+	usage
+	exit 2
+	;;
+esac
