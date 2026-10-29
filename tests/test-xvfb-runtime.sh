@@ -244,7 +244,7 @@ wait_for_config_notifications() {
 	expected=$1
 	i=0
 	while [ "$i" -lt 100 ]; do
-		count=$(grep -Fxc -- '-u critical dwm: bad config hotkeys.toml: invalid config - loaded defaults' "$work/notifications.log" || true)
+		count=$(grep -Fxc -- '-u critical dwm: bad config hotkeys.toml: invalid config - not loaded; fix it and save' "$work/notifications.log" || true)
 		if [ "$count" -ge "$expected" ]; then
 			return 0
 		fi

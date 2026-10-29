@@ -3544,19 +3544,21 @@ static void (*lookup_func(const char *name))(const Arg *)
 	return NULL;
 }
 
-/* Fire a notify-send (async, non-blocking) to warn about bad/missing config */
+/* Fire a notify-send (async, non-blocking) to warn about bad/missing config.
+ * The loaders return early, so the file is not loaded: a reload keeps the
+ * previous settings, and nothing from it is used at startup. */
 static void
 notify_bad_config(const char *filename, const char *reason)
 {
 	const char *base = strrchr(filename, '/');
 	base = base ? base + 1 : filename;
 	char msg[768];
-	int len = snprintf(msg, sizeof(msg), "%s: %s - loaded defaults",
+	int len = snprintf(msg, sizeof(msg), "%s: %s - not loaded; fix it and save",
 	                   base, reason);
 	if (len < 0)
 		return;
 	if ((size_t)len >= sizeof(msg))
-		copystr(msg, sizeof(msg), "config error - loaded defaults");
+		copystr(msg, sizeof(msg), "config error - not loaded; fix it and save");
 	pid_t pid = fork();
 	if (pid == 0) {
 		execlp("notify-send", "notify-send", "-u", "critical",

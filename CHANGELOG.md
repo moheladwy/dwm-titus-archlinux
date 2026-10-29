@@ -213,6 +213,11 @@ the port.
 
 ### Fixed
 
+- Make the invalid-configuration notification say what happens. It said the
+  defaults were loaded, but dwm skips a file that fails to parse: a reload
+  keeps the previous settings and nothing from the file is used at startup.
+  It now reads "FILE: invalid config - not loaded; fix it and save".
+
 - Make the shipped RAIL window rule float as intended. It used `float=1`, which
   dwm ignores; the key is `isfloating=1`. Installs keep an existing
   `window-rules.toml`, so update that line by hand to pick up the fix.
