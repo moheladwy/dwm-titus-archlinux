@@ -475,6 +475,9 @@ check-screenshot:
 check-brightness:
 	tests/test-dwm-brightness.sh
 
+check-window-rules:
+	tests/test-window-rules-keys.sh
+
 check-release-helper:
 	tests/test-release-helper.sh
 
@@ -633,6 +636,9 @@ check-system-management:
 check-quickshell-system-management: all
 	tests/test-quickshell-system-management.sh
 	status=0; tests/test-quickshell-system-management-xvfb.sh || status=$$?; \
+		if [ "$$status" -eq 77 ]; then exit 0; fi; \
+		[ "$$status" -eq 0 ] || exit "$$status"; \
+		tests/test-quickshell-update-ui-xvfb.sh || status=$$?; \
 		if [ "$$status" -eq 77 ]; then exit 0; fi; \
 		exit "$$status"
 
@@ -884,6 +890,7 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-webapp-launch
 	$(MAKE) check-screenshot
 	$(MAKE) check-brightness
+	$(MAKE) check-window-rules
 	$(MAKE) check-release-helper
 	$(MAKE) check-arch-packages
 	$(MAKE) check-install
@@ -902,6 +909,6 @@ check: check-picom check-picom-xvfb
 	check-update-center-settings \
 	check-display-profile check-display-setup check-arch-packages check-arch-platform check-format check-install \
 	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-agent-skills check-lock \
-	check-session-guards check-session-migration check-screenshot check-brightness check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
+	check-session-guards check-session-migration check-screenshot check-brightness check-window-rules check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
 	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-nvidia-suspend-test check-terminal check-xvfb-runtime install install-system install-user \
 	install-cursors install-app-themes check-app-themes native release release-check uninstall uninstall-files
