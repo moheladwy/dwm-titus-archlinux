@@ -10,9 +10,12 @@ eyebrow: Reference
 > Press <kbd>Super</kbd> + <kbd>/</kbd> inside dwm to open a live, searchable
 > Quickshell keybind viewer.
 
-**MODKEY** = <kbd>Super</kbd> (Windows key) in the shipped `config.h`.
+**MODKEY** = <kbd>Super</kbd> (Windows key) in the shipped `config.def.h` (copied to `config.h` on the first build).
 
-Bindings are defined in `config/hotkeys.toml` and reload instantly on save — no recompile needed.
+Bindings are read from `~/.config/dwm-titus/hotkeys.toml` (or your
+`XDG_CONFIG_HOME` equivalent) and reload instantly on save — no recompile
+needed. The repository's `config/hotkeys.toml` holds the shipped defaults
+listed on this page.
 
 ---
 
@@ -26,6 +29,9 @@ Bindings are defined in `config/hotkeys.toml` and reload instantly on save — n
 | `Super` + `B` | Browser |
 | `Super` + `/` | Keybind viewer |
 | `Super` + `F1` | Control Center |
+| `Super` + `Alt` + `F1` | Control Center |
+| `Super` + `W` | Looking Glass client (`looking-glass-client -F`) |
+| `Super` + `Shift` + `W` | Randomize wallpaper |
 | `Super` + `Shift` + `R` | Restart Quickshell |
 
 ## Screenshots
@@ -40,7 +46,9 @@ All `dwm-screenshot` capture modes omit the mouse cursor.
 `maim` region captures start selection immediately without a monitor chooser.
 The active-monitor shortcut uses the monitor under the pointer. Clipboard
 captures are PNG selections owned by `xclip`, while captures saved to disk use
-JPEG. The lightweight capture flow intentionally has no annotation toolbar.
+JPEG. Saved captures go to `$(xdg-user-dir PICTURES)/Screenshots`, or
+`~/Pictures/Screenshots` when `xdg-user-dir` is unavailable. The lightweight
+capture flow intentionally has no annotation toolbar.
 
 ## Applications and Web Apps
 
@@ -126,6 +134,11 @@ the dwm session after updating to activate this behavior.
 | `XF86MonBrightnessUp` | Brightness up |
 | `XF86MonBrightnessDown` | Brightness down |
 
+The brightness keys run `dwm-brightness 10%+` and `dwm-brightness 10%-`. The
+helper changes the backlight of the enabled internal panel (eDP, LVDS, or DSI),
+so hybrid-graphics laptops adjust the screen in use rather than the first
+backlight found.
+
 ## Session & Power
 
 | Keys | Action |
@@ -139,15 +152,18 @@ the dwm session after updating to activate this behavior.
 
 | Action | Function |
 |--------|----------|
-| `Super` + Left drag | Move window |
-| `Super` + Middle click | Toggle floating |
+| `Super` + Left drag | Move a floating window, or drag a tiled window to a new place in the layout |
 | `Super` + Right drag | Resize window |
+
+Mouse bindings come from the `buttons` array in `hotkeys.toml`.
 
 ---
 
 ## Customizing Keybinds
 
-Edit `config/hotkeys.toml` — changes take effect on save, no recompile required.
+Edit `~/.config/dwm-titus/hotkeys.toml` — changes take effect on save, no
+recompile required. dwm falls back to the managed default copy only when that
+file is missing.
 
 ```toml
 [vars]

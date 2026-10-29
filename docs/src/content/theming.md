@@ -7,8 +7,10 @@ eyebrow: Personalization
 
 # Theming
 
-Themes are defined in `config/themes.toml`. Change the active theme and **save**
-to update dwm, Quickshell, terminal, GTK, and Qt styling. No restart needed.
+Themes are defined in `~/.config/dwm-titus/themes.toml` (or your
+`XDG_CONFIG_HOME` equivalent); the repository's `config/themes.toml` is the
+shipped default. Change the active theme and **save** to update dwm,
+Quickshell, terminal, GTK, and Qt styling. No restart needed.
 
 ```toml
 [active]
@@ -38,6 +40,15 @@ dwm-settings-theme recover
 ```
 
 Recovery refuses to overwrite an externally changed theme file.
+
+Theme changes made from Settings, the Control Center, or `dwm-settings-theme`
+also update the GTK, Qt (`qt6ct`), and kitty configuration files. When
+`~/.config/kitty`, `gtk-3.0`, `gtk-4.0`, or `qt6ct` (or a file inside them) is a
+link into a dotfiles repository you own, the change is written through the link,
+so other desktops that share those files change too. Links to folders owned by
+another user, or links whose target is missing, are refused. Settings then shows
+a read-only theme card, and choosing a theme in the Control Center or running
+`dwm-settings-theme apply NAME` names the refused path.
 
 ---
 
@@ -125,7 +136,7 @@ Then set `theme = "mytheme"` under `[active]` and save.
 
 ## Applying Themes via Control Center
 
-Open the Control Center with <kbd>Super</kbd> + <kbd>F1</kbd>, navigate to **Appearance → Select Theme**, and pick from the list. The theme switches immediately.
+Open the Control Center with <kbd>Super</kbd> + <kbd>F1</kbd>, open **Appearance**, and click a theme in the list. The theme switches immediately, and the page reports "Theme applied: NAME" or "Theme change failed:" with the reason.
 
 ---
 ## Wallpapers

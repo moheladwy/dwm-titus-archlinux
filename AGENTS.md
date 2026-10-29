@@ -291,8 +291,7 @@ scripts/run-tests
 For shell changes:
 
 ```sh
-shellcheck install.sh scripts/*.sh tests/*.sh
-shfmt -d install.sh scripts/*.sh tests/*.sh
+scripts/run-tests make check-shell check-format
 ```
 
 For Quickshell QML changes, run `scripts/quickshell-qmllint --root config/quickshell`

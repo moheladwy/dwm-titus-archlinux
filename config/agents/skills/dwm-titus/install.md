@@ -26,14 +26,14 @@ ping -c1 -W3 archlinux.org >/dev/null && echo "network ok"
 ## Installer reference
 
 ```sh
-./install.sh --dry-run --non-interactive --profile PROFILE   # plan only, no changes
-./install.sh --profile PROFILE                               # interactive install
+./install.sh --dry-run --profile PROFILE   # plan only, no changes, no prompts
+./install.sh --profile PROFILE             # interactive install
 ```
 
 | Option | Effect |
 | --- | --- |
 | `--profile core\|recommended\|full` | Package set. Default `full` (or `$DWM_INSTALL_PROFILE`). `minimal` = `core`. |
-| `--dry-run` | Print the full plan, including the system upgrade, then exit. |
+| `--dry-run` | Print the full plan, including the system upgrade, then exit. Asks nothing and works without a terminal, so it needs no `--non-interactive`. |
 | `--yes` | Accept the install summary. pacman still asks for its own confirmation. |
 | `--non-interactive` | No prompts; adds `--noconfirm` to pacman. Only on explicit request. |
 | `--enable-aur` | Install the optional AUR extras with an existing `paru` or `yay`. |
@@ -52,13 +52,27 @@ Profiles:
   `xdg-user-dirs`, wallpapers, and LightDM when no display manager is found.
 
 What the installer does, in order: Arch check, plan and summary, one visible
-`sudo pacman -Syu` (aborts the install if it fails or is declined), official
-packages with `sudo pacman -S --needed --`, optional AUR extras, build
+`sudo pacman -Syu` (aborts the install if it fails or is declined), build
 options (`scripts/configure-build.sh` asks for refresh rate, font size,
-modifier key, and layout defaults when `config.h` is missing), display
-manager handling, `make` as the user, `sudo make install` (system files to
-`/usr/local`, user files as the user), default apps, Gear Lever, and the
-display wizard when run inside an X11 session.
+modifier key, and layout defaults when `config.h` is missing), official
+packages with `sudo pacman -S --needed --`, optional AUR extras, fonts,
+terminal, the optional Herdr workspace (`--install-herdr`), wallpapers
+(`full`, into `~/Pictures/backgrounds`), display manager handling, `make` as the user,
+`sudo make install` (system files to `/usr/local`, user files as the user),
+default apps, Gear Lever, and the display wizard when run inside an X11
+session.
+
+Along the way it also changes these files, and says so in its output:
+
+- With `recommended` or `full`, when `/usr/share/themes/Nordic` has no
+  `gtk-3.0` or `gtk-4.0` directory, it downloads the Nordic GTK theme with
+  `git clone` and replaces that directory with `sudo`.
+- With `recommended` or `full`, when no MesloLGS Nerd Font is installed, it
+  downloads Meslo with `curl`, checks its SHA-256, and unpacks it into
+  `~/.local/share/fonts/Meslo/`.
+- When Picom is installed, it edits the tooltip opacity rule in
+  `/etc/xdg/picom.conf` with `sudo` so the panel stays opaque. The first
+  edit keeps the original as `/etc/xdg/picom.conf.dwm-titus.bak`.
 
 For an unattended run, the build questions take their answers from
 `DWM_REFRESH_RATE`, `DWM_FONT_SIZE`, `DWM_MODKEY`, `DWM_MFACT`,
@@ -110,7 +124,7 @@ No desktop environment or display manager is needed first.
    sudo pacman -Syu --needed git
    git clone https://github.com/moheladwy/dwm-titus-archlinux.git
    cd dwm-titus-archlinux
-   ./install.sh --dry-run --non-interactive --profile full
+   ./install.sh --dry-run --profile full
    ./install.sh --profile full
    ```
 
@@ -138,7 +152,7 @@ The user already has another desktop or display manager.
 1. Run the dry run and review it with the user:
 
    ```sh
-   ./install.sh --dry-run --non-interactive --profile recommended
+   ./install.sh --dry-run --profile recommended
    ```
 
 2. **Back up an existing Quickshell setup.** If `~/.config/quickshell/` holds
@@ -216,10 +230,13 @@ set resolution and monitor layout.
 ## Uninstall
 
 From the checkout, `sudo make uninstall DATADIR=/usr/share` removes the
-installed binaries, helpers, session file, themes, and cursors.
+installed binaries, helpers, session file, the `Dwm-*` themes, and cursors.
 `DATADIR=/usr/share` matches what `install.sh` used. Uninstalling does not
 remove packages, user configuration, the LightDM drop-in and
 `slick-greeter.conf` (which still select the dwm session), a display-setup
-Xorg fragment, or the agent skill links in `~/.claude/skills/` and
+Xorg fragment, `/usr/share/themes/Nordic`, the Meslo fonts in
+`~/.local/share/fonts/Meslo/`, the edited `/etc/xdg/picom.conf` (its original
+is `/etc/xdg/picom.conf.dwm-titus.bak`), the wallpapers in
+`~/Pictures/backgrounds`, or the agent skill links in `~/.claude/skills/` and
 `~/.agents/skills/`. List those for the user and ask before removing any of
 them, or anything under `~/.config` or `~/.local/share/dwm-titus`.

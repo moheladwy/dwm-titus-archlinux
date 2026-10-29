@@ -48,7 +48,12 @@ submitting a pull request.
 | X11 behavior | `scripts/run-tests make check-xvfb-runtime check-monitor-tags` |
 | Settings loading, search, and section navigation | `scripts/run-tests make check-quickshell-settings-responsiveness-xvfb` plus the full Settings runtime gate |
 | Quickshell QML | `scripts/run-tests make check-quickshell-qml` plus real or nested X11 runtime validation |
-| System update UI | `scripts/run-tests tests/test-quickshell-update-ui-xvfb.sh` for the focused native fixture, plus configured QML lint |
+| System update UI | `scripts/run-tests make check-quickshell-system-management` (runs `tests/test-quickshell-update-ui-xvfb.sh`, which can also run alone as the focused native fixture), plus configured QML lint |
+| Audio and volume display | `scripts/run-tests make check-quickshell-audio` (includes `tests/test-quickshell-volume-xvfb.sh` against a private PipeWire graph) |
+| Tray | `scripts/run-tests make check-quickshell-tray` (includes tray resync after a Quickshell restart) |
+| Control Center | `scripts/run-tests make check-quickshell-controlcenter` (includes the theme result UI test) |
+| Brightness | `scripts/run-tests make check-brightness` |
+| Window rules | `scripts/run-tests make check-window-rules` (every shipped rule key must be one dwm reads) |
 | Documentation | `npm --prefix docs ci`, then `npm --prefix docs run build` |
 | Agent skills (`config/agents/skills/`) | `scripts/run-tests make check-agent-skills check-install-preservation` |
 | Platform detection | `scripts/run-tests make check-arch-platform` |
@@ -97,7 +102,7 @@ This covers automated compilation, lint, private-bus mocks, and nested Xvfb
 checks; it does not qualify a real session, systemd, polkit, or hardware. Gates
 requiring real services or a virtual machine remain separate validation.
 Run `scripts/run-tests make check-test-runner-podman` for the runner contract
-without Podman. This target neither launches containers nor extends `check`.
+without Podman. This target launches no containers and is part of `check`.
 
 When Podman is not installed, Docker can build and run the same Arch container
 locally from `tests/containers/arch/Containerfile`, with the checkout mounted

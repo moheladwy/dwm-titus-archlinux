@@ -7,8 +7,9 @@ eyebrow: Desktop control
 
 # Settings
 
-The unified Settings application provides one place to inspect desktop
-capabilities and see which features are available, restricted, or planned.
+The unified Settings application provides one place to change desktop
+settings and to see which capabilities this system supports, restricts, or
+lacks.
 
 Open Control Center with `Super+F1`, then select **Settings** from the main
 menu. You can also run:
@@ -156,6 +157,4 @@ The **Use at next login** display action writes only the managed
 `90-dwm-titus-display.conf` fragment after a separate confirmation and polkit
 authorization. The installed helper accepts validated display records only,
 backs up the previous managed next-login fragment, and offers **Restore login
-backup**. It does not capture the live XRandR layout. Later phases add
-connectivity, audio, power, defaults, personalization, and system-management
-operations.
+backup**. It does not capture the live XRandR layout.

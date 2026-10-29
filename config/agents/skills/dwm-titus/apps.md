@@ -102,8 +102,12 @@ dwm-default-apps set-browser firefox.desktop
 dwm-default-apps set-role file-manager org.kde.dolphin.desktop
 dwm-default-apps set-role terminal kitty.desktop
 dwm-default-apps set-mime application/pdf org.gnome.Evince.desktop
-dwm-default-apps reset-role browser
+dwm-default-apps reset-role browser                    # restore the value before the last change
 ```
+
+`reset-role` restores what the role was before the last `dwm-default-apps`
+change to it. Without that recovery record, or when the file changed since,
+it fails with "recovery is unavailable"; then set the role explicitly.
 
 Desktop ids are the `.desktop` file names in `/usr/share/applications/` or
 `~/.local/share/applications/`. `set-mime` accepts only these types:
@@ -143,6 +147,15 @@ clashes (see `configuration.md`):
 ```toml
 { mod="SUPER SHIFT", key="n", desc="Obsidian", func="spawn", exec=["obsidian"] },
 { mod="SUPER SHIFT", key="s", desc="Slack",    func="spawn", exec=["flatpak", "run", "com.slack.Slack"] },
+```
+
+dwm starts commands with the session `PATH`, which usually does not include
+`~/.local/bin`. `exec=[...]` runs the program directly and expands only
+`[vars]` entries, so for a script there use `cmd=`, which runs through
+`/bin/sh -c` and expands `$HOME`:
+
+```toml
+{ mod="SUPER SHIFT", key="t", desc="My tool", func="spawn", cmd="$HOME/.local/bin/tool" },
 ```
 
 Pair it with a window rule if the app should open on a tag, float, or stay

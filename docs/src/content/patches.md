@@ -49,17 +49,19 @@ Reorder windows within the stack without using the mouse.
 ### Window Swallowing
 When a GUI application is launched from a terminal, it replaces the terminal in the layout. Closing the app brings the terminal back.
 
-Controlled via window rules in `config.h`:
-```c
-{ "Alacritty", NULL, NULL, 0, 0, 1, 0, -1 },  /* isterminal = 1 */
+Controlled via window rules in `~/.config/dwm-titus/window-rules.toml`:
+```toml
+{ class="Alacritty", isterminal=1 },
 ```
+Mark a terminal with `isterminal=1`; add `noswallow=1` to a rule to keep that
+window from ever swallowing its terminal.
 
 ### Fullscreen (3-State)
 Three fullscreen modes available:
 
 | Mode | Keys | Description |
 |------|------|-------------|
-| True fullscreen | `Super` + `M` | Hides bar, takes full screen |
+| Fullscreen (monocle) | `Super` + `M` | Switches to the monocle layout and hides the bar; press again to restore |
 | Fake fullscreen | `Super` + `Shift` + `Y` | Looks fullscreen, bar still usable |
 | Monocle layout | — | Single window view, bar visible |
 
@@ -80,7 +82,10 @@ Implements `_NET_WM_STATE`, `_NET_CURRENT_DESKTOP`, `_NET_NUMBER_OF_DESKTOPS`, a
 Title bar icons via `_NET_WM_ICON`. Applications that set this atom display their icon in the bar.
 
 ### Systray
-A built-in system tray is compiled in and can be configured in `config.h`.
+The system tray is part of the Quickshell panel, which hosts StatusNotifier
+tray icons; it has no `config.h` options. After the panel restarts it runs
+`dwm-quickshell-tray resync` to re-register icons that applications still
+publish, so apps that register only once at startup reappear.
 
 ---
 
@@ -97,11 +102,13 @@ When focus moves to a different window or monitor (via keyboard), the mouse curs
 ## Live Configuration
 
 ### TOML Hotkeys (`hotkeys.toml`)
-Keybindings are parsed from `config/hotkeys.toml` at runtime. Edit and save — bindings update without recompiling or restarting dwm.
+Keybindings are parsed from `~/.config/dwm-titus/hotkeys.toml` at runtime; the repository's `config/hotkeys.toml` is the shipped default. Edit and save — bindings update without recompiling or restarting dwm.
 
 ### TOML Themes (`themes.toml`)
-Colors for dwm, terminal, GTK, and Qt are sourced from `config/themes.toml`.
-Save the file to apply a new theme instantly across supported apps.
+Colors for dwm, terminal, GTK, and Qt are sourced from
+`~/.config/dwm-titus/themes.toml`, with the repository's `config/themes.toml`
+as the shipped default. Save the file to apply a new theme instantly across
+supported apps.
 
 ---
 

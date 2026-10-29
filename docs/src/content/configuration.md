@@ -8,16 +8,26 @@ eyebrow: Make it yours
 # Configuration
 
 dwm-titus keeps user configuration under
-`${XDG_CONFIG_HOME:-$HOME/.config}/dwm-titus/`. Hotkeys and themes
-**live-reload on save** — no recompile needed for most changes.
+`${XDG_CONFIG_HOME:-$HOME/.config}/dwm-titus/`. Hotkeys, themes, and window
+rules **live-reload on save** — no recompile needed for most changes.
 
 | File | Purpose |
 |------|---------|
-| `config/hotkeys.toml` | All keybindings |
-| `config/themes.toml` | Colors, themes, border size |
+| `hotkeys.toml` | All keybindings |
+| `themes.toml` | Colors, themes, border size |
+| `window-rules.toml` | Per-application window rules |
 | `power.conf` | Control Center screen DPMS and auto-lock choices |
 
-For deeper changes (window rules, fonts, refresh rate), edit `config.h` and
+The repository's `config/hotkeys.toml`, `config/themes.toml`, and
+`config/window-rules.toml` are the shipped defaults. dwm reads the copies in
+your configuration directory and falls back to the managed default copy under
+`~/.local/share/dwm-titus/config/` only when a user file is missing.
+
+If a saved file is invalid TOML, dwm does not fail silently: it shows a critical
+"dwm: bad config" notification naming the file and keeps the previously loaded
+settings until the file is fixed.
+
+For deeper changes (fonts, refresh rate), edit `config.h` and
 run the complete developer synchronization command:
 
 ```bash
@@ -92,11 +102,11 @@ $EDITOR config.h
 |---------|-------------|
 | `refresh_rate` | Match your monitor (default 60; set 120 for high-refresh) |
 | `fonts[]` | Font family and size used in the bar |
-| `colors[]` | Managed by `themes.toml` — rarely edit directly |
-| `autostart[]` | Programs launched on dwm start |
-| `rules[]` | Per-app window rules (floating, tag assignment, terminal flag) |
-| `keys[]` | Fallback static keybinds (prefer `hotkeys.toml`) |
 | `MODKEY` | `Mod4Mask` = Super, `Mod1Mask` = Alt |
+
+Colors, keybindings, and window rules are not set in `config.h`: they load
+only from `themes.toml`, `hotkeys.toml`, and `window-rules.toml`. Startup
+programs are launched by `scripts/autostart.sh`.
 
 ### Window Rules
 
@@ -237,13 +247,20 @@ fullscreen can change the application's layout. Changing the overlay application
 to create an unmanaged window is another development option, but it must then
 handle its own positioning and input behavior.
 
-Rules in `config.h` let you assign windows to specific tags or force float:
+#### Assign tags or force floating
 
-```c
-/* class      instance  title   tags mask  isfloating  isterminal  noswallow  monitor */
-{ "Gimp",     NULL,     NULL,   0,         1,          0,           0,        -1 },
-{ "Firefox",  NULL,     NULL,   1 << 1,    0,          0,          -1,        -1 },
+Rules in `~/.config/dwm-titus/window-rules.toml` also assign windows to a tag
+or force them to float:
+
+```toml
+{ class="Gimp", isfloating=1 },
+{ class="Firefox", tags=2 },
 ```
+
+`tags` is a single tag number from 1 to 9 (here, tag 2); 0 or an omitted field
+keeps the current tag. `class`, `instance`, and `title` are case-sensitive
+substring matches, so choose distinctive values: `class="Fire"` would also
+match any other class containing that text.
 
 ---
 
@@ -353,6 +370,8 @@ user- or distribution-managed locker untouched.
 ### Modifier Syntax
 
 Use space-separated modifiers: `"SUPER"`, `"SUPER SHIFT"`, `"SUPER CTRL"`, `"SUPER CTRL SHIFT"`.
+`ALT` is also available (for example `"SUPER ALT"`), and `""` means no
+modifier, as used by the media keys.
 
 ### Available Functions
 
@@ -373,8 +392,17 @@ Use space-separated modifiers: `"SUPER"`, `"SUPER SHIFT"`, `"SUPER CTRL"`, `"SUP
 | `togglebar` | — | Show/hide bar |
 | `focusmon` | `i=1` or `i=-1` | Focus monitor |
 | `tagmon` | `i=1` or `i=-1` | Send window to monitor |
-| `view` | `ui=-1` = all tags | Switch tag |
+| `view` | `ui=-1` = all tags; no argument = previous tag | Switch tag |
+| `tag` | `ui=` tag bitmask | Send window to tag |
+| `toggleview` | `ui=` tag bitmask | Also show tag alongside current |
+| `toggletag` | `ui=` tag bitmask | Also show window on that tag |
+| `moveorplace` | `i=2` | Mouse: move a floating window or place a tiled one (for `buttons`) |
+| `resizemouse` | — | Mouse: resize window (for `buttons`) |
+| `sigstatusbar` | `i=N` | Send a signal to the `dwmblocks` status process |
 | `quit` | — | Exit dwm |
+
+`ui` is a tag bitmask: `1` is tag 1, `2` is tag 2, `4` is tag 3, and so on.
+`tag_keys` below generates the per-tag bindings for you.
 
 ### Tag Bindings
 

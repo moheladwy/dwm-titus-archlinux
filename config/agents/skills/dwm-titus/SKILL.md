@@ -34,8 +34,8 @@ Read the matching guide before acting. They live next to this file.
 - [`install.md`](install.md): install on a fresh or minimal Arch system
   (including servers driven over SSH) or on an existing Arch desktop.
 - [`configuration.md`](configuration.md): keybindings, window rules, themes,
-  wallpaper, fonts, panel, displays, input, power, compositor, and
-  compile-time `config.h` options.
+  wallpaper, fonts, screenshots, brightness keys, panel, displays, input,
+  power, compositor, and compile-time `config.h` options.
 - [`apps.md`](apps.md): install, remove, and replace applications; default
   apps; web apps; autostart; launching apps from a key.
 - [`maintenance.md`](maintenance.md): system, AUR, and desktop updates,
@@ -76,7 +76,10 @@ clone is, or make a fresh one (see `maintenance.md`); never `cd ""`.
    user, never with `sudo` or as root. Never install an AUR helper on your
    own, and never send official packages through it.
 5. **Never run the installer, `make install`, or user helpers as root.** The
-   installer refuses root and calls `sudo` itself only where needed.
+   installer refuses root and calls `sudo` itself only where needed. Do not
+   run `sudo make install` yourself either: it skips the installer's system
+   upgrade and package steps and the live-install backup that
+   `./scripts/dev-sync-install.sh` makes. Use `./install.sh` or `./scripts/dev-sync-install.sh`.
 6. **Do not edit managed files.** Installs and updates replace them:
    - `~/.config/quickshell/` (the whole directory)
    - `~/.local/share/dwm-titus/` (managed copy of `config/` and `scripts/`)
@@ -99,8 +102,11 @@ clone is, or make a fresh one (see `maintenance.md`); never `cd ""`.
 
 ## Privilege escalation
 
-`pacman`, `systemctl` on system units, and `make install` need root. Before
-you run one, check whether `sudo` can work without a password prompt:
+`pacman` and `systemctl` on system units need root. System file
+installation needs root only through `./install.sh` or
+`./scripts/dev-sync-install.sh`, which call `sudo make install` themselves
+with `OWNER` and `USER_HOME` set. Before you run a root command, check
+whether `sudo` can work without a password prompt:
 
 ```sh
 sudo -n true 2>/dev/null && echo "sudo ready" || echo "sudo needs a password"
@@ -148,7 +154,7 @@ Everyday entry points:
 | Command | Purpose |
 | --- | --- |
 | `dwm-settings open` | Open Settings |
-| `dwm-controlcenter` | Toggle the Control Center (`Super+F1`) |
+| `dwm-controlcenter` | Toggle the Control Center (`Super+F1` opens it) |
 | `dwm-diagnostics` | Required and optional health checks |
 | `dwm-default-apps status` | Default browser, terminal, file manager |
 | `dwm-settings-theme apply NAME` | Switch theme |
@@ -198,7 +204,8 @@ Press `Super+/` in the session for a searchable list of the live keybindings.
   `themes.toml`.
 - "Always open Steam on tag 5" ->
   `{ class="steam", tags=5 },` in `window-rules.toml` (check the class with
-  `xprop WM_CLASS` first).
+  `xprop WM_CLASS` first). Classes match as substrings, so this also sends
+  every Steam game (`steam_app_NNN`) to tag 5; say so.
 - "Use kitty as my terminal" -> `sudo pacman -Syu --needed kitty`, then
   `dwm-default-apps set-role terminal kitty.desktop`.
 - "Make Firefox my default browser" ->
