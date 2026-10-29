@@ -199,16 +199,22 @@ dwm_install_aur_profile() {
 
 dwm_install_available_package_profile() {
 	local profile=$1
+	local packages=()
 	local package
 	local status=0
 
+	# Collect the list first: pacman inside the read loop would inherit the
+	# list as stdin and answer its own confirmation prompt with a package name.
 	while IFS= read -r package; do
-		[[ -n $package ]] || continue
+		[[ -n $package ]] && packages+=("$package")
+	done < <(dwm_packages "$DISTRO_FAMILY" "$profile")
+
+	for package in "${packages[@]}"; do
 		if ! install_optional_package "$package"; then
 			printf 'Skipping unavailable optional package: %s\n' "$package" >&2
 			status=1
 		fi
-	done < <(dwm_packages "$DISTRO_FAMILY" "$profile")
+	done
 
 	return "$status"
 }
