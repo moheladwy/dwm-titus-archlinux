@@ -20,8 +20,9 @@ Bar Widgets, Quick Actions, Appearance, and Power Settings replace the menu
 contents in the same card and provide a Back control. Press <kbd>Esc</kbd> or
 click outside the card to close it from any page.
 
-The Utilities section opens the unified Settings application directly. Phase
-1 Settings is a read-only capability overview with section search and
+The **Settings** row in the main menu opens the unified Settings application
+directly. Settings has editable Displays, Input, Network, Bluetooth, Audio,
+Power, Defaults, Appearance, and System pages, with section search and
 keyboard/mouse navigation. It can also be opened with `dwm-settings open`.
 
 ---
@@ -51,6 +52,10 @@ future Quickshell session. Settings Appearance exposes the same shared controls
 and can restore the safe all-on default. The redesigned panel retains the
 active-window title, status segments, and system tray, and shows all nine dwm
 tags (workspaces). Hovering icon-only panel controls displays a text tooltip.
+After a panel restart, the tray runs `dwm-quickshell-tray resync` once to
+re-register icons that applications still publish. The volume widget shows the
+real output volume, including values above 100%, while volume sliders set
+0-100%.
 
 The panel, popovers, and control-center cards use fully opaque colors. Their
 palette follows the active theme in `themes.toml` and updates when that file is
@@ -135,20 +140,19 @@ root-owned installed helper.
 | Restart Picom | Kill and relaunch the compositor |
 | Restart Quickshell | Reload the managed Quickshell shell |
 | Reload Wallpaper | Randomize from `~/Pictures/backgrounds/` |
-| Restart NetworkManager | `sudo systemctl restart NetworkManager` |
-| Run Dependency Check | Opens `check-deps.sh` in a terminal |
+| Restart NetworkManager | `sudo systemctl restart NetworkManager` in a terminal |
+| Dependency Check | Opens `check-deps.sh` in a terminal |
+| Self-Heal | Runs the configured self-heal script (`DWM_SELF_HEAL_SCRIPT`, `~/.config/dwm-titus/self-heal.path`, or `dwm-self-heal`) in a terminal |
 | Install Missing Deps | Runs `install.sh` in a terminal |
 | Wallpaper Folder | Open `~/Pictures/backgrounds/` in the file manager |
-| GTK Settings | Launch `nwg-look` for GTK theming |
+| GTK Settings | Launch `nwg-look` for GTK theming; shown only when `nwg-look` is installed |
 
 ### Appearance
 
-| Action | Description |
-|--------|-------------|
-| Select Theme | Pick from all themes defined in `themes.toml` |
-| Randomize Wallpaper | Random image from `~/Pictures/backgrounds/` |
-| Open Wallpaper Folder | Open folder in file manager |
-| GTK Theme Settings | Launch `nwg-look` for GTK theming |
+The Appearance page lists every theme defined in `themes.toml`, with the active
+one marked. Click a theme to apply it. The page then reports "Theme applied:
+NAME" or "Theme change failed:" followed by the reason. Wallpaper and GTK
+actions are under Quick Actions.
 
 ### Power Settings
 
@@ -193,8 +197,12 @@ dwm-controlcenter
 The script is a compatibility wrapper around the Quickshell IPC target:
 
 ```bash
-quickshell ipc --path "${XDG_DATA_HOME:-$HOME/.local/share}/dwm-titus/config/quickshell/shell.qml" call controlcenter toggle
+quickshell ipc --path "${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml" call controlcenter toggle
 ```
+
+It falls back to
+`${XDG_DATA_HOME:-$HOME/.local/share}/dwm-titus/config/quickshell/shell.qml`
+only when the configuration-directory copy is missing.
 
 Open or refresh System Health directly through its IPC target:
 

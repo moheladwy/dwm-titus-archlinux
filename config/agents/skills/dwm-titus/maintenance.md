@@ -31,14 +31,18 @@ Two supported ways:
    `github.com/moheladwy/dwm-titus-archlinux`, shows what changes, and
    installs a confirmed update with progress and recovery records. It needs
    a fully upgraded system; otherwise it stops with "Update system packages
-   first". Run `sudo pacman -Syu` and retry.
+   first". Run `sudo pacman -Syu` and retry. When the install came from a Git
+   checkout, it also refuses a checkout that is a Git worktree, is on a
+   branch other than `main`, has local changes (including untracked files),
+   or has history that is not an ancestor of upstream `main`. Those cases
+   need the source installer (way 2).
 2. **From the checkout** (clean tree required):
 
    ```sh
    cd CHECKOUT                    # "checkout" in installed.json (see below)
    git status --short             # must be empty; ask the user about local changes
    git pull --ff-only
-   ./install.sh --dry-run --non-interactive --profile PROFILE   # review the plan
+   ./install.sh --dry-run --profile PROFILE   # review the plan
    ./install.sh --yes --profile PROFILE
    ./scripts/dev-sync-install.sh
    ```
@@ -88,9 +92,9 @@ confirmed repair buttons. For a source checkout, also run
 | Symptom | Fix |
 | --- | --- |
 | Panel missing or frozen | `dwm-quickshell-controlcenter action restart-quickshell` (or `Super+Shift+R`). Check `ls ~/.config/quickshell/shell.qml`. |
-| Brightness keys do nothing | Hybrid-graphics laptops have two backlights. Bind the keys to `dwm-brightness 10%+` / `dwm-brightness 10%-` in `hotkeys.toml`, which pick the enabled panel's backlight; `brightnessctl -l` lists the devices. |
-| App runs but its tray icon is missing | `dwm-quickshell-tray resync` registers icons that apps still publish. The panel runs it after every restart. If nothing is printed, the app has no tray icon. |
-| Hotkey or rule ignored | Re-read the TOML for syntax errors, check the key name with `xev`, then `kill -USR1 "$(pidof dwm)"`. |
+| Brightness keys do nothing | Hybrid-graphics laptops have two backlights. An older `hotkeys.toml` may still bind `brightnessctl set`; bind the keys to `dwm-brightness 10%+` / `dwm-brightness 10%-` (the shipped defaults), which pick the enabled panel's backlight. `brightnessctl -l` lists the devices. |
+| App runs but its tray icon is missing | `dwm-quickshell-tray resync` registers icons that apps still publish. The panel runs it after every restart. If nothing is printed, nothing needed re-registering; an app that still has no icon may need restarting. |
+| Hotkey or rule ignored | Re-read the TOML for syntax errors, check the key name with `xev` (`sudo pacman -Syu --needed xorg-xev`), then `kill -USR1 "$(pidof dwm)"`. |
 | Theme not applied | `theme-apply.sh` shows errors; check `[active]` in `themes.toml`. |
 | Compositor artifacts | `dwm-settings-picom restart`; choose XRender in Settings > Appearance > Compositor. |
 | `Super+X` opens nothing | Run the terminal from a shell to see its error; check `terminal` under `[vars]`. |

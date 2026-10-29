@@ -42,6 +42,14 @@ The top-level provider record describes the combined surface:
 provider  power  available|partial|restricted|unavailable  ACCESS  DETAIL
 ```
 
+The current helper (`dwm-quickshell-controlcenter power-snapshot`) always
+emits `provider  power  available  user-session` with a fixed detail; it does
+not aggregate the individual records into `partial`, `restricted`, or
+`unavailable`. Per-capability status is carried in the `STATE` field of each
+`power-*` record below (the `power-external` and `power-profile` records carry
+their own values instead). The lock-only `power-lock-snapshot` emits only the
+protocol and `power-lock` records, with no provider record.
+
 Individual records remain authoritative for their own capability. A missing
 battery, profile service, X11 display, locker, logind service, or lid does not
 invalidate unrelated readable state.

@@ -40,9 +40,13 @@ scripts/dwm-titus-release --version v0.6.1 --notes RELEASE_NOTES.md
 After publishing `v0.6.1`, the script updates `config.mk` to `VERSION = 0.7.0`
 unless `--no-bump` is provided.
 
-The helper validates and hashes the source archive before it creates a remote
-tag or release. Releases contain only the source tarball; the project publishes
-no installer images, package repository, or signing keys. Users install Arch
+The helper validates and hashes the release archive before it creates a remote
+tag or release. A release uploads two assets: `release/dwm-titus-VERSION.tar.gz`
+and its checksum file `release/dwm-titus-VERSION-SHA256SUMS`. The archive holds
+the compiled `dwm` binary, `.xinitrc`, a `dwm.desktop` generated for the release
+`PREFIX`, and copies of the `assets/`, `config/`, and `scripts/` directories; it
+does not contain the C sources, `config.h`, or object files. The project
+publishes no installer images, package repository, or signing keys. Users install Arch
 Linux from the official ISO or `archinstall`, then run `./install.sh`.
 `--version` confirms the version already committed in `config.mk`; it does not
 rewrite release source.

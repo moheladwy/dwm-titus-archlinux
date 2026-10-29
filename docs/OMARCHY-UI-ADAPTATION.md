@@ -121,11 +121,11 @@ notification, health, application, or Settings provider; change an IPC target,
 window title, helper argument contract, privilege boundary, or keybinding; or
 fold UI-5 features into the review.
 
-`TASKS.md` combines `P3-UI4` with the remaining Connectivity and Audio work in
-one active Phase 3 plan. Only the `P3-UI4` section belongs in the next pull
-request. Completing that visual conversion does not complete Phase 3 or
-authorize product Phase 4; the provider, workflow, hardware, and validation
-gates must pass first.
+Historical note: while `P3-UI4` was in progress, the Phase 3 task plan
+combined it with the remaining Connectivity and Audio work, and only the
+`P3-UI4` section belonged in its pull request (PR #163). Completing that visual
+conversion did not by itself complete Phase 3 or authorize product Phase 4.
+`TASKS.md` no longer carries this plan.
 
 ## Command Menu Contract
 

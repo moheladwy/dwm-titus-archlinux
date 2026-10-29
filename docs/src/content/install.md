@@ -150,7 +150,7 @@ applications menu that Dolphin's "Open With" needs outside Plasma.
 Dolphin's terminal action reads the terminal from `~/.config/kdeglobals`. When
 that file is absent, the installer seeds it with the selected terminal. An
 existing `kdeglobals` is preserved. To select Dolphin on an existing account,
-use Settings > Default Applications or:
+use Settings > Defaults or:
 
 ```bash
 dwm-default-apps set-role file-manager org.kde.dolphin.desktop
@@ -244,10 +244,11 @@ user-owned choice.
 
 ## First Login
 
-`Super` is usually the Windows key. Open the file manager with `Super+E`, open
-a terminal with `Super+X`, take a full screenshot with `Super+P`, select a
-region with `Super+Shift+P`, or copy a region to the clipboard with
-`Super+Ctrl+P`.
+`Super` is usually the Windows key. Open your default file manager with
+`Super+E` (the `recommended` profile installs none; Dolphin comes with the
+`full` profile, or install one yourself), open a terminal with `Super+X`,
+screenshot the active monitor with `Super+P`, select a region with
+`Super+Shift+P`, or copy a region to the clipboard with `Super+Ctrl+P`.
 
 ## Package Updates
 

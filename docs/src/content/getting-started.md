@@ -44,7 +44,10 @@ Three layouts are available — switch between them instantly.
 | Layout | Keys |
 |--------|------|
 | Tiling (master + stack) | `Super` + `T` |
-| Floating | `Super` + `Shift` + `M` |
+| Floating | `Super` + `F` |
 | Fullscreen (monocle) | `Super` + `M` |
+
+To float only the focused window, press `Super` + `Shift` + `M` or
+`Super` + `Space`; press it again to tile the window.
 
 See [Keybindings](./keybinds.html) for the full reference.

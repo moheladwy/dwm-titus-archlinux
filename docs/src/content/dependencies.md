@@ -76,7 +76,7 @@ helpers and service APIs perform the underlying operations.
 | Network connections | `networkmanager` | Full and source-update reconciliation. Backend for networking controls. Arch packages Wi-Fi support in `networkmanager` itself. It may already be present on an existing system. |
 | Bluetooth | `bluez`, `bluez-utils`, `blueman` | Desktop. Bluetooth services, command-line tools, and device management. |
 | Battery and power profiles | `upower`, `power-profiles-daemon` | Desktop. Battery state and performance/power profiles. An installed provider such as `tuned-ppd` is retained rather than replaced. |
-| Brightness | `brightnessctl` | Desktop. Backlight control where supported by the hardware. |
+| Brightness | `brightnessctl` | Desktop. Backlight control where supported by the hardware. The brightness keys run `dwm-brightness 10%+` and `dwm-brightness 10%-`, which use `brightnessctl` on the backlight of the enabled internal panel, so hybrid-graphics laptops with two backlights change the right one. |
 | Display controls | `xorg-xrandr`, `xorg-xset`, `xorg-xsetroot` | Core. Monitor layout/modes, screen power settings, and root-window utilities. |
 | Input controls | `xorg-xinput`, `xorg-setxkbmap`; `xkbset` (**AUR-only**) | Core for `xinput` and `setxkbmap`: input settings and keyboard layouts. `xkbset` backs the session-wide AccessX controls, which report as unavailable without it. |
 | Input driver | `xf86-input-libinput` | Desktop. Xorg keyboard and pointer driver integration. |

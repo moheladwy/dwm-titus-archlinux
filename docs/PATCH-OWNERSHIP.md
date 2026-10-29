@@ -67,8 +67,16 @@ Invariants:
 
 Regression coverage:
 
-- No direct automated swallowing regression exists yet. Refactors that touch
-  this path need either a focused process-tree test or manual X11 validation.
+- `tests/test-xvfb-runtime.sh` (`make check-xvfb-runtime`) launches a test
+  terminal client that spawns a child window, verifies the child swallows the
+  terminal and takes focus (including with `fullscreen` and `fakefullscreen`
+  rules and a fake-fullscreen parent), and verifies that killing the child
+  restores the terminal client with its previous fullscreen state.
+- The same file uses `noswallow=1` rules only as a rule-override case for
+  opening fullscreen; no test yet verifies that `noswallow` prevents
+  swallowing, that `swallowfloating` is respected, or that missing process
+  information skips swallowing. Refactors that touch those paths need a
+  focused process-tree test or manual X11 validation.
 
 ## Systray
 

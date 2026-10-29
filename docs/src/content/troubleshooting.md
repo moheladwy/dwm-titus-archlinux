@@ -7,6 +7,16 @@ eyebrow: Get unstuck
 
 # Troubleshooting
 
+Run the dependency checker first; it covers most common issues:
+
+```bash
+dwm-diagnostics
+```
+
+Or use the [Control Center](./control-center.html) -> **System Health**.
+
+---
+
 ## Login keyring asks for a password every login
 
 If the prompt says the login keyring did not get unlocked, run
@@ -51,14 +61,6 @@ application setup from an installed dwm-titus checkout, run:
 install-gearlever
 ```
 
-Run the dependency checker first — it covers most common issues:
-
-```bash
-dwm-diagnostics
-```
-
-Or use the [Control Center](./control-center.html) -> **System Health**.
-
 ---
 
 ## dwm Won't Start
@@ -66,7 +68,8 @@ Or use the [Control Center](./control-center.html) -> **System Health**.
 **Black screen / returns immediately to login:**
 - Run `dwm-diagnostics` and resolve any required X11/session failures.
 - Preview required packages with `./install.sh --dry-run --profile core`.
-- Check `.xinitrc` exists and ends with `exec dwm`
+- If you use `startx`, check that `~/.xinitrc` exists and its last line starts
+  dwm (the shipped file ends with `dbus-run-session -- sh -c 'exec dwm'`)
 - Run `startx` from a TTY to see error output in the terminal
 
 **`dwm: cannot open display`:**
@@ -79,7 +82,8 @@ Or use the [Control Center](./control-center.html) -> **System Health**.
 
 - Install the recommended desktop layer: `./install.sh --profile recommended`
 - Verify the managed config exists: `ls ~/.config/quickshell/shell.qml`
-- Run manually: `quickshell --no-duplicate`
+- Relaunch it with `Super`+`Shift`+`R` or
+  `dwm-quickshell-controlcenter action restart-quickshell`
 - Check fonts: `fc-list | grep -i meslo`
 
 ---
@@ -88,7 +92,7 @@ Or use the [Control Center](./control-center.html) -> **System Health**.
 
 - Run `alacritty` from an existing shell to inspect its error directly
 - Install Alacritty with a full upgrade: `sudo pacman -Syu --needed alacritty`
-- Confirm the fixed terminal in `config/hotkeys.toml`:
+- Confirm the fixed terminal in `~/.config/dwm-titus/hotkeys.toml`:
   ```toml
   [vars]
   terminal = "alacritty"
@@ -133,9 +137,43 @@ Alacritty. The default `Super`+`X` binding remains plain Alacritty.
 
 ## Keybinds Not Working
 
-- Check `config/hotkeys.toml` for syntax errors — invalid TOML silently fails
+- Check `~/.config/dwm-titus/hotkeys.toml` for syntax errors. Invalid TOML
+  shows a critical "dwm: bad config" notification and dwm keeps its previous
+  bindings
 - Verify the key name is correct (use `xev` to find X11 key names)
 - If a bind still doesn't work, add it as a fallback in `config.h` and recompile
+
+---
+
+## Brightness Keys Do Nothing
+
+- The default brightness keys run `dwm-brightness 10%+` and
+  `dwm-brightness 10%-`, which use `brightnessctl` on the backlight of the
+  enabled internal panel. This matters on hybrid-graphics laptops that expose
+  two backlights.
+- Installs keep an existing `~/.config/dwm-titus/hotkeys.toml`. If your
+  bindings still call `brightnessctl set ...` without a device, change them to
+  `dwm-brightness 10%+` and `dwm-brightness 10%-`.
+- Run `brightnessctl -l` to list the available backlights.
+
+---
+
+## Tray Icon Missing After a Panel Restart
+
+- The panel runs `dwm-quickshell-tray resync` automatically after it starts.
+  You can also run it yourself: it prints each icon it registers and prints
+  nothing when nothing needed registering.
+- Apps that publish no StatusNotifierItem at `/StatusNotifierItem` cannot be
+  re-registered; restart those apps.
+
+---
+
+## Volume Shows Above 100%
+
+- The panel shows the real output level. `pactl`-style `+5%` steps, including
+  scrolling on the panel volume widget, can boost the volume past 100%.
+- Lower it with the slider in the panel's audio controls, or with
+  `pactl set-sink-volume @DEFAULT_SINK@ 100%`.
 
 ---
 
@@ -162,9 +200,9 @@ Alacritty. The default `Super`+`X` binding remains plain Alacritty.
 
 ## NVIDIA / Suspend Issues
 
-- Black screen on wake: run `scripts/nvidia-suspend-test.sh` to diagnose
+- Black screen on wake: run `nvidia-suspend-test.sh` to diagnose
 - DPMS/screensaver issues: use Control Center -> Power, or run
-  `scripts/disable-powersaving` to disable blanking and DPMS for the current
+  `disable-powersaving` to disable blanking and DPMS for the current
   session
 
 ---
@@ -220,4 +258,4 @@ activation errors identify a recovery backup and session log.
 ## Still Stuck?
 
 - Open an issue: [github.com/moheladwy/dwm-titus-archlinux/issues](https://github.com/moheladwy/dwm-titus-archlinux/issues)
-- Run the full check: `bash scripts/check-deps.sh`
+- Run the full check: `check-deps.sh`

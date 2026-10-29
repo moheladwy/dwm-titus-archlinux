@@ -80,8 +80,10 @@ extras exist only in the AUR: `xkbset` (used by the AccessX input controls) and
 the Arc, Numix, Yaru, and Bluebird GTK themes. To install them, pass
 `--enable-aur`. The installer then uses an AUR helper you already have
 (`paru` or `yay`), running it as your user. It never installs an AUR helper for
-you and never sends official packages through it. Without `--enable-aur`, the
-AUR extras are skipped and everything else still works.
+you and never sends official packages through it. Without `--enable-aur`, an
+interactive run with `paru` or `yay` present asks before installing them
+(default No), and `--non-interactive` skips them. Everything else works without
+the AUR extras.
 
 `maim` is an optional dependency used only by the screenshot hotkeys. If it is
 unavailable, installation continues and reports that the screenshot hotkeys

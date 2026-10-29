@@ -25,7 +25,8 @@ tag_keys = [
 
 - `mod`: space-separated `SUPER`, `SHIFT`, `CTRL`, `ALT`, or `""`.
 - `key`: an X11 keysym name (`a`, `Return`, `space`, `comma`, `F1`,
-  `XF86AudioMute`). Find one with `xev`.
+  `XF86AudioMute`). Find one with `xev`, which no profile installs:
+  `sudo pacman -Syu --needed xorg-xev`.
 - `func`: `spawn` (with `exec=[...]` for argv, or `cmd="..."` for a shell
   command), `killclient`, `zoom`, `focusstack`/`movestack`/`incnmaster`
   (`i=1`/`i=-1`), `setmfact` (`f=0.05`), `setcfact` (`f=0.25`), `setlayout`
@@ -40,9 +41,13 @@ tag_keys = [
 Put new bindings inside the `keys = [ ... ]` array, before its closing `]`.
 The commented examples under "CUSTOM SHORTCUTS" sit after the array, and
 entries placed there are ignored. Before adding a binding, search for the same
-`mod` and `key` pair and tell the user about any clash. Invalid TOML fails
-silently, so re-read the edited lines and test the key afterwards. `SUPER`
-means the build's `MODKEY` (Super unless the user chose Alt when building).
+`mod` and `key` pair and tell the user about any clash. A file that fails to
+parse raises a critical "dwm: bad config" notification, and dwm keeps the
+bindings it already had (a session that starts with a broken `hotkeys.toml`
+has no keybindings). An unknown keysym or `func` skips that entry with only a
+message on dwm's standard error, and an unknown field is ignored silently, so
+re-read the edited lines and test the key afterwards. `SUPER` means the
+build's `MODKEY` (Super unless the user chose Alt when building).
 
 Panel and shell actions are `spawn` entries that call `quickshell ipc --path
 "${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml" call TARGET FUNCTION`
@@ -62,9 +67,11 @@ rules = [
 ]
 ```
 
-Fields: `class` (second `WM_CLASS` value), `instance` (first value), `title`
-(case-sensitive substring), `monitor` (`-1` any), `tags` (`1`-`9`; `0` or
-omitted = current tag), `isfloating`, `isterminal` (enables swallowing),
+Match fields: `class` (second `WM_CLASS` value), `instance` (first value),
+and `title`. All three are case-sensitive substring matches, so pick a
+distinctive value: `class="steam"` also matches every Steam game
+(`steam_app_NNN`) and `steamwebhelper`. Other fields: `monitor` (`-1` any),
+`tags` (`1`-`9`; `0` or omitted = current tag), `isfloating`, `isterminal` (enables swallowing),
 `noswallow`, `fullscreen` (true fullscreen on open), `fakefullscreen`
 (borderless monitor-sized window without EWMH fullscreen; exit with
 `Super+Shift+Y`), `ignoresizehints`, and `alwaysontop`. Flags take integer
@@ -125,6 +132,28 @@ dwm-settings-personalization status
 
 The panel icon font stays Meslo Nerd Font whatever text font is chosen.
 
+## Screenshots
+
+| Key | Action |
+| --- | --- |
+| `Super+P` | Save the monitor under the pointer |
+| `Super+Shift+P` | Select an area and save it to a file |
+| `Super+Ctrl+P` | Select an area and copy it to the clipboard |
+
+The keys run `dwm-screenshot screen|gui|clip` (`full` saves all monitors).
+Files go to `$(xdg-user-dir PICTURES)/Screenshots` (fallback
+`~/Pictures/Screenshots`); the helper ignores any `SCREENSHOT_DIR` variable.
+Saved files are JPEG, clipboard captures are PNG. It needs `maim`, which the
+`recommended` and `full` profiles install.
+
+## Brightness keys
+
+The default `XF86MonBrightnessUp`/`XF86MonBrightnessDown` bindings run
+`dwm-brightness 10%+` and `dwm-brightness 10%-`, which change the backlight
+of the enabled internal panel. A `hotkeys.toml` from an older install keeps
+its `brightnessctl set` bindings, which on hybrid-graphics laptops can change
+the wrong backlight; replace them with the `dwm-brightness` commands.
+
 ## Panel widgets
 
 ```sh
@@ -159,6 +188,12 @@ These are easiest in Settings (`dwm-settings open`) or the Control Center
 - Input devices and keyboard layout: Settings > Input. Saved values live in
   `~/.config/dwm-titus/input-settings.conf` and replay at login and hotplug.
   `setxkbmap` changes last only for the current session.
+- The layout and modifier options are saved per device (`setxkbmap
+  -device`). Settings lists every key-producing device as a keyboard
+  ("Video Bus", "Power Button", and so on). Set the layout on the real
+  keyboard entry (for example "AT Translated Set 2 keyboard" on laptops); a
+  layout saved on another device has no effect. Each keyboard needs its own
+  setting.
 - Screen blanking, auto-lock, and suspend lock: Control Center > Power
   Settings, or Settings > Power. The file is
   `~/.config/dwm-titus/power.conf`.
@@ -224,7 +259,8 @@ the files in the checkout (`config/quickshell/`, `scripts/`), run
 panel with a repository path (`quickshell --path config/quickshell`); hotkeys
 talk to the installed `~/.config/quickshell/shell.qml` instance. Local source
 edits block `git pull --ff-only`, and Settings > Desktop updates refuses a
-checkout with local changes, so tell the user. Changes meant for the project
+checkout with local changes (see `maintenance.md` for every refusal reason),
+so tell the user. Changes meant for the project
 follow the repository `AGENTS.md` instead of this skill.
 
 ## Resetting to defaults
