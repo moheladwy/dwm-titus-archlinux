@@ -213,6 +213,13 @@ the port.
 
 ### Fixed
 
+- Keep tray icons after the panel restarts. Many applications (Electron apps
+  such as Lark and Time Doctor, and KDE's KGpg) register their tray icon only
+  once, so a Quickshell restart, or kded6 taking over the tray watcher, left
+  them running without an icon. The panel now runs the new
+  `dwm-quickshell-tray resync` once at startup, which registers every icon that
+  applications still publish, once each.
+
 - Let Settings and the Control Center change themes when a dotfiles manager
   links configuration folders such as `~/.config/kitty`, `gtk-3.0`, `gtk-4.0`,
   or `qt6ct` (for example ML4W). The theme helper now follows a linked folder,

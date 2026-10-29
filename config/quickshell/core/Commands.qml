@@ -84,6 +84,10 @@ Singleton {
         return helperCommand("dwm-quickshell-controls", action, args, true);
     }
 
+    function trayHelperCommand(action) {
+        return helperCommand("dwm-quickshell-tray", action, [], true);
+    }
+
     function controlCenterHelperCommand(action, args) {
         return helperCommand("dwm-quickshell-controlcenter", action, args, true);
     }
