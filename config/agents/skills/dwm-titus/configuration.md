@@ -104,6 +104,11 @@ Copy an existing section, rename it, edit the colors, then
 `dwm-settings-theme apply NAME`. If a theme does not apply, run
 `theme-apply.sh` to see its errors.
 
+When a dotfiles manager links `~/.config/kitty`, `gtk-3.0`, `gtk-4.0`,
+`qt6ct`, or the files inside them to a repository the user owns, a theme
+change writes through the links into that repository. Other desktops that
+share those files change too; tell the user before applying.
+
 ## Wallpaper, fonts, cursor, icons
 
 ```sh

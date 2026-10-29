@@ -583,30 +583,15 @@ integration_path_list() {
 }
 
 integration_path_list_for() {
-	local integration_home=$1 integration_config_home=$2 gtk2_path gtk3_path gtk4_path
-	gtk2_path=$integration_home/.gtkrc-2.0
-	gtk3_path=$integration_config_home/gtk-3.0/settings.ini
-	gtk4_path=$integration_config_home/gtk-4.0/settings.ini
-	if [[ -L $gtk2_path ]]; then
-		# Journal the file that theme-apply edits while preserving the user's
-		# dotfile link. Rebuilding this list before publish/recovery makes a
-		# retargeted link fail the stored path-hash check.
-		gtk2_path=$(readlink -f -- "$gtk2_path") || gtk2_path=$integration_home/.gtkrc-2.0
-	fi
-	if [[ -L $gtk3_path ]]; then
-		gtk3_path=$(readlink -f -- "$gtk3_path") || gtk3_path=$integration_config_home/gtk-3.0/settings.ini
-	fi
-	if [[ -L $gtk4_path ]]; then
-		gtk4_path=$(readlink -f -- "$gtk4_path") || gtk4_path=$integration_config_home/gtk-4.0/settings.ini
-	fi
+	local integration_home=$1 integration_config_home=$2 index
 	integration_paths=(
 		"$integration_config_home/alacritty/active-theme.toml"
 		"$integration_config_home/alacritty/alacritty.toml"
 		"$integration_config_home/kitty/active-theme.conf"
 		"$integration_config_home/kitty/kitty.conf"
-		"$gtk3_path"
-		"$gtk4_path"
-		"$gtk2_path"
+		"$integration_config_home/gtk-3.0/settings.ini"
+		"$integration_config_home/gtk-4.0/settings.ini"
+		"$integration_home/.gtkrc-2.0"
 		"$integration_config_home/dwm-titus/cursor.Xresources"
 		"$integration_config_home/dwm-titus/theme-env.sh"
 		"$integration_config_home/qt5ct/qt5ct.conf"
@@ -615,6 +600,45 @@ integration_path_list_for() {
 		"$integration_config_home/dwm-titus/xsettingsd.conf"
 		"$integration_config_home/kitty/kitty.conf.dwm-titus.bak"
 	)
+	for index in "${!integration_paths[@]}"; do
+		integration_paths[index]=$(integration_path_target "${integration_paths[index]}")
+	done
+}
+
+# Journal the file that theme-apply edits while preserving the user's dotfile
+# links, whether a link replaces the file itself or its configuration folder
+# (for example ~/.config/kitty managed by a dotfiles repository). Rebuilding
+# this list before publish/recovery makes a retargeted link fail the stored
+# path-hash check. Unresolvable paths are returned unchanged and then rejected
+# by the path-chain validation.
+integration_path_target() {
+	local path=$1 directory
+	if [[ -L $path ]]; then
+		readlink -f -- "$path" || printf '%s\n' "$path"
+		return 0
+	fi
+	directory=$(integration_directory_target "${path%/*}") || {
+		printf '%s\n' "$path"
+		return 0
+	}
+	path=$directory/${path##*/}
+	if [[ -L $path ]]; then
+		readlink -f -- "$path" || printf '%s\n' "$path"
+		return 0
+	fi
+	printf '%s\n' "$path"
+}
+
+# Print the real directory behind a configuration folder that is, or sits
+# under, a link. Only directories owned by the invoking user are followed.
+integration_directory_target() {
+	local directory=$1 resolved
+	[[ $directory == /* ]] || return 1
+	existing_path_chain_is_safe "$directory/.integration" && return 1
+	resolved=$(readlink -e -- "$directory") || return 1
+	[[ -d $resolved && ! -L $resolved ]] || return 1
+	[[ $(stat -c %u -- "$resolved") == "$UID" ]] || return 1
+	printf '%s\n' "$resolved"
 }
 
 integration_path_list_for_count() {
@@ -1499,7 +1523,8 @@ prepare_integration_outputs() (
 		fi
 	done
 	for index in alacritty kitty; do
-		if [[ -d $config_home/$index && ! -L $config_home/$index ]]; then
+		if [[ -d $config_home/$index && ! -L $config_home/$index ]] ||
+			integration_directory_target "$config_home/$index" >/dev/null; then
 			mkdir -p -- "$stage_config_home/$index"
 		fi
 	done

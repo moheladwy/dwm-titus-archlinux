@@ -210,6 +210,14 @@ the port.
 
 ### Fixed
 
+- Let Settings and the Control Center change themes when a dotfiles manager
+  links configuration folders such as `~/.config/kitty`, `gtk-3.0`, `gtk-4.0`,
+  or `qt6ct` (for example ML4W). The theme helper now follows a linked folder,
+  or a linked file inside one, into the real directory when that directory
+  exists and is owned by the user, and keeps the links. Links into another
+  user's directory or to a missing target are still refused. Previously any
+  linked folder made every theme change silently do nothing.
+
 - Make Kitty follow the selected theme instead of Nord. The shipped
   `kitty.conf` no longer sets its own palette or includes `nord.conf`. Theme
   apply, including from Settings, updates an existing `kitty.conf` once: it
