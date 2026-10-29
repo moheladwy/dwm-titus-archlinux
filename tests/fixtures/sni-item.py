@@ -7,6 +7,7 @@ changes owner. --plain publishes a connection with no item at all.
 """
 
 import argparse
+import ctypes
 import sys
 
 from gi.repository import Gio, GLib
@@ -33,7 +34,11 @@ def main():
     parser.add_argument("--no-register", action="store_true")
     parser.add_argument("--plain", action="store_true")
     parser.add_argument("--ready", required=True, help="file that receives the unique name")
+    parser.add_argument("--comm", help="process name, which may contain spaces")
     args = parser.parse_args()
+    if args.comm:
+        # PR_SET_NAME; busctl reports this name in its PROCESS column.
+        ctypes.CDLL(None).prctl(15, args.comm.encode()[:15], 0, 0, 0)
 
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     if not args.plain:

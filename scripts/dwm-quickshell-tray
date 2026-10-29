@@ -18,27 +18,21 @@ usage() {
 
 # Print the bus names of the registered items, without their object paths.
 registered_services() {
-	busctl --user get-property "$watcher" "$watcher_path" "$watcher" \
+	busctl --user --json=short get-property "$watcher" "$watcher_path" "$watcher" \
 		RegisteredStatusNotifierItems 2>/dev/null |
-		awk '{
-			for (i = 3; i <= NF; i++) {
-				item = $i
-				gsub(/"/, "", item)
-				sub(/\/.*/, "", item)
-				if (item != "") print item
-			}
-		}'
+		jq -r '.data[] | sub("/.*$"; "") | select(length > 0)'
 }
 
 resync() {
-	command -v busctl >/dev/null 2>&1 || return 0
+	command -v busctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 0
 	busctl --user status "$watcher" >/dev/null 2>&1 || return 0
 	work=$(mktemp -d)
 	trap 'rm -rf "$work"' EXIT
-	# NAME PID PROCESS USER CONNECTION ...; CONNECTION is the unique name that
-	# owns NAME, and equals NAME for unique names.
-	busctl --user list --no-legend --no-pager 2>/dev/null |
-		awk '$5 ~ /^:/ { print $1, $5 }' >"$work/names"
+	# Each line is a bus name and the unique connection that owns it; a unique
+	# name owns itself. Bus names cannot contain spaces.
+	busctl --user --json=short list --no-pager 2>/dev/null |
+		jq -r '.[] | select((.connection // "") | startswith(":"))
+			| "\(.name) \(.connection)"' >"$work/names"
 	registered_services >"$work/registered"
 	awk 'NR == FNR { owner[$1] = $2; next } { print ($1 in owner) ? owner[$1] : $1 }' \
 		"$work/names" "$work/registered" >"$work/registered-owners"

@@ -45,6 +45,7 @@ wait_for() {
 Xvfb -displayfd 3 -screen 0 640x480x24 -nolisten tcp -extension GLX \
 	3>"$work/display" >"$work/xvfb.log" 2>&1 &
 pids="$pids $!"
+# shellcheck disable=SC2016 # expanded later by wait_for
 wait_for '[ -s "$work/display" ]' 'Xvfb display'
 display=$(sed -n '1p' "$work/display")
 
@@ -66,15 +67,19 @@ latest_items() {
 
 start_shell first
 wait_for 'busctl --user status org.kde.StatusNotifierWatcher >/dev/null 2>&1' 'Quickshell watcher'
-python3 -I "$repo/tests/fixtures/sni-item.py" --id unique-only --ready "$work/unique.ready" &
+# A process name with spaces must not hide the item from the resync scan.
+python3 -I "$repo/tests/fixtures/sni-item.py" --id unique-only --comm 'tray item app' \
+	--ready "$work/unique.ready" &
 pids="$pids $!"
 python3 -I "$repo/tests/fixtures/sni-item.py" --id well-known \
 	--name org.kde.StatusNotifierItem-4242-1 --ready "$work/named.ready" &
 pids="$pids $!"
 python3 -I "$repo/tests/fixtures/sni-item.py" --id plain --plain --ready "$work/plain.ready" &
 pids="$pids $!"
+# shellcheck disable=SC2016 # expanded later by wait_for
 wait_for '[ -s "$work/unique.ready" ] && [ -s "$work/named.ready" ] && [ -s "$work/plain.ready" ]' \
 	'tray item fixtures'
+# shellcheck disable=SC2016 # expanded later by wait_for
 wait_for '[ "$(latest_items first)" = "TRAY_ITEMS 2 unique-only,well-known" ]' \
 	'both items in the first shell'
 
@@ -83,6 +88,7 @@ wait_for '[ "$(latest_items first)" = "TRAY_ITEMS 2 unique-only,well-known" ]' \
 kill "$shell_pid"
 wait "$shell_pid" 2>/dev/null || true
 start_shell second
+# shellcheck disable=SC2016 # expanded later by wait_for
 wait_for '[ "$(latest_items second)" = "TRAY_ITEMS 2 unique-only,well-known" ]' \
 	'both items after the restart'
 sleep 1
