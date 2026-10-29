@@ -143,6 +143,26 @@ without_providers=$(DWM_TEST_PPD_PROVIDER=0 DWM_TEST_PULSEAUDIO=0 desktop_instal
 printf '%s\n' "$without_providers" | grep -Fxq power-profiles-daemon
 printf '%s\n' "$without_providers" | grep -Fxq pipewire-pulse
 
+# Each optional install must read its pacman confirmation from the caller's
+# terminal, never from the package list being iterated.
+optional_install() {
+	printf 'y\ny\ny\n' | bash -c '
+		. "$1"
+		DISTRO_FAMILY=arch
+		install_optional_package() {
+			local answer=""
+			IFS= read -r answer || true
+			printf "%s:%s\n" "$1" "$answer"
+		}
+		dwm_install_available_package_profile theme-gtk
+	' _ "$repo/scripts/dwm-packages.sh"
+}
+expected_answers=$(dwm_packages arch theme-gtk | sed 's/$/:y/')
+if [[ $(optional_install) != "$expected_answers" ]]; then
+	printf 'Optional package installs did not read confirmation from the terminal.\n' >&2
+	exit 1
+fi
+
 "$repo/install.sh" --dry-run --non-interactive --profile core >/dev/null
 
 printf 'Arch package map: PASS (%s official packages, %s AUR-optional)\n' \
