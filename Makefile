@@ -533,6 +533,7 @@ check-quickshell-audio:
 
 check-quickshell-controlcenter:
 	tests/test-quickshell-controlcenter.sh
+	tests/test-quickshell-controlcenter-theme-xvfb.sh
 
 check-quickshell-power-backend:
 	tests/test-quickshell-power-backend.sh

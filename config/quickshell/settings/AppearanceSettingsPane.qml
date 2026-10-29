@@ -562,7 +562,7 @@ Flickable {
             label: "Theme changes are read-only"
             statusState: "restricted"
             value: "Protected"
-            detail: "Inventory and active colors remain available, but a theme source or integration path failed ownership, link, or atomic-update safety checks."
+            detail: "Inventory and active colors remain available, but a theme source or integration path failed ownership, link, or atomic-update safety checks. Choosing a theme in the Control Center (Super+F1, Appearance) or running dwm-settings-theme apply NAME names the refused path."
         }
 
         StatusCard {
