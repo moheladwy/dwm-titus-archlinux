@@ -531,6 +531,7 @@ check-quickshell-controls:
 
 check-quickshell-audio:
 	tests/test-quickshell-audio.sh
+	tests/test-quickshell-volume-xvfb.sh
 
 check-quickshell-controlcenter:
 	tests/test-quickshell-controlcenter.sh

@@ -76,7 +76,7 @@ Scope {
         const sink = root.audioSink;
 
         if (sink !== null && sink.ready && sink.audio !== null) {
-            root.volumePercent = root.clampPercent(sink.audio.volume * 100);
+            root.volumePercent = root.readPercent(sink.audio.volume * 100);
             root.volumeMuted = sink.audio.muted;
             root.volumeText = (root.volumeMuted ? "VOL muted " : "VOL ") + root.volumePercent.toString() + "%";
             root.outputDeviceName = sink.name;
@@ -263,7 +263,7 @@ Scope {
 
         const match = trimmed.match(/([0-9]+)%/);
         if (match !== null) {
-            root.volumePercent = root.clampPercent(parseInt(match[1], 10));
+            root.volumePercent = root.readPercent(parseInt(match[1], 10));
         }
         root.volumeMuted = trimmed.indexOf("VOL muted") === 0;
     }
@@ -301,6 +301,18 @@ Scope {
         root.outputDevices = devices;
         root.outputDeviceName = defaultName;
         root.outputDeviceDescription = defaultDescription;
+    }
+
+    // Reported volume keeps values above 100%, which pactl and the panel's own
+    // volume steps can reach, so the panel shows what is actually playing.
+    function readPercent(value) {
+        const number = Math.round(Number(value));
+
+        if (isNaN(number)) {
+            return root.volumePercent;
+        }
+
+        return Math.max(0, number);
     }
 
     function clampPercent(value) {

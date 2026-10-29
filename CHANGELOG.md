@@ -213,6 +213,11 @@ the port.
 
 ### Fixed
 
+- Show the real output volume above 100% in the panel and the controls popup.
+  `pactl` and the panel's own volume steps can boost past 100%, but the display
+  stopped at 100%, so a boosted sink looked unchanged. Volume sliders still set
+  0-100%.
+
 - Keep tray icons after the panel restarts. Many applications (Electron apps
   such as Lark and Time Doctor, and KDE's KGpg) register their tray icon only
   once, so a Quickshell restart, or kded6 taking over the tray watcher, left
