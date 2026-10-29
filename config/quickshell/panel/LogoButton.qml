@@ -15,9 +15,13 @@ PanelPill {
         id: logoImage
 
         anchors.centerIn: parent
-        width: Theme.scaledSize(24)
-        height: Theme.scaledSize(25.2)
-        source: Qt.resolvedUrl("../assets/ctt_logo.png")
+        width: Theme.scaledSize(22)
+        height: Theme.scaledSize(22)
+        // Shipped by the Arch Linux filesystem package, which every Arch
+        // system has installed.
+        source: "file:///usr/share/pixmaps/archlinux-logo.svg"
+        sourceSize.width: width
+        sourceSize.height: height
         fillMode: Image.PreserveAspectFit
         asynchronous: true
         smooth: true
@@ -27,7 +31,7 @@ PanelPill {
     UiText {
         anchors.centerIn: parent
         visible: logoImage.status === Image.Error
-        text: "CTT"
+        text: "Arch"
         color: Theme.accent
         font.pixelSize: Theme.tinyFontSize
         font.bold: true

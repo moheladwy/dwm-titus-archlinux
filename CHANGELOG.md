@@ -89,6 +89,9 @@ the port.
 
 ### Changed
 
+- The panel menu button shows the Arch Linux logo instead of the Chris Titus
+  Tech logo. It uses `/usr/share/pixmaps/archlinux-logo.svg` from Arch's
+  `filesystem` package and shows "Arch" if that file is missing.
 - The installer runs one visible `sudo pacman -Syu` before installing any
   package, because Arch does not support partial upgrades. It is listed in the
   `--dry-run` plan, uses pacman's own prompt, adds `--noconfirm` only with
