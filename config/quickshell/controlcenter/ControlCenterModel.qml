@@ -33,6 +33,10 @@ Scope {
     property string pendingAction: ""
     property bool actionSucceeded: false
     property string actionError: ""
+    property string pendingTheme: ""
+    property bool themeSetSucceeded: false
+    property string themeSetError: ""
+    property string themeStatus: ""
     property var powerModel: null
     property var infoRows: []
     property var themeRows: []
@@ -127,8 +131,11 @@ Scope {
         }
     }
 
-    function openAppearance() {
-        root.openPage("appearance", "Loading themes...", themesProcess);
+    function openAppearance(status) {
+        // A theme change result stays visible while the list reloads.
+        root.themeStatus = status || "";
+        root.openPage("appearance", root.themeStatus.length > 0
+            ? root.themeStatus : "Loading themes...", themesProcess);
     }
 
     function openKeybinds() {
@@ -209,8 +216,12 @@ Scope {
         }
 
         root.busy = true;
+        root.pendingTheme = name;
+        root.themeSetSucceeded = false;
+        root.themeSetError = "";
         root.message = "Applying " + name + "...";
-        themeSetProcess.command = Commands.controlCenterHelperCommand("theme-set", [name]);
+        themeSetProcess.command = Commands.checkedCommand(
+            Commands.controlCenterHelperCommand("theme-set", [name]));
         themeSetProcess.running = true;
     }
 
@@ -237,7 +248,8 @@ Scope {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.themeRows = root.parseRows(this.text, ["status", "name"]);
-                root.message = root.themeRows.length + " themes";
+                root.message = root.themeStatus.length > 0
+                    ? root.themeStatus : root.themeRows.length + " themes";
             }
         }
     }
@@ -300,11 +312,26 @@ Scope {
         command: ["sh", "-c", "exit 0"]
         running: false
 
+        stdout: StdioCollector {
+            onStreamFinished: root.themeSetSucceeded = this.text.split("\n")
+                .indexOf("theme\t" + root.pendingTheme) >= 0
+        }
+
+        stderr: StdioCollector {
+            // The helper's final stderr line names why a change was refused.
+            onStreamFinished: root.themeSetError = this.text.trim().split("\n")
+                .pop().trim().slice(0, 1024)
+        }
+
         onRunningChanged: {
             if (!running && root.busy) {
                 root.busy = false;
-                root.message = "Theme applied";
-                root.openAppearance();
+                const status = root.themeSetSucceeded
+                    ? "Theme applied: " + root.pendingTheme
+                    : "Theme change failed: " + (root.themeSetError.length > 0
+                        ? root.themeSetError : root.pendingTheme);
+                root.pendingTheme = "";
+                root.openAppearance(status);
             }
         }
     }
