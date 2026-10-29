@@ -88,6 +88,7 @@ confirmed repair buttons. For a source checkout, also run
 | Symptom | Fix |
 | --- | --- |
 | Panel missing or frozen | `dwm-quickshell-controlcenter action restart-quickshell` (or `Super+Shift+R`). Check `ls ~/.config/quickshell/shell.qml`. |
+| Brightness keys do nothing | Hybrid-graphics laptops have two backlights. Bind the keys to `dwm-brightness 10%+` / `dwm-brightness 10%-` in `hotkeys.toml`, which pick the enabled panel's backlight; `brightnessctl -l` lists the devices. |
 | App runs but its tray icon is missing | `dwm-quickshell-tray resync` registers icons that apps still publish. The panel runs it after every restart. If nothing is printed, the app has no tray icon. |
 | Hotkey or rule ignored | Re-read the TOML for syntax errors, check the key name with `xev`, then `kill -USR1 "$(pidof dwm)"`. |
 | Theme not applied | `theme-apply.sh` shows errors; check `[active]` in `themes.toml`. |
