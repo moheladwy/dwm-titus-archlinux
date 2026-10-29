@@ -1409,8 +1409,14 @@ if run_theme personalization-repair-ready; then
 	exit 1
 fi
 rm "$work/personalization-repair-hardlink-theme.toml"
-mkdir -p "$work/personalization-repair-unsafe-integration"
-ln -s "$work/personalization-repair-unsafe-integration" "$config_home/qt5ct"
+if ((UID == 0)); then
+	repair_unsafe_integration=$work/personalization-repair-unsafe-integration
+	mkdir -p "$repair_unsafe_integration"
+	chown 1 "$repair_unsafe_integration"
+else
+	repair_unsafe_integration=/tmp
+fi
+ln -s "$repair_unsafe_integration" "$config_home/qt5ct"
 if run_theme personalization-repair-ready; then
 	printf 'repair was reported ready for an unsafe integration path\n' >&2
 	exit 1
@@ -1553,10 +1559,31 @@ if HOME=$home_dir XDG_CONFIG_HOME=$config_home XDG_DATA_HOME=$data_home \
 	exit 1
 fi
 
-mkdir -p "$work/unsafe-integration-target"
-ln -s "$work/unsafe-integration-target" "$config_home/alacritty"
+# A linked integration folder is followed only into an existing directory the
+# user owns.
+if ((UID == 0)); then
+	foreign_integration=$work/foreign-integration-target
+	mkdir "$foreign_integration"
+	chown 1 "$foreign_integration"
+else
+	foreign_integration=/tmp
+fi
+ln -s "$foreign_integration" "$config_home/alacritty"
 if run_theme mutation-ready; then
-	printf 'symlinked integration directory was reported mutation-ready\n' >&2
+	printf 'integration folder linked to a foreign-owned directory was reported mutation-ready\n' >&2
+	exit 1
+fi
+rm "$config_home/alacritty"
+ln -s "$work/missing-integration-target" "$config_home/alacritty"
+if run_theme mutation-ready; then
+	printf 'dangling integration folder link was reported mutation-ready\n' >&2
+	exit 1
+fi
+rm "$config_home/alacritty"
+mkdir -p "$work/owned-integration-target"
+ln -s "$work/owned-integration-target" "$config_home/alacritty"
+if ! run_theme mutation-ready; then
+	printf 'integration folder linked to an owned directory was not mutation-ready\n' >&2
 	exit 1
 fi
 rm "$config_home/alacritty"
@@ -1772,6 +1799,97 @@ run_theme_real_apply apply dracula >/dev/null 2>"$work/settings-kitty.err"
 [[ $(grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$config_home/kitty/kitty.conf" | tail -n 1) == 'include active-theme.conf' ]]
 [[ $(stat -c %a "$config_home/kitty/kitty.conf.dwm-titus.bak") == 600 ]]
 cmp -s "$work/settings-legacy-kitty.conf" "$config_home/kitty/kitty.conf.dwm-titus.bak"
+
+# Configuration folders managed by a dotfiles repository stay links. A Settings
+# apply publishes into the linked folders, including a linked file inside one,
+# and a preview revert restores the linked targets.
+reset_fixture
+linked_dotfiles=$work/linked-dotfiles
+rm -rf "$linked_dotfiles"
+mkdir -p "$linked_dotfiles/kitty" "$linked_dotfiles/kitty-source" \
+	"$linked_dotfiles/gtk-3.0" "$linked_dotfiles/qt6ct"
+printf 'font_size 11\n' >"$linked_dotfiles/kitty-source/kitty.conf"
+ln -s "$linked_dotfiles/kitty-source/kitty.conf" "$linked_dotfiles/kitty/kitty.conf"
+printf '[Settings]\nkeep-linked-folder=yes\n' >"$linked_dotfiles/gtk-3.0/settings.ini"
+for linked_folder in kitty gtk-3.0 qt6ct; do
+	ln -s "$linked_dotfiles/$linked_folder" "$config_home/$linked_folder"
+done
+if ! run_theme_real_apply apply dracula >/dev/null 2>"$work/linked-folders-apply.err"; then
+	cat "$work/linked-folders-apply.err" >&2
+	exit 1
+fi
+[[ $(active_theme) == dracula ]]
+for linked_folder in kitty gtk-3.0 qt6ct; do
+	[[ -L $config_home/$linked_folder ]]
+done
+[[ -L $linked_dotfiles/kitty/kitty.conf ]]
+grep -Fqx 'font_size 11' "$linked_dotfiles/kitty-source/kitty.conf"
+grep -Fqx 'include active-theme.conf' "$linked_dotfiles/kitty-source/kitty.conf"
+[[ -f $linked_dotfiles/kitty/active-theme.conf && ! -L $linked_dotfiles/kitty/active-theme.conf ]]
+grep -Fqx 'keep-linked-folder=yes' "$linked_dotfiles/gtk-3.0/settings.ini"
+grep -Eq '^gtk-theme-name=' "$linked_dotfiles/gtk-3.0/settings.ini"
+cp "$linked_dotfiles/gtk-3.0/settings.ini" "$work/linked-gtk-applied.ini"
+cp "$linked_dotfiles/kitty/active-theme.conf" "$work/linked-kitty-applied.conf"
+if ! run_theme_real_apply preview linked-folders 10 gruvbox >/dev/null \
+	2>"$work/linked-folders-preview.err"; then
+	cat "$work/linked-folders-preview.err" >&2
+	exit 1
+fi
+if cmp -s "$work/linked-kitty-applied.conf" "$linked_dotfiles/kitty/active-theme.conf"; then
+	printf 'theme preview did not publish into a linked kitty folder\n' >&2
+	exit 1
+fi
+if ! run_theme_real_apply revert linked-folders >/dev/null \
+	2>"$work/linked-folders-revert.err"; then
+	cat "$work/linked-folders-revert.err" >&2
+	exit 1
+fi
+[[ $(active_theme) == dracula ]]
+for linked_folder in kitty gtk-3.0 qt6ct; do
+	[[ -L $config_home/$linked_folder ]]
+done
+cmp -s "$work/linked-gtk-applied.ini" "$linked_dotfiles/gtk-3.0/settings.ini"
+cmp -s "$work/linked-kitty-applied.conf" "$linked_dotfiles/kitty/active-theme.conf"
+# Retargeting a linked folder to an identical copy before publication must not
+# redirect the writes there.
+linked_retarget=$work/linked-dotfiles-retarget
+rm -rf "$linked_retarget"
+cp -a "$linked_dotfiles/kitty" "$linked_retarget"
+linked_publish_ready=$work/linked-publish.ready
+linked_publish_release=$work/linked-publish.release
+rm -f "$linked_publish_ready" "$linked_publish_release"
+DWM_TEST_BEFORE_INTEGRATION_PUBLISH=$linked_publish_ready \
+	DWM_TEST_INTEGRATION_PUBLISH_RELEASE=$linked_publish_release \
+	run_theme_real_apply apply gruvbox >"$work/linked-retarget.out" \
+	2>"$work/linked-retarget.err" &
+linked_retarget_pid=$!
+for attempt in {1..100}; do
+	[[ -e $linked_publish_ready ]] && break
+	sleep 0.05
+done
+[[ -e $linked_publish_ready ]]
+ln -sfn "$linked_retarget" "$config_home/kitty"
+: >"$linked_publish_release"
+set +e
+wait "$linked_retarget_pid"
+linked_retarget_status=$?
+set -e
+[[ $linked_retarget_status -eq 1 ]]
+grep -Fq 'changed while publishing the transaction' "$work/linked-retarget.err"
+cmp -s "$work/linked-kitty-applied.conf" "$linked_retarget/active-theme.conf"
+cmp -s "$work/linked-kitty-applied.conf" "$linked_dotfiles/kitty/active-theme.conf"
+run_theme recovery-status | grep -q $'^recovery\tavailable'
+ln -sfn "$linked_dotfiles/kitty" "$config_home/kitty"
+if ! run_theme_real_apply recover >/dev/null 2>"$work/linked-retarget-recover.err"; then
+	cat "$work/linked-retarget-recover.err" >&2
+	exit 1
+fi
+[[ $(active_theme) == dracula ]]
+cmp -s "$work/linked-kitty-applied.conf" "$linked_dotfiles/kitty/active-theme.conf"
+cmp -s "$work/linked-gtk-applied.ini" "$linked_dotfiles/gtk-3.0/settings.ini"
+for linked_folder in kitty gtk-3.0 qt6ct; do
+	rm "$config_home/$linked_folder"
+done
 
 reset_fixture
 mkdir -p "$config_home/gtk-3.0"
