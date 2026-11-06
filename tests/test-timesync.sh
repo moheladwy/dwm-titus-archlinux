@@ -81,6 +81,7 @@ if run; then
 fi
 [[ ! -s $TIMESYNC_LOG ]]
 # The installer runs the step and lists it in its plan.
+# shellcheck disable=SC2016 # Match the installer's literal command text.
 grep -Fq 'bash "$REPO_DIR/scripts/configure-timesync.sh"' "$repo/install.sh"
 grep -Fq 'Time synchronization: enable/start timesyncd' "$repo/install.sh"
 printf 'Automatic time synchronization provisioning checks passed.\n'

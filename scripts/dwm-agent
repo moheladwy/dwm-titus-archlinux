@@ -379,7 +379,7 @@ launch() {
 	done
 
 	agent=$(current_agent)
-	if ((!inline)); then
+	if ((! inline)); then
 		if [[ -z $agent ]]; then
 			command=("$0" setup)
 		else
