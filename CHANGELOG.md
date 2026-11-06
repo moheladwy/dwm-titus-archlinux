@@ -21,6 +21,12 @@ the port.
   and dwm publishes each monitor's workspaces as `_DWM_MONITOR_TAGS` so the
   panel shows the same split.
 
+- Ship the `dwm-titus-debug` diagnosis skill next to the Arch `dwm-titus`
+  skill, an AI assistant Settings page, actionable crash notifications, and
+  opt-in X11 hang detection. Diagnosis preserves agent approvals; optional
+  agent installation uses an existing mise. See
+  [AI assistance](docs/AI-ASSIST.md) for setup and recovery.
+
 - Add the `dwm-titus` agent skill (`config/agents/skills/dwm-titus/`, linked
   from `.agents/skills/` and `.claude/skills/`) so Claude Code, Codex, and
   other Agent Skills clients can install the desktop on a fresh or existing

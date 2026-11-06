@@ -30,6 +30,10 @@ Options:
   --skip-herdr           Do not install Herdr.
   --enable-aur           Install the optional AUR packages with an existing
                          paru or yay helper, run as the invoking user.
+  --install-ai-agent NAME
+                         Install an AI agent for "Diagnose with AI"
+                         (codex, opencode, gemini, claude, cursor-agent or
+                         hermes) with mise. Repeatable.
   --dry-run              Print the resolved plan and exit before changes.
   -h, --help             Show this help.
 EOF
@@ -58,6 +62,7 @@ NORDIC_THEME_REF="master"
 ARCH="$(uname -m)"
 INSTALL_PROFILE="${DWM_INSTALL_PROFILE:-full}"
 HERDR_INSTALL_MODE="${DWM_INSTALL_HERDR:-false}"
+AI_AGENTS=()
 NON_INTERACTIVE=false
 ASSUME_YES=false
 AUR_APPROVED=false
@@ -93,6 +98,16 @@ while (($# > 0)); do
 	--skip-herdr)
 		HERDR_INSTALL_MODE=false
 		shift
+		;;
+	--install-ai-agent)
+		case ${2:-} in
+		codex | opencode | gemini | claude | cursor-agent | hermes) AI_AGENTS+=("$2") ;;
+		*)
+			err "--install-ai-agent needs codex, opencode, gemini, claude, cursor-agent or hermes"
+			exit 1
+			;;
+		esac
+		shift 2
 		;;
 	--enable-aur)
 		AUR_APPROVED=true
@@ -259,6 +274,11 @@ print_install_summary() {
 		printf '  Herdr workspace: skipped (unsupported architecture: %s)\n' "$ARCH"
 	else
 		printf '  Herdr workspace: skipped (optional; use --install-herdr to enable)\n'
+	fi
+	if ((${#AI_AGENTS[@]})); then
+		printf '  AI agents: %s (existing mise; no system repository changes)\n' "${AI_AGENTS[*]}"
+	else
+		printf '  AI agents: skipped (optional; use --install-ai-agent NAME or Settings)\n'
 	fi
 	echo ""
 }
@@ -699,6 +719,16 @@ if install_recommended_profile; then
 	fi
 fi
 configure_displays_after_install
+
+# ── AI agents for "Diagnose with AI" ─────────────────────
+for agent in "${AI_AGENTS[@]}"; do
+	info "Installing the $agent AI agent with mise..."
+	if "$REPO_DIR/scripts/dwm-install-ai-agent" "$agent"; then
+		ok "$agent is installed; pick and sign in with: dwm-agent setup $agent"
+	else
+		warn "$agent installation failed; retry with scripts/dwm-install-ai-agent $agent."
+	fi
+done
 
 # ── Done ─────────────────────────────────────────────────
 echo ""
