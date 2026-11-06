@@ -81,6 +81,13 @@ active_window() {
 	DISPLAY=$display xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | sed -n 's/.*# //p'
 }
 
+window_geometry() {
+	DISPLAY=$display xdotool getwindowgeometry --shell "$1" 2>/dev/null | awk -F= '
+		$1 == "X" { x = $2 } $1 == "Y" { y = $2 }
+		$1 == "WIDTH" { w = $2 } $1 == "HEIGHT" { h = $2 }
+		END { print x "," y "," w "," h }'
+}
+
 root_value() {
 	DISPLAY=$display xprop -root "$1" 2>/dev/null | sed -n 's/^[^=]*= //p' | tr -d '[:space:]'
 }
@@ -204,6 +211,46 @@ wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,0,1920,0,1920,1080,4
 DISPLAY=$display xdotool key Super+3
 wait_for_value _DWM_SELECTED_MONITOR 0
 wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,2,1920,0,1920,1080,4
+
+# A floating window that is fullscreen while the split changes, staying on its
+# monitor, must return to its own geometry when it leaves fullscreen.
+DISPLAY=$display xdotool key Super+5
+client=$(cat "$work/client.id")
+i=0
+until [ "$(active_window)" = "$client" ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf '%s\n' 'the test client did not regain focus on workspace 5' >&2
+		exit 1
+	}
+	sleep 0.05
+done
+DISPLAY=$display xdotool key Super+space
+sleep 0.5
+floating=$(window_geometry "$client")
+DISPLAY=$display xdotool windowstate --add FULLSCREEN "$client"
+i=0
+until [ "$(window_geometry "$client")" = 1920,0,1920,1080 ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf 'the test client did not become fullscreen (%s)\n' "$(window_geometry "$client")" >&2
+		exit 1
+	}
+	sleep 0.05
+done
+set_monitor_tags '[2, 7]'
+wait_for_value _DWM_MONITOR_TAGS 3,508
+DISPLAY=$display xdotool windowstate --remove FULLSCREEN "$client"
+i=0
+until [ "$(window_geometry "$client")" = "$floating" ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf 'leaving fullscreen restored %s instead of %s\n' \
+			"$(window_geometry "$client")" "$floating" >&2
+		exit 1
+	}
+	sleep 0.05
+done
 
 # The last monitor also owns workspaces the list leaves over.
 set_monitor_tags '[2, 2]'

@@ -5879,10 +5879,11 @@ getmontagmask(int monnum)
 static void
 setmontagcounts(const int *counts, int n)
 {
+	struct { Client *c; Monitor *m; int x, y, w, h; } *saved;
 	Client *c;
 	Monitor *m;
 	unsigned int *home, mask;
-	int i, nmons, changed = n != nmontagcounts;
+	int i, nmons, nclients, nsaved, changed = n != nmontagcounts;
 
 	for (i = 0; !changed && i < n; i++)
 		changed = counts[i] != montagcounts[i];
@@ -5911,6 +5912,24 @@ setmontagcounts(const int *counts, int n)
 			m->tagset[m->seltags] = mask & (~mask + 1);
 	}
 	free(home);
+	/* resizeclient() records the previous geometry as the restore geometry, so
+	 * keep each real-fullscreen window's pre-fullscreen geometry, moved with the
+	 * window if it changes monitor. */
+	for (nclients = 0, m = mons; m; m = m->next)
+		for (c = m->clients; c; c = c->next)
+			nclients++;
+	saved = ecalloc(nclients ? nclients : 1, sizeof(*saved));
+	for (nsaved = 0, m = mons; m; m = m->next)
+		for (c = m->clients; c; c = c->next)
+			if (c->isfullscreen && c->fakefullscreen != 1) {
+				saved[nsaved].c = c;
+				saved[nsaved].m = m;
+				saved[nsaved].x = c->oldx;
+				saved[nsaved].y = c->oldy;
+				saved[nsaved].w = c->oldw;
+				saved[nsaved].h = c->oldh;
+				nsaved++;
+			}
 	/* As after a monitor change: moved real-fullscreen windows cover their new
 	 * monitor, and focus returns to a visible window. */
 	reconcilemonitortags();
@@ -5919,6 +5938,14 @@ setmontagcounts(const int *counts, int n)
 		for (c = m->clients; c; c = c->next)
 			if (c->isfullscreen && c->fakefullscreen != 1)
 				resizeclient(c, m->mx, m->my, m->mw, m->mh);
+	for (i = 0; i < nsaved; i++) {
+		c = saved[i].c;
+		c->oldx = saved[i].x + c->mon->mx - saved[i].m->mx;
+		c->oldy = saved[i].y + c->mon->my - saved[i].m->my;
+		c->oldw = saved[i].w;
+		c->oldh = saved[i].h;
+	}
+	free(saved);
 	arrange(NULL);
 	focus(NULL);
 	updatecurrentdesktop();
