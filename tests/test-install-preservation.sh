@@ -13,6 +13,8 @@ TEST_REPO="$WORK_DIR/repo"
 TEST_HOME="$WORK_DIR/home"
 XDG_CONFIG_HOME="$TEST_HOME/.config"
 XDG_DATA_HOME="$TEST_HOME/.local/share"
+export XDG_STATE_HOME="$TEST_HOME/.local/state"
+export XDG_CACHE_HOME="$TEST_HOME/.cache"
 XDG_CONFIG_DIRS="$WORK_DIR/etc-xdg"
 OWNER_TMPDIR="$WORK_DIR/owner-tmp"
 mkdir -p "$OWNER_TMPDIR"
@@ -319,7 +321,9 @@ for _ in 1 2; do
 		OWNER="$OWNER" \
 		XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
 		XDG_CONFIG_DIRS="$XDG_CONFIG_DIRS" \
-		XDG_DATA_HOME="$XDG_DATA_HOME"
+		XDG_DATA_HOME="$XDG_DATA_HOME" \
+		XDG_STATE_HOME="$XDG_STATE_HOME" \
+		XDG_CACHE_HOME="$XDG_CACHE_HOME"
 	[[ $(stat -c %a "$XDG_DATA_HOME/dwm-titus/scripts/generate-app-themes.py") == "$(stat -c %a "$TEST_REPO/scripts/generate-app-themes.py")" ]] || {
 		printf 'Managed source file modes changed during installation.\n' >&2
 		exit 1
@@ -423,17 +427,27 @@ test "$(stat -c %U "$XDG_CONFIG_HOME/autostart")" = "$OWNER"
 FRESH_HOME="$WORK_DIR/fresh-home"
 FRESH_CONFIG_HOME="$FRESH_HOME/.config"
 FRESH_DATA_HOME="$FRESH_HOME/.local/share"
+FRESH_STATE_HOME="$FRESH_HOME/.local/state"
+FRESH_CACHE_HOME="$FRESH_HOME/.cache"
 FRESH_CONFIG_DIRS="$WORK_DIR/fresh-etc-xdg"
 mkdir -p "$FRESH_CONFIG_DIRS/autostart"
 if [[ $(id -u) -eq 0 ]]; then
 	chown -R "$OWNER:$OWNER_GROUP" "$FRESH_CONFIG_DIRS"
 fi
-run_as_owner env HOME="$FRESH_HOME" make -C "$TEST_REPO" install-user \
+run_as_owner env HOME="$FRESH_HOME" XDG_STATE_HOME="$FRESH_STATE_HOME" \
+	XDG_CACHE_HOME="$FRESH_CACHE_HOME" make -C "$TEST_REPO" install-user \
 	USER_HOME="$FRESH_HOME" \
 	OWNER="$OWNER" \
 	XDG_CONFIG_HOME="$FRESH_CONFIG_HOME" \
 	XDG_CONFIG_DIRS="$FRESH_CONFIG_DIRS" \
-	XDG_DATA_HOME="$FRESH_DATA_HOME"
+	XDG_DATA_HOME="$FRESH_DATA_HOME" \
+	XDG_STATE_HOME="$FRESH_STATE_HOME" \
+	XDG_CACHE_HOME="$FRESH_CACHE_HOME"
+
+for fixture_state in "$XDG_STATE_HOME" "$FRESH_STATE_HOME"; do
+	test -f "$fixture_state/dwm-titus/desktop-update/installed.json"
+	test -f "$fixture_state/dwm-titus/desktop-update/build-config.h"
+done
 
 # An ~/.agents home alone gets the link, and a dangling link left by an
 # earlier dwm-titus data directory is repointed at the current copy.

@@ -810,7 +810,7 @@ check-install-manifest: all
 	echo "==> Install manifest, retired-path removal, and uninstall symmetry validated."
 
 check-install-preservation:
-	tests/test-install-preservation.sh
+	tests/test-install-state-isolation.sh
 
 check-agent-skills:
 	/usr/bin/python3 tests/test-agent-skills.py
