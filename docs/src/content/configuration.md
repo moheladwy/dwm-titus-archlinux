@@ -313,7 +313,9 @@ support or the NVIDIA Full Composition Pipeline and enables only the compatible
 default. The proposed layout is applied as a live preview and automatically
 restored unless it is confirmed. Advanced calls may pass
 `--force-full-composition-pipeline off` to disable the NVIDIA default; forcing
-it on with an incompatible kernel or Xorg driver is rejected.
+it on with an incompatible kernel or Xorg driver, or for a reverse PRIME sink
+(RandR provider `NVIDIA-G0`) that only displays another GPU's frames, is
+rejected.
 
 Accepted layouts are installed as the isolated managed fragment
 `/etc/X11/xorg.conf.d/90-dwm-titus-display.conf`; existing Xorg files are not

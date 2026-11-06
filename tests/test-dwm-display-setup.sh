@@ -183,6 +183,10 @@ case ${1:-} in
 	[ "${TEST_PROPERTIES_UNAVAILABLE:-0}" != 1 ] || exit 1
 	cat "$TEST_PROPERTIES"
 	;;
+--listproviders)
+	[ -n "${TEST_PROVIDERS:-}" ] || exit 1
+	cat "$TEST_PROVIDERS"
+	;;
 *)
 	printf '%s\n' "$*" >>"$TEST_XRANDR_LOG"
 	case " $* " in
@@ -377,6 +381,9 @@ env "${env_common[@]}" TEST_PROPERTIES="$work/properties-unsupported" \
 	"$BASH_BIN" "$HELPER" capabilities >"$work/capabilities-nvidia-modesetting"
 grep -Fqx $'output\tHDMI-1\tunsupported\tunsupported' \
 	"$work/capabilities-nvidia-modesetting"
+# Without a RandR provider listing (TEST_PROVIDERS unset), the provider role is
+# unknown and NVIDIA outputs keep the composition pipeline. The reverse PRIME
+# and NVIDIA-primary listings are covered below.
 env "${env_common[@]}" TEST_PROPERTIES="$work/properties-unsupported" \
 	DWM_KERNEL_DRIVER=nvidia DWM_XORG_DRIVER=modesetting \
 	DWM_XORG_DRIVERS='modesetting nvidia' TEST_NVIDIA_OUTPUTS='HDMI-1 DP-1 DP-2' \
@@ -392,6 +399,55 @@ grep -Fq 'Option "ForceFullCompositionPipeline" "true"' \
 	"$work/generated-nvidia-hybrid.conf"
 grep -Fq 'MatchDriver "nvidia-drm"' "$work/generated-nvidia-hybrid.conf"
 grep -Fq 'Driver "nvidia"' "$work/generated-nvidia-hybrid.conf"
+
+# A hybrid laptop whose external port is wired to the NVIDIA GPU while another
+# GPU renders the screen: RandR lists NVIDIA as a GPU screen (NVIDIA-G0) that
+# only scans out frames, so the composition pipeline must stay off there.
+cat >"$work/providers-reverse-prime" <<'PROVIDERS'
+Providers: number : 2
+Provider 0: id: 0x53 cap: 0xf, Source Output, Sink Output, Source Offload, Sink Offload crtcs: 4 outputs: 1 associated providers: 1 name:AMD Radeon Graphics @ pci:0000:06:00.0
+Provider 1: id: 0x1f4 cap: 0x2, Sink Output crtcs: 4 outputs: 4 associated providers: 1 name:NVIDIA-G0
+PROVIDERS
+cat >"$work/providers-nvidia-primary" <<'PROVIDERS'
+Providers: number : 2
+Provider 0: id: 0x1b7 cap: 0x1, Source Output crtcs: 4 outputs: 4 associated providers: 1 name:NVIDIA-0
+Provider 1: id: 0x53 cap: 0xf, Source Output, Sink Output, Source Offload, Sink Offload crtcs: 4 outputs: 1 associated providers: 1 name:AMD Radeon Graphics @ pci:0000:06:00.0
+PROVIDERS
+env_reverse_prime=(
+	"${env_common[@]}" TEST_PROPERTIES="$work/properties-unsupported"
+	DWM_KERNEL_DRIVER=nvidia DWM_XORG_DRIVER=amdgpu DWM_XORG_DRIVERS='amdgpu nvidia'
+	TEST_NVIDIA_OUTPUTS='HDMI-1 DP-1 DP-2' TEST_PROVIDERS="$work/providers-reverse-prime"
+)
+env "${env_reverse_prime[@]}" "$BASH_BIN" "$HELPER" capabilities \
+	>"$work/capabilities-reverse-prime"
+grep -Fqx $'output\tHDMI-1\tunsupported\tunsupported' "$work/capabilities-reverse-prime"
+env "${env_reverse_prime[@]}" "$BASH_BIN" "$HELPER" detect >"$work/detect-reverse-prime"
+grep -Fq 'ForceFullCompositionPipeline=unsupported' "$work/detect-reverse-prime"
+env "${env_reverse_prime[@]}" "$BASH_BIN" "$HELPER" generate "$work/profile-60.conf" \
+	>"$work/generated-reverse-prime.conf"
+grep -Fq 'MatchDriver "nvidia-drm"' "$work/generated-reverse-prime.conf"
+if grep -Fq 'ForceFullCompositionPipeline' "$work/generated-reverse-prime.conf"; then
+	printf '%s\n' 'ForceFullCompositionPipeline was emitted for a reverse PRIME sink' >&2
+	exit 1
+fi
+if env "${env_reverse_prime[@]}" "$BASH_BIN" "$HELPER" generate "$work/profile-60.conf" \
+	--force-full-composition-pipeline on >/dev/null 2>"$work/reverse-prime-error"; then
+	printf '%s\n' 'forced ForceFullCompositionPipeline was accepted for a reverse PRIME sink' >&2
+	exit 1
+fi
+grep -Fq 'reverse PRIME display sink' "$work/reverse-prime-error"
+# NVIDIA-G0 exists on such laptops even when no selected output uses it.
+if env "${env_reverse_prime[@]}" DWM_KERNEL_DRIVER=amdgpu \
+	"$BASH_BIN" "$HELPER" generate "$work/profile-60.conf" \
+	--force-full-composition-pipeline on >/dev/null 2>"$work/reverse-prime-amd-error"; then
+	printf '%s\n' 'forced ForceFullCompositionPipeline was accepted for AMD-only outputs' >&2
+	exit 1
+fi
+grep -Fq 'do not use the NVIDIA Xorg driver' "$work/reverse-prime-amd-error"
+env "${env_reverse_prime[@]}" TEST_PROVIDERS="$work/providers-nvidia-primary" \
+	"$BASH_BIN" "$HELPER" generate "$work/profile-60.conf" \
+	>"$work/generated-nvidia-primary.conf"
+grep -Fq 'Option "ForceFullCompositionPipeline" "true"' "$work/generated-nvidia-primary.conf"
 env "${env_common[@]}" TEST_PROPERTIES="$work/properties-unsupported" \
 	DWM_KERNEL_DRIVER=nvidia DWM_XORG_DRIVER=nvidia \
 	"$BASH_BIN" "$HELPER" generate "$work/profile-60.conf" >"$work/generated-nvidia.conf"

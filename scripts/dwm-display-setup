@@ -445,11 +445,37 @@ output_tearfree_compatible() {
 	return 1
 }
 
+# RandR names an NVIDIA GPU that renders an X screen NVIDIA-0 and one that only
+# displays frames rendered by another GPU (a reverse PRIME sink) NVIDIA-G0. The
+# answer is cached; it stays unknown when RandR cannot list providers. It is
+# GPU-wide: with several NVIDIA GPUs, any rendering one marks the role render,
+# matching the single nvidia-drm OutputClass the generator writes.
+nvidia_provider_role=
+nvidia_is_reverse_prime_sink() {
+	local providers
+
+	if [[ -z $nvidia_provider_role ]]; then
+		nvidia_provider_role=unknown
+		if [[ -n ${DISPLAY:-} ]] && command -v xrandr >/dev/null 2>&1 &&
+			providers=$(xrandr --listproviders 2>/dev/null); then
+			if grep -Eq 'name:NVIDIA-[0-9]+( |$)' <<<"$providers"; then
+				nvidia_provider_role=render
+			elif grep -Eq 'name:NVIDIA-G[0-9]+( |$)' <<<"$providers"; then
+				nvidia_provider_role=sink
+			fi
+		fi
+	fi
+	[[ $nvidia_provider_role == sink ]]
+}
+
 driver_full_composition_pipeline_compatible() {
 	local kernel_driver=$1
 
 	[[ $kernel_driver == nvidia ]] || return 1
-	xorg_uses_driver nvidia
+	xorg_uses_driver nvidia || return 1
+	# The composition pipeline belongs to an NVIDIA screen that composes its
+	# own frames. A reverse PRIME sink only scans out another GPU's frames.
+	! nvidia_is_reverse_prime_sink
 }
 
 output_full_composition_pipeline_compatible() {
@@ -457,6 +483,15 @@ output_full_composition_pipeline_compatible() {
 
 	[[ ${cfg_enabled[$index]} == 1 ]] || return 1
 	driver_full_composition_pipeline_compatible "${cfg_kernel_drivers[$index]}"
+}
+
+enabled_output_uses_nvidia() {
+	local index
+
+	for index in "${!cfg_outputs[@]}"; do
+		[[ ${cfg_enabled[$index]} == 1 && ${cfg_kernel_drivers[$index]} == nvidia ]] && return 0
+	done
+	return 1
 }
 
 full_composition_pipeline_compatible() {
@@ -739,6 +774,10 @@ resolved_full_composition_pipeline() {
 		;;
 	on)
 		if ! full_composition_pipeline_compatible; then
+			if enabled_output_uses_nvidia && xorg_uses_driver nvidia &&
+				nvidia_is_reverse_prime_sink; then
+				die "ForceFullCompositionPipeline was requested, but the NVIDIA outputs are a reverse PRIME display sink (RandR provider NVIDIA-G0)"
+			fi
 			die "ForceFullCompositionPipeline was requested, but the active outputs do not use the NVIDIA Xorg driver"
 		fi
 		return 0
