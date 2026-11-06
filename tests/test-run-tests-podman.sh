@@ -92,15 +92,21 @@ if args[0] == 'build':
         assert profile in text
     sys.exit(int(os.environ.get('CONTRACT_BUILD_STATUS', '0')))
 assert args[0] == 'run', args
-assert args[1:7] == ['--rm', '--interactive', '--network=private',
-                      '--security-opt=label=disable', '--mount',
+assert args[1:8] == ['--rm', '--interactive', '--network=private',
+                      '--security-opt=label=disable', '--security-opt=unmask=/proc/*', '--mount',
                       f'type=bind,src={work}/repository/.git,dst=/source/repository,ro=true,bind-nonrecursive'], args
-assert args[7:9] == ['--mount',
-                    f'type=bind,src={work}/current worktree,dst=/source/worktree,ro=true,bind-nonrecursive'], args
-assert args[9:13] == ['localhost/dwm-titus-tests:arch', 'bash', '-c', args[12]], args
-assert args[13] == 'container-stage', args
-assert len(args[14]) == 40, args
-script = args[12]
+assert args[8:10] == ['--mount',
+                     f'type=bind,src={work}/current worktree,dst=/source/worktree,ro=true,bind-nonrecursive'], args
+assert args[10:14] == ['localhost/dwm-titus-tests:arch', 'bash', '-c', args[13]], args
+assert args[14] == 'container-stage', args
+assert len(args[15]) == 40, args
+script = args[13]
+# The mock runs staging directly on its host, not inside a container. Keep
+# container account/display setup out of this fixture even when invoked as root;
+# the real rootless runner integration covers that namespaced setup.
+root_setup = 'if ((EUID == 0)); then'
+assert script.count(root_setup) == 1
+script = script.replace(root_setup, 'if false; then', 1)
 stage = work / 'container'
 stage.mkdir()
 script = script.replace('/source/repository', str(work / 'repository/.git'))
@@ -108,8 +114,8 @@ script = script.replace('/source/repository', str(work / 'repository/.git'))
 script = script.replace('/source/worktree', str(work / 'current worktree'))
 script = script.replace('/workspace', str(stage))
 if os.environ.get('CONTRACT_STAGE_FAILURE'):
-    args[14] = '0' * 40
-result = subprocess.run(['bash', '-c', script, *args[13:]], input=sys.stdin.buffer.read())
+    args[15] = '0' * 40
+result = subprocess.run(['bash', '-c', script, *args[14:]], input=sys.stdin.buffer.read())
 import shutil
 shutil.rmtree(stage)
 sys.exit(result.returncode)
