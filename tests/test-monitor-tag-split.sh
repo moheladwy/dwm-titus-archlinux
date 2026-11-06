@@ -225,9 +225,17 @@ until [ "$(active_window)" = "$client" ]; do
 	}
 	sleep 0.05
 done
+tiled=$(window_geometry "$client")
 DISPLAY=$display xdotool key Super+space
-sleep 0.5
-floating=$(window_geometry "$client")
+i=0
+until floating=$(window_geometry "$client") && [ "$floating" != "$tiled" ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf '%s\n' 'the test client did not float' >&2
+		exit 1
+	}
+	sleep 0.05
+done
 DISPLAY=$display xdotool windowstate --add FULLSCREEN "$client"
 i=0
 until [ "$(window_geometry "$client")" = 1920,0,1920,1080 ]; do
@@ -247,6 +255,45 @@ until [ "$(window_geometry "$client")" = "$floating" ]; do
 	[ "$i" -lt 200 ] || {
 		printf 'leaving fullscreen restored %s instead of %s\n' \
 			"$(window_geometry "$client")" "$floating" >&2
+		exit 1
+	}
+	sleep 0.05
+done
+
+# Fullscreen again, then move workspace 5 to the first monitor: leaving
+# fullscreen there restores the same geometry shifted onto that monitor.
+DISPLAY=$display xdotool windowstate --add FULLSCREEN "$client"
+i=0
+until [ "$(window_geometry "$client")" = 1920,0,1920,1080 ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf '%s\n' 'the test client did not become fullscreen again' >&2
+		exit 1
+	}
+	sleep 0.05
+done
+set_monitor_tags '[5, 4]'
+wait_for_value _DWM_MONITOR_TAGS 31,480
+DISPLAY=$display xdotool key Super+5
+wait_for_value _DWM_SELECTED_MONITOR 0
+i=0
+until [ "$(window_geometry "$client")" = 0,0,1920,1080 ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf 'the fullscreen client did not cover the first monitor (%s)\n' \
+			"$(window_geometry "$client")" >&2
+		exit 1
+	}
+	sleep 0.05
+done
+shifted=$(printf '%s\n' "$floating" | awk -F, '{ print $1 - 1920 "," $2 "," $3 "," $4 }')
+DISPLAY=$display xdotool windowstate --remove FULLSCREEN "$client"
+i=0
+until [ "$(window_geometry "$client")" = "$shifted" ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf 'leaving fullscreen on the new monitor restored %s instead of %s\n' \
+			"$(window_geometry "$client")" "$shifted" >&2
 		exit 1
 	}
 	sleep 0.05
