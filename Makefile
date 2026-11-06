@@ -521,8 +521,11 @@ check-diagnostics:
 check-status:
 	tests/test-dwm-status.sh
 
-check-monitor-tags:
+check-monitor-tags: all
 	tests/test-monitor-tag-switching.sh
+	status=0; tests/test-monitor-tag-split.sh || status=$$?; \
+		if [ "$$status" -eq 77 ]; then exit 0; fi; \
+		exit "$$status"
 
 check-quickshell-launcher:
 	tests/test-quickshell-launcher.sh

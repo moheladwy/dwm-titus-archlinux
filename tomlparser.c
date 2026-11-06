@@ -288,6 +288,17 @@ toml_parse(const char *path, TomlDoc *doc)
 					vp = unescape_into(vp + 1, dst, TOML_MAX_STR);
 					if (*vp == '"') vp++;
 					ent->val.a.len++;
+				} else if (*vp == '-' || isdigit((unsigned char)*vp)) {
+					/* Bare integers are kept as their decimal text. */
+					char *dst = ent->val.a.items[ent->val.a.len];
+					size_t n = 0;
+					while (*vp && *vp != ',' && *vp != ']'
+					       && !isspace((unsigned char)*vp)) {
+						if (n + 1 < TOML_MAX_STR) dst[n++] = *vp;
+						vp++;
+					}
+					dst[n] = '\0';
+					ent->val.a.len++;
 				} else {
 					vp++;
 				}

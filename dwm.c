@@ -84,7 +84,7 @@ enum { NetSupported, NetWMName, NetWMPid, NetWMState, NetWMCheck,
        NetWMWindowTypeMenu, NetWMWindowTypePopupMenu, NetWMWindowTypeDropdownMenu,
        NetWMWindowTypeCombo, NetWMWindowTypeDnd,
        NetClientList, NetDesktopNames, NetDesktopViewport, NetNumberOfDesktops, NetCurrentDesktop,
-       NetWMDesktop, NetDwmMonitorDesktops, NetDwmSelectedMonitor, NetLast }; /* EWMH atoms */
+       NetWMDesktop, NetDwmMonitorDesktops, NetDwmMonitorTags, NetDwmSelectedMonitor, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
@@ -501,10 +501,15 @@ struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 /* monitor-specific tag management */
 static int monitorcount = 1;
+/* Workspaces each monitor owns, in logical monitor order (primary first), from
+ * hotkeys.toml [monitors] tags. With fewer entries than monitors, split evenly. */
+static int montagcounts[TOML_MAX_ARR];
+static int nmontagcounts;
 static int getmonlogicalindex(Monitor *target);
 static unsigned int getmontagmask(int monnum);
 static void updatemonitorcount(void);
 static void reconcilemonitortags(void);
+static void setmontagcounts(const int *counts, int n);
 
 /* common utility implementations */
 static void
@@ -3686,6 +3691,43 @@ build_arg(const char *func_name, const TomlDoc *doc,
 	return arg;
 }
 
+/* Read [monitors] tags = [n, ...]: how many workspaces each monitor owns, in
+ * logical monitor order. Each entry must be at least 1 and they may total at
+ * most the number of tags; the last monitor also owns any left over. An absent
+ * value splits the workspaces evenly, and so does an invalid one, after a
+ * bad-config notification. */
+static void
+loadmontagcounts(const TomlDoc *doc, const char *path)
+{
+	const TomlValue *v = toml_get(doc, "monitors", "tags");
+	int counts[TOML_MAX_ARR];
+	int i, n = 0, total = 0, valid = 1;
+	long count;
+	char *end;
+
+	if (v && (v->type != TOML_ARRAY || v->a.len == 0))
+		valid = 0;
+	for (i = 0; v && valid && i < v->a.len; i++) {
+		errno = 0;
+		count = strtol(v->a.items[i], &end, 10);
+		if (end == v->a.items[i] || *end != '\0' || errno != 0
+		|| count < 1 || count > (long)LENGTH(tags)
+		|| (total += (int)count) > (int)LENGTH(tags)) {
+			valid = 0;
+			break;
+		}
+		counts[n++] = (int)count;
+	}
+	if (!valid) {
+		fprintf(stderr, "dwm: ignoring [monitors] tags: entries must be whole "
+		        "numbers of at least 1 that total at most %d\n", (int)LENGTH(tags));
+		if (path)
+			notify_bad_config(path, "invalid [monitors] tags");
+		n = 0;
+	}
+	setmontagcounts(counts, n);
+}
+
 static void
 load_hotkeys_toml(const char *user_path, const char *default_path)
 {
@@ -3706,6 +3748,7 @@ load_hotkeys_toml(const char *user_path, const char *default_path)
 			return;
 		}
 	}
+	loadmontagcounts(&doc, parsed ? user_path : default_path);
 	int nregular = toml_table_count(&doc, "keys");
 	int ntag     = toml_table_count(&doc, "tag_keys");
 	int total    = nregular + ntag * 4;
@@ -4256,6 +4299,7 @@ setup(void)
 	netatom[NetDesktopNames] = XInternAtom(dpy, "_NET_DESKTOP_NAMES", False);
 	netatom[NetWMDesktop] = XInternAtom(dpy, "_NET_WM_DESKTOP", False);
 	netatom[NetDwmMonitorDesktops] = XInternAtom(dpy, "_DWM_MONITOR_DESKTOPS", False);
+	netatom[NetDwmMonitorTags] = XInternAtom(dpy, "_DWM_MONITOR_TAGS", False);
 	netatom[NetDwmSelectedMonitor] = XInternAtom(dpy, "_DWM_SELECTED_MONITOR", False);
 	dwmfullscreenmonitorsatom = XInternAtom(dpy, "_DWM_FULLSCREEN_MONITORS", False);
 	dwmtagupdateatom = XInternAtom(dpy, "DWM_TAG_UPDATE", False);
@@ -5149,6 +5193,16 @@ updatecurrentdesktop(void)
 	}
 	XChangeProperty(dpy, root, netatom[NetDwmMonitorDesktops], XA_INTEGER, 32,
 		PropModeReplace, (unsigned char *)monitor_desktops, count * 5);
+	/* One tag mask per logical monitor, so panels draw the same split. */
+	for (i = 0; i < count; i++)
+		monitor_desktops[i] = 0;
+	for (m = mons; m; m = m->next) {
+		logicalindex = getmonlogicalindex(m);
+		if (logicalindex >= 0 && logicalindex < count)
+			monitor_desktops[logicalindex] = getmontagmask(m->num);
+	}
+	XChangeProperty(dpy, root, netatom[NetDwmMonitorTags], XA_CARDINAL, 32,
+		PropModeReplace, (unsigned char *)monitor_desktops, count);
 	free(monitor_desktops);
 	updateselectedmonitor();
 	updatefullscreenmonitors();
@@ -5779,13 +5833,18 @@ getmontagmask(int monnum)
 		
 	if (monitorcount <= 1)
 		return TAGMASK;
-		
-	tagspermon = LENGTH(tags) / monitorcount;
-	if (tagspermon == 0) tagspermon = 1;
-	
-	start = logicalindex * tagspermon;
-	end = start + tagspermon;
-	
+
+	if (nmontagcounts >= monitorcount && logicalindex < monitorcount) {
+		for (start = 0, i = 0; i < logicalindex; i++)
+			start += montagcounts[i];
+		end = start + montagcounts[logicalindex];
+	} else {
+		tagspermon = LENGTH(tags) / monitorcount;
+		if (tagspermon == 0) tagspermon = 1;
+		start = logicalindex * tagspermon;
+		end = start + tagspermon;
+	}
+
 	if (logicalindex == monitorcount - 1)
 		end = LENGTH(tags);
 	
@@ -5799,6 +5858,48 @@ getmontagmask(int monnum)
 		mask |= 1 << i;
 	
 	return mask ? mask : (1 << (monnum % LENGTH(tags)));
+}
+
+/* Change the configured workspace split. A monitor showing the first workspace
+ * of its old range moves to the first of its new one, so the split takes effect
+ * at login and on reload; windows follow their workspaces to the owning monitor. */
+static void
+setmontagcounts(const int *counts, int n)
+{
+	Monitor *m;
+	unsigned int *home, mask;
+	int i, nmons, changed = n != nmontagcounts;
+
+	for (i = 0; !changed && i < n; i++)
+		changed = counts[i] != montagcounts[i];
+	if (!changed)
+		return;
+	if (!mons) {
+		for (i = 0; i < n; i++)
+			montagcounts[i] = counts[i];
+		nmontagcounts = n;
+		return;
+	}
+	updatemonitorcount();
+	for (nmons = 0, m = mons; m; m = m->next)
+		nmons++;
+	home = ecalloc(nmons, sizeof(*home));
+	for (i = 0, m = mons; m; m = m->next, i++) {
+		mask = getmontagmask(m->num);
+		home[i] = mask & (~mask + 1);
+	}
+	for (i = 0; i < n; i++)
+		montagcounts[i] = counts[i];
+	nmontagcounts = n;
+	for (i = 0, m = mons; m; m = m->next, i++) {
+		mask = getmontagmask(m->num);
+		if (m->tagset[m->seltags] == home[i])
+			m->tagset[m->seltags] = mask & (~mask + 1);
+	}
+	free(home);
+	reconcilemonitortags();
+	arrange(NULL);
+	updatecurrentdesktop();
 }
 
 /* Keep each monitor on tags owned by its current logical monitor index. */

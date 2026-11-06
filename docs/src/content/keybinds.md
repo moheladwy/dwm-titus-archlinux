@@ -115,6 +115,11 @@ the dwm session after updating to activate this behavior.
 | `Super` + `0` | Show windows from all nine tags; `0` is not a tag |
 | `Super` + `Tab` | Previous tag |
 
+With several monitors, each monitor owns its own tags (split evenly by
+default), and switching to a tag focuses the monitor that owns it. Set the
+split with `[monitors] tags` in `hotkeys.toml`; see
+[Configuration](/configuration.html#workspaces-per-monitor).
+
 ## Multi-Monitor
 
 | Keys | Action |

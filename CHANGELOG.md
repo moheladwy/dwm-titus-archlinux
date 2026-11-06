@@ -14,6 +14,13 @@ the port.
 
 ### Added
 
+- Choose how many workspaces each monitor owns with `[monitors] tags` in
+  `hotkeys.toml` (for example `tags = [3, 6]` for 1-3 on the primary monitor
+  and 4-9 on the second). Without it the split stays even. Saving applies it
+  live, invalid values show a bad-config notification and keep the even split,
+  and dwm publishes each monitor's workspaces as `_DWM_MONITOR_TAGS` so the
+  panel shows the same split.
+
 - Add the `dwm-titus` agent skill (`config/agents/skills/dwm-titus/`, linked
   from `.agents/skills/` and `.claude/skills/`) so Claude Code, Codex, and
   other Agent Skills clients can install the desktop on a fresh or existing

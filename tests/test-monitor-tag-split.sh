@@ -1,0 +1,181 @@
+#!/bin/sh
+# Run dwm on two side-by-side monitors and check the per-monitor workspace
+# split: the even default, hotkeys.toml [monitors] tags applied on reload,
+# workspace keys landing on the owning monitor, and invalid values rejected.
+# Xvfb cannot expose two positioned monitors, so this uses Xorg with the dummy
+# video driver (xf86-video-dummy) and two RandR outputs; it skips (77) when
+# that server is unavailable.
+
+set -eu
+
+repo_dir=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
+
+for cmd in xrandr xprop xdotool; do
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		printf 'missing required command: %s\n' "$cmd" >&2
+		exit 77
+	fi
+done
+xorg=/usr/lib/Xorg
+dummy_driver=$(find /usr/lib/xorg/modules/drivers /usr/lib64/xorg/modules/drivers \
+	-name dummy_drv.so 2>/dev/null | head -n 1)
+if [ ! -x "$xorg" ] || [ -z "$dummy_driver" ]; then
+	printf '%s\n' 'skipping: Xorg with the dummy video driver is not installed' >&2
+	exit 77
+fi
+
+work=$(mktemp -d)
+trap 'set +e; [ -n "${dwm_pid:-}" ] && kill "$dwm_pid" 2>/dev/null; [ -n "${xorg_pid:-}" ] && kill "$xorg_pid" 2>/dev/null; rm -rf "$work"' EXIT HUP INT TERM
+
+home="$work/home"
+hotkeys="$home/.config/dwm-titus/hotkeys.toml"
+mkdir -p "$work/bin" "$home/.config/dwm-titus" "$home/.local/share/dwm-titus/config"
+# Keep notifications off the caller's desktop while recording them.
+: >"$work/notifications.log"
+cat >"$work/bin/notify-send" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >>"${DWM_XVFB_NOTIFICATION_LOG:?}"
+EOF
+chmod 755 "$work/bin/notify-send"
+cp "$repo_dir/config/hotkeys.toml" "$repo_dir/config/themes.toml" \
+	"$repo_dir/config/window-rules.toml" "$home/.config/dwm-titus/"
+cp "$repo_dir/config/"*.toml "$home/.local/share/dwm-titus/config/"
+cp "$hotkeys" "$work/hotkeys.base"
+
+root_value() {
+	DISPLAY=$display xprop -root "$1" 2>/dev/null | sed -n 's/^[^=]*= //p' | tr -d '[:space:]'
+}
+
+wait_for_value() {
+	prop=$1
+	expected=$2
+	i=0
+	while [ "$i" -lt 200 ]; do
+		[ "$(root_value "$prop")" = "$expected" ] && return 0
+		i=$((i + 1))
+		sleep 0.05
+	done
+	printf '%s did not become %s (last: %s)\n' "$prop" "$expected" "$(root_value "$prop")" >&2
+	tail -n 20 "$work/dwm.log" >&2
+	return 1
+}
+
+set_monitor_tags() {
+	cp "$work/hotkeys.base" "$hotkeys"
+	if [ -n "$1" ]; then
+		printf '\n[monitors]\ntags = %s\n' "$1" >>"$hotkeys"
+	fi
+	kill -USR1 "$dwm_pid"
+}
+
+# A headless server: no input devices or GPUs are added from the host.
+cat >"$work/xorg.conf" <<'EOF'
+Section "ServerFlags"
+	Option "AutoAddDevices" "false"
+	Option "AutoAddGPU" "false"
+	Option "AutoBindGPU" "false"
+EndSection
+Section "Device"
+	Identifier "dummy"
+	Driver "dummy"
+	VideoRam 256000
+EndSection
+Section "Screen"
+	Identifier "screen"
+	Device "dummy"
+	DefaultDepth 24
+	SubSection "Display"
+		Depth 24
+		Virtual 3840 1080
+	EndSubSection
+EndSection
+EOF
+display=":$((($$ % 500) + 650))"
+"$xorg" "$display" -config "$work/xorg.conf" -noreset -nolisten tcp \
+	-logfile "$work/xorg.log" >"$work/xorg.out" 2>&1 &
+xorg_pid=$!
+i=0
+until DISPLAY=$display xprop -root >/dev/null 2>&1; do
+	i=$((i + 1))
+	if [ "$i" -ge 200 ] || ! kill -0 "$xorg_pid" 2>/dev/null; then
+		printf '%s\n' 'skipping: Xorg with the dummy driver did not start' >&2
+		tail -n 20 "$work/xorg.log" >&2 2>/dev/null || true
+		exit 77
+	fi
+	sleep 0.05
+done
+# Two 1920x1080 outputs side by side; dwm reads them through Xinerama.
+DISPLAY=$display xrandr --newmode 1920x1080_test 173.00 1920 2048 2248 2576 \
+	1080 1083 1088 1120 -hsync +vsync
+for output in DUMMY0 DUMMY1; do
+	DISPLAY=$display xrandr --addmode "$output" 1920x1080_test
+done
+DISPLAY=$display xrandr --output DUMMY0 --mode 1920x1080_test --pos 0x0 --primary \
+	--output DUMMY1 --mode 1920x1080_test --pos 1920x0
+
+DISPLAY=$display \
+	HOME=$home \
+	XDG_CONFIG_HOME="$home/.config" \
+	XDG_DATA_HOME="$home/.local/share" \
+	PATH="$work/bin:$repo_dir:$PATH" \
+	DWM_XVFB_NOTIFICATION_LOG="$work/notifications.log" \
+	"$repo_dir/dwm" >"$work/dwm.log" 2>&1 &
+dwm_pid=$!
+
+# Default: nine workspaces split evenly, 1-4 and 5-9.
+wait_for_value _DWM_MONITOR_TAGS 15,496
+wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,0,1920,0,1920,1080,4
+
+# 1-3 on the first monitor, 4-9 on the second, which moves from its old first
+# workspace (5) to its new one (4).
+set_monitor_tags '[3, 6]'
+wait_for_value _DWM_MONITOR_TAGS 7,504
+wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,0,1920,0,1920,1080,3
+
+# Workspace keys land on the monitor that owns the workspace.
+DISPLAY=$display xdotool key Super+5
+wait_for_value _DWM_SELECTED_MONITOR 1
+wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,0,1920,0,1920,1080,4
+DISPLAY=$display xdotool key Super+3
+wait_for_value _DWM_SELECTED_MONITOR 0
+wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,2,1920,0,1920,1080,4
+
+# The last monitor also owns workspaces the list leaves over.
+set_monitor_tags '[2, 2]'
+wait_for_value _DWM_MONITOR_TAGS 3,508
+
+# Fewer entries than monitors falls back to the even split, quietly.
+set_monitor_tags '[3]'
+wait_for_value _DWM_MONITOR_TAGS 15,496
+[ ! -s "$work/notifications.log" ] || {
+	printf '%s\n' 'a valid [monitors] value emitted a notification' >&2
+	cat "$work/notifications.log" >&2
+	exit 1
+}
+
+# Invalid values keep the even split and report the bad setting.
+set_monitor_tags '[3, 6]'
+wait_for_value _DWM_MONITOR_TAGS 7,504
+for invalid in '[5, 6]' '[0, 9]' '["three", 6]'; do
+	before=$(wc -l <"$work/notifications.log")
+	set_monitor_tags "$invalid"
+	wait_for_value _DWM_MONITOR_TAGS 15,496
+	i=0
+	while [ "$(wc -l <"$work/notifications.log")" -le "$before" ]; do
+		i=$((i + 1))
+		[ "$i" -lt 100 ] || {
+			printf 'invalid [monitors] tags %s raised no notification\n' "$invalid" >&2
+			exit 1
+		}
+		sleep 0.05
+	done
+	grep -Fq 'invalid [monitors] tags' "$work/notifications.log"
+	set_monitor_tags '[3, 6]'
+	wait_for_value _DWM_MONITOR_TAGS 7,504
+done
+
+# Removing the section restores the even split.
+set_monitor_tags ''
+wait_for_value _DWM_MONITOR_TAGS 15,496
+
+printf '%s\n' 'Configured per-monitor workspace split on two monitors: PASS'

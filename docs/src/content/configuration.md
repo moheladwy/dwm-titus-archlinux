@@ -417,6 +417,30 @@ tag_keys = [
 ]
 ```
 
+### Workspaces per Monitor
+
+With several monitors, each monitor owns its own workspaces. By default the
+nine are split evenly: with two monitors, the primary owns 1-4 and the second
+5-9. Switching to a workspace focuses the monitor that owns it, and the panel
+shows each monitor its own workspaces.
+
+To choose the split, add a `[monitors]` section at the end of `hotkeys.toml`
+and list how many workspaces each monitor owns, primary first:
+
+```toml
+[monitors]
+tags = [3, 6]   # primary: 1-3, second monitor: 4-9
+```
+
+Each entry must be at least 1 and they may total at most 9; the last monitor
+also owns any left over. Keep the list on one line. Saving applies it live:
+windows move with their workspaces to the monitor that now owns them, and a
+monitor showing the first workspace of its old range moves to the first of
+its new one. With more monitors than entries, or an invalid value, the
+workspaces are split evenly again; an invalid value also shows a
+"bad config" notification. A dwm built before this setting ignores it, so log
+out and back in once after updating.
+
 ---
 
 ## Notes on XDG Autostart

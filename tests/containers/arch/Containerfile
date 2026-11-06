@@ -39,7 +39,7 @@ RUN bash -euo pipefail -c 'retry() { local attempt; \
         dwm_packages arch "$profile"; done); \
     mapfile -t packages < <(printf "%s\n" "$packages" | sort -u); \
     packages+=(bash git tar findutils diffutils shellcheck shfmt \
-        rsync python-pillow gtk3 gtk4 xorg-xauth); \
+        rsync python-pillow gtk3 gtk4 xorg-xauth xf86-video-dummy); \
     retry pacman -Sw --noconfirm --needed --disable-download-timeout "${packages[@]}"; \
     pacman -S --noconfirm --needed "${packages[@]}"; \
     pacman -Scc --noconfirm; find /var/cache/pacman/pkg -mindepth 1 -delete; \

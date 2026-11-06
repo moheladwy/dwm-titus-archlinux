@@ -193,3 +193,13 @@ buttons = [
   { click="ClkTagBar",    mod="",       button=1,  func="view" },
   { click="ClkTagBar",    mod="",       button=3,  func="toggleview" },
 ]
+
+# ── MONITOR WORKSPACES ────────────────────────────────────────────────────────
+# With several monitors, each monitor owns its own workspaces, split evenly by
+# default (two monitors: 1-4 and 5-9). To choose the split, uncomment the two
+# lines below and list how many workspaces each monitor owns, primary first.
+# Each entry must be at least 1, they may total at most 9, and the last monitor
+# also takes any left over. Keep the list on one line. Saving applies it live.
+#
+# [monitors]
+# tags = [3, 6]
