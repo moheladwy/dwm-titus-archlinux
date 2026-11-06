@@ -173,8 +173,8 @@ with tempfile.TemporaryDirectory(dir=os.environ["TMPDIR"]) as directory:
             for widget in ("calendar", "weather"):
                 ipc(widget)
                 wait(lambda: state()[widget + "Visible"], f"{widget} did not reopen for overview")
-                run("xdotool", "key", "super+Tab")
-                wait(lambda: state()["overviewVisible"] and not state()["overviewBusy"], "Super+Tab did not open overview over a panel popup")
+                run("xdotool", "key", "super+grave")
+                wait(lambda: state()["overviewVisible"] and not state()["overviewBusy"], "Super+grave did not open overview over a panel popup")
                 assert not state()["calendarVisible"] and not state()["weatherVisible"], "Panel widget remained visible over the overview"
                 run("xdotool", "key", "Escape")
                 wait(lambda: not state()["overviewVisible"] and not state()["overviewBusy"], "Overview Escape did not dismiss")
