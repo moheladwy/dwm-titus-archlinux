@@ -49,8 +49,11 @@ the end of `hotkeys.toml`, keeping the list on one line:
 tags = [3, 6]   # primary 1-3, second monitor 4-9
 ```
 
-List how many workspaces each monitor owns, primary first (check the order with
-`xrandr --listmonitors`). Entries are at least 1 and total at most 9; the last
+List how many workspaces each monitor owns in dwm's monitor order: normally the
+primary first, then the X server's monitor order, but a monitor at y >= 1080
+counts as first.
+Check the order with `xprop -root _DWM_MONITOR_DESKTOPS` (rows of x, y, width,
+height, workspace per monitor). Entries are at least 1 and total at most 9; the last
 monitor takes any left over. Saving applies it live and moves windows with
 their workspaces. An invalid value shows a "bad config" notification and keeps
 the even split. Confirm with `xprop -root _DWM_MONITOR_TAGS` (one bitmask per

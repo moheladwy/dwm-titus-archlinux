@@ -197,7 +197,8 @@ buttons = [
 # ── MONITOR WORKSPACES ────────────────────────────────────────────────────────
 # With several monitors, each monitor owns its own workspaces, split evenly by
 # default (two monitors: 1-4 and 5-9). To choose the split, uncomment the two
-# lines below and list how many workspaces each monitor owns, primary first.
+# lines below and list how many workspaces each monitor owns, in dwm's monitor
+# order: normally the primary first (see xprop -root _DWM_MONITOR_DESKTOPS).
 # Each entry must be at least 1, they may total at most 9, and the last monitor
 # also takes any left over. Keep the list on one line. Saving applies it live.
 #

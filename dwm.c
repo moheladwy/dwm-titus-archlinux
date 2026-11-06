@@ -505,6 +505,9 @@ static int monitorcount = 1;
  * hotkeys.toml [monitors] tags. With fewer entries than monitors, split evenly. */
 static int montagcounts[TOML_MAX_ARR];
 static int nmontagcounts;
+/* Last published _DWM_MONITOR_TAGS, to skip unchanged writes. */
+static long publishedmontags[TOML_MAX_ARR];
+static int npublishedmontags = -1;
 static int getmonlogicalindex(Monitor *target);
 static unsigned int getmontagmask(int monnum);
 static void updatemonitorcount(void);
@@ -5193,7 +5196,8 @@ updatecurrentdesktop(void)
 	}
 	XChangeProperty(dpy, root, netatom[NetDwmMonitorDesktops], XA_INTEGER, 32,
 		PropModeReplace, (unsigned char *)monitor_desktops, count * 5);
-	/* One tag mask per logical monitor, so panels draw the same split. */
+	/* One tag mask per logical monitor, so panels draw the same split. It
+	 * changes only on reload or hotplug; skip rewrites that wake watchers. */
 	for (i = 0; i < count; i++)
 		monitor_desktops[i] = 0;
 	for (m = mons; m; m = m->next) {
@@ -5201,8 +5205,17 @@ updatecurrentdesktop(void)
 		if (logicalindex >= 0 && logicalindex < count)
 			monitor_desktops[logicalindex] = getmontagmask(m->num);
 	}
-	XChangeProperty(dpy, root, netatom[NetDwmMonitorTags], XA_CARDINAL, 32,
-		PropModeReplace, (unsigned char *)monitor_desktops, count);
+	if (count > TOML_MAX_ARR || count != npublishedmontags
+	|| memcmp(publishedmontags, monitor_desktops, count * sizeof(long)) != 0) {
+		XChangeProperty(dpy, root, netatom[NetDwmMonitorTags], XA_CARDINAL, 32,
+			PropModeReplace, (unsigned char *)monitor_desktops, count);
+		if (count <= TOML_MAX_ARR) {
+			memcpy(publishedmontags, monitor_desktops, count * sizeof(long));
+			npublishedmontags = count;
+		} else {
+			npublishedmontags = -1;
+		}
+	}
 	free(monitor_desktops);
 	updateselectedmonitor();
 	updatefullscreenmonitors();

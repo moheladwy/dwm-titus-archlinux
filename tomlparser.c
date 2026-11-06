@@ -288,8 +288,9 @@ toml_parse(const char *path, TomlDoc *doc)
 					vp = unescape_into(vp + 1, dst, TOML_MAX_STR);
 					if (*vp == '"') vp++;
 					ent->val.a.len++;
-				} else if (*vp == '-' || isdigit((unsigned char)*vp)) {
-					/* Bare integers are kept as their decimal text. */
+				} else {
+					/* Bare tokens such as integers are kept as their text,
+					 * so readers can parse or reject them. */
 					char *dst = ent->val.a.items[ent->val.a.len];
 					size_t n = 0;
 					while (*vp && *vp != ',' && *vp != ']'
@@ -299,8 +300,6 @@ toml_parse(const char *path, TomlDoc *doc)
 					}
 					dst[n] = '\0';
 					ent->val.a.len++;
-				} else {
-					vp++;
 				}
 			}
 

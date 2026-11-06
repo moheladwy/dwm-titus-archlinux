@@ -57,3 +57,7 @@ RUN bash -euo pipefail -c 'useradd -m aurbuild; \
 
 # No systemd, host session, or hardware is required by the runner.
 ENV QT_QUICK_BACKEND=software
+
+# This image installs xf86-video-dummy for the two-monitor test; make a
+# missing or failing dummy server an error instead of a skip.
+ENV DWM_TEST_REQUIRE_XORG_DUMMY=1

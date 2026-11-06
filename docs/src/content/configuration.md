@@ -425,7 +425,11 @@ nine are split evenly: with two monitors, the primary owns 1-4 and the second
 shows each monitor its own workspaces.
 
 To choose the split, add a `[monitors]` section at the end of `hotkeys.toml`
-and list how many workspaces each monitor owns, primary first:
+and list how many workspaces each monitor owns, in dwm's monitor order. That is
+normally the primary monitor first, then the others in the X server's monitor
+order; a monitor placed below another at y >= 1080 counts as first. The rows of
+`xprop -root _DWM_MONITOR_DESKTOPS` (x, y, width, height, workspace per
+monitor) and the masks in `xprop -root _DWM_MONITOR_TAGS` follow that order.
 
 ```toml
 [monitors]

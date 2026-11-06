@@ -19,9 +19,15 @@ done
 xorg=/usr/lib/Xorg
 dummy_driver=$(find /usr/lib/xorg/modules/drivers /usr/lib64/xorg/modules/drivers \
 	-name dummy_drv.so 2>/dev/null | head -n 1)
-if [ ! -x "$xorg" ] || [ -z "$dummy_driver" ]; then
-	printf '%s\n' 'skipping: Xorg with the dummy video driver is not installed' >&2
+# The pinned test container sets DWM_TEST_REQUIRE_XORG_DUMMY=1, so a missing or
+# failing server is an error there instead of a skip.
+skip() {
+	printf 'skipping: %s\n' "$1" >&2
+	[ "${DWM_TEST_REQUIRE_XORG_DUMMY:-0}" = 1 ] && exit 1
 	exit 77
+}
+if [ ! -x "$xorg" ] || [ -z "$dummy_driver" ]; then
+	skip 'Xorg with the dummy video driver is not installed'
 fi
 
 work=$(mktemp -d)
@@ -96,11 +102,13 @@ wait_for_value() {
 	return 1
 }
 
+# Replace hotkeys.toml in one rename, so dwm never reloads a half-written file.
 set_monitor_tags() {
-	cp "$work/hotkeys.base" "$hotkeys"
+	cp "$work/hotkeys.base" "$hotkeys.next"
 	if [ -n "$1" ]; then
-		printf '\n[monitors]\ntags = %s\n' "$1" >>"$hotkeys"
+		printf '\n[monitors]\ntags = %s\n' "$1" >>"$hotkeys.next"
 	fi
+	mv "$hotkeys.next" "$hotkeys"
 	kill -USR1 "$dwm_pid"
 }
 
@@ -134,9 +142,8 @@ i=0
 until DISPLAY=$display xprop -root >/dev/null 2>&1; do
 	i=$((i + 1))
 	if [ "$i" -ge 200 ] || ! kill -0 "$xorg_pid" 2>/dev/null; then
-		printf '%s\n' 'skipping: Xorg with the dummy driver did not start' >&2
 		tail -n 20 "$work/xorg.log" >&2 2>/dev/null || true
-		exit 77
+		skip 'Xorg with the dummy driver did not start'
 	fi
 	sleep 0.05
 done
@@ -217,7 +224,7 @@ wait_for_value _DWM_MONITOR_TAGS 15,496
 # Invalid values keep the even split and report the bad setting.
 set_monitor_tags '[3, 6]'
 wait_for_value _DWM_MONITOR_TAGS 7,504
-for invalid in '[5, 6]' '[0, 9]' '["three", 6]'; do
+for invalid in '[5, 6]' '[0, 9]' '["three", 6]' '[3, true, 6]'; do
 	before=$(wc -l <"$work/notifications.log")
 	set_monitor_tags "$invalid"
 	wait_for_value _DWM_MONITOR_TAGS 15,496
