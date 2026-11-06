@@ -274,7 +274,7 @@ elif action == 'set':
         assert state()["items"][0]["timeoutMs"] == 0
         version = subprocess.run(["quickshell", "--version"], env=env, capture_output=True, text=True,
                                  check=True, timeout=5).stdout
-        # This exact Fedora build has an inverted comparison in setText(): it
+        # This Quickshell snapshot (revision dacfa9d) has an inverted comparison in setText(): it
         # discards changed labels before QML receives them. Keep other native
         # replacement assertions active, and test our textChanged handler below.
         broken_labels = "dacfa9de829ac7cb173825f593236bf2c21f637e" in version
