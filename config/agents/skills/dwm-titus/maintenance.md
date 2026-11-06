@@ -107,6 +107,7 @@ confirmed repair buttons. For a source checkout, also run
 | Interrupted system update | Read `/var/log/pacman.log`, then Update Center > **Recover**, or run `sudo pacman -Syu` again. pacman does not roll back. |
 | Settings warns about PackageKit | PackageKit frontends can run `pacman -Sy` behind the user's back. Suggest removing `packagekit` if nothing needs it. |
 | NVIDIA black screen after suspend | `nvidia-suspend-test.sh` diagnoses the setup. |
+| Desktop freezes about 2 s at a time after plugging in a monitor (hybrid laptop) | If `xrandr --listproviders` shows `NVIDIA-G0`, the port is on the NVIDIA GPU while the other GPU renders (reverse PRIME); the NVIDIA display driver can block X in 2 s timeouts. Confirm with `grep 'unsynchronized pixmap' /var/log/Xorg.0.log`. The fix is making NVIDIA the primary GPU (Xorg `PrimaryGPU`, see `docs/src/content/troubleshooting.md`), a system change: ask first, keep a rollback, and remind the user a TTY login recovers a failed start. |
 
 ## Recovery from a broken session
 

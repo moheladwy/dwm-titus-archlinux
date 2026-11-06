@@ -213,6 +213,14 @@ the port.
 
 ### Fixed
 
+- `dwm-display-setup` no longer enables NVIDIA `ForceFullCompositionPipeline`
+  for outputs on an NVIDIA GPU that is only a reverse PRIME display sink
+  (RandR provider `NVIDIA-G0`), as on hybrid laptops whose external port is
+  wired to the NVIDIA GPU while the integrated GPU renders the desktop. The
+  `capabilities` and `detect` reports mark those outputs unsupported, and
+  forcing the option on for them is rejected. Layouts saved earlier keep their
+  file; re-run `dwm-display-setup` to regenerate it.
+
 - Make the invalid-configuration notification say what happens. It said the
   defaults were loaded, but dwm skips a file that fails to parse: a reload
   keeps the previous settings and nothing from the file is used at startup.

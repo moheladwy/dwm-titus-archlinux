@@ -190,9 +190,23 @@ Alacritty. The default `Super`+`X` binding remains plain Alacritty.
   option or RandR property. Unsupported drivers are left unchanged.
 - NVIDIA Full Composition Pipeline is enabled in generated persistence only
   when the relevant output uses the NVIDIA kernel driver and an NVIDIA Xorg
-  provider is available, including supported hybrid configurations. Run
+  provider is available, including supported hybrid configurations. It stays
+  off when the NVIDIA GPU is only a reverse PRIME display sink (RandR provider
+  `NVIDIA-G0`), because another GPU renders the frames there. Run
   `dwm-display-setup capabilities` to inspect the detected fallback before
   saving a layout.
+- Hybrid laptop freezes for about two seconds at a time after an external
+  monitor is connected: on many laptops the external port is wired to the
+  NVIDIA GPU while the integrated GPU renders the desktop (reverse PRIME).
+  `xrandr --listproviders` then shows `NVIDIA-G0`, and the X log may report
+  `falling back to unsynchronized pixmap sharing`. The NVIDIA display driver
+  can then block the X server in two-second timeouts. Making the NVIDIA GPU
+  the primary renderer (`Option "PrimaryGPU" "yes"` in an `OutputClass`
+  matching `nvidia-drm`, with the integrated GPU attached as an output sink
+  through `xrandr --setprovideroutputsource` at display-manager start, as
+  described on the ArchWiki "NVIDIA Optimus" page) avoids that path. This is a
+  system Xorg change outside dwm-titus; keep a rollback ready and a TTY login
+  available.
 - Display layout profiles: run `dwm-display-profile dir` and
   `dwm-display-profile template` to create optional `xrandr` profiles
 
