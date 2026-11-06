@@ -189,6 +189,13 @@ case $* in
 		exit 1
 	fi
 	;;
+*"_DWM_MONITOR_TAGS"*)
+	if [ "${DWM_TEST_MONITOR_TAGS+x}" = x ]; then
+		printf '_DWM_MONITOR_TAGS(CARDINAL) = %s\n' "$DWM_TEST_MONITOR_TAGS"
+	else
+		exit 1
+	fi
+	;;
 *"_DWM_SELECTED_MONITOR"*)
 	if [ "${DWM_TEST_SELECTED_MONITOR+x}" = x ]; then
 		printf '_DWM_SELECTED_MONITOR(CARDINAL) = %s\n' "$DWM_TEST_SELECTED_MONITOR"
@@ -213,15 +220,20 @@ chmod +x "$work/bin/xprop" "$work/bin/xdotool"
 
 DWM_TEST_FULLSCREEN_MONITORS='0, 1' \
 	DWM_TEST_MONITOR_DESKTOPS='2560, 0, 2560, 1440, 0, 0, 0, 2560, 1440, 4' \
+	DWM_TEST_MONITOR_TAGS='7, 504' \
 	DWM_TEST_SELECTED_MONITOR=1 \
 	PATH="$work/bin:$PATH" \
 	"$repo_dir/scripts/dwm-quickshell-state" state >"$work/state.out"
 grep -Fqx 'monitor_desktops=2560,0,2560,1440,0,0,0,2560,1440,4' "$work/state.out"
+grep -Fqx 'monitor_tags=7,504' "$work/state.out"
 grep -Fqx 'focused_monitor=1' "$work/state.out"
 grep -Fqx 'fullscreen_monitors=0|1' "$work/state.out"
 
 PATH="$work/bin:$PATH" \
 	"$repo_dir/scripts/dwm-quickshell-state" state >"$work/fallback.out"
 grep -Fqx 'monitor_desktops=4' "$work/fallback.out"
+# An older dwm publishes no tag masks; the panel then keeps its even split.
+grep -Fqx 'monitor_tags=' "$work/fallback.out"
+grep -Eq '^[[:space:]]+_DWM_MONITOR_TAGS [\]$' "$repo_dir/scripts/dwm-quickshell-state"
 
 printf '%s\n' "Monitor tag-switch source guard: PASS"

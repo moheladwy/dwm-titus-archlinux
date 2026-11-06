@@ -289,7 +289,17 @@ toml_parse(const char *path, TomlDoc *doc)
 					if (*vp == '"') vp++;
 					ent->val.a.len++;
 				} else {
-					vp++;
+					/* Bare tokens such as integers are kept as their text,
+					 * so readers can parse or reject them. */
+					char *dst = ent->val.a.items[ent->val.a.len];
+					size_t n = 0;
+					while (*vp && *vp != ',' && *vp != ']'
+					       && !isspace((unsigned char)*vp)) {
+						if (n + 1 < TOML_MAX_STR) dst[n++] = *vp;
+						vp++;
+					}
+					dst[n] = '\0';
+					ent->val.a.len++;
 				}
 			}
 

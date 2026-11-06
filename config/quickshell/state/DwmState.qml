@@ -7,6 +7,9 @@ Scope {
     property int currentWorkspace: 0
     property int focusedMonitorIndex: -1
     property var monitorWorkspaceRows: []
+    // One workspace bitmask per logical monitor, published by dwm as
+    // _DWM_MONITOR_TAGS. Empty with an older dwm, which splits evenly.
+    property var monitorTagMasks: []
     property var workspaceNames: ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
     property var occupiedWorkspaces: []
     property var fullscreenMonitorIndexes: []
@@ -50,6 +53,11 @@ Scope {
                     });
                 }
                 root.monitorWorkspaceRows = rows;
+            } else if (key === "monitor_tags") {
+                root.monitorTagMasks = value.length > 0 ? value.split(",").map(function(mask) {
+                    const parsed = parseInt(mask, 10);
+                    return isNaN(parsed) ? 0 : parsed;
+                }) : [];
             } else if (key === "focused_monitor") {
                 const parsed = parseInt(value, 10);
 
@@ -162,6 +170,20 @@ Scope {
         const screenCount = Math.max(1, root.monitorWorkspaceRows.length > 0
             ? root.monitorWorkspaceRows.length : Quickshell.screens.length);
         const logicalIndex = Math.min(root.screenIndex(screen), screenCount - 1);
+        const mask = root.monitorTagMasks.length === screenCount
+            ? root.monitorTagMasks[logicalIndex] : 0;
+
+        if (mask > 0) {
+            for (let index = 0; index < workspaceCount; index++) {
+                if (mask & (1 << index)) {
+                    indexes.push(index);
+                }
+            }
+            if (indexes.length > 0) {
+                return indexes;
+            }
+        }
+
         const workspacesPerScreen = Math.max(1, Math.floor(workspaceCount / screenCount));
         let start = logicalIndex * workspacesPerScreen;
         let end = logicalIndex === screenCount - 1

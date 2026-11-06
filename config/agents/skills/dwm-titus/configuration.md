@@ -38,6 +38,27 @@ tag_keys = [
 - Each `tag_keys` entry generates the view, toggle-view, move, and toggle-tag
   bindings for that tag.
 
+### Workspaces per monitor
+
+With several monitors each monitor owns its own workspaces, split evenly by
+default (two monitors: 1-4 and 5-9). To change the split, add this section at
+the end of `hotkeys.toml`, keeping the list on one line:
+
+```toml
+[monitors]
+tags = [3, 6]   # primary 1-3, second monitor 4-9
+```
+
+List how many workspaces each monitor owns in dwm's monitor order: normally the
+primary first, then the X server's monitor order, but a monitor at y >= 1080
+counts as first.
+Check the order with `xprop -root _DWM_MONITOR_DESKTOPS` (rows of x, y, width,
+height, workspace per monitor). Entries are at least 1 and total at most 9; the last
+monitor takes any left over. Saving applies it live and moves windows with
+their workspaces. An invalid value shows a "bad config" notification and keeps
+the even split. Confirm with `xprop -root _DWM_MONITOR_TAGS` (one bitmask per
+monitor; `7, 504` means 1-3 and 4-9).
+
 Put new bindings inside the `keys = [ ... ]` array, before its closing `]`.
 The commented examples under "CUSTOM SHORTCUTS" sit after the array, and
 entries placed there are ignored. Before adding a binding, search for the same
