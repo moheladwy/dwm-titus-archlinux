@@ -309,6 +309,11 @@ the port.
 - Install `nm-connection-editor` with the recommended profile. The network
   popover already sends Edit Connections and enterprise (802.1X) Wi-Fi to it,
   but stock installs did not have it, so those paths were hidden or failed.
+- Mark panel tags that hold windows with a small corner square and draw their
+  numbers brighter than empty tags. The panel state helper now reads xprop's
+  window-list format, so the occupied tags and the panel's running-apps list
+  are no longer always empty, and it reads each window's properties with one
+  xprop call.
 
 - Make Kitty follow the selected theme instead of Nord. The shipped
   `kitty.conf` no longer sets its own palette or includes `nord.conf`. Theme
