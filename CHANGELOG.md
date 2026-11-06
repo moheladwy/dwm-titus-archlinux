@@ -20,6 +20,14 @@ the port.
   live, invalid values show a bad-config notification and keep the even split,
   and dwm publishes each monitor's workspaces as `_DWM_MONITOR_TAGS` so the
   panel shows the same split.
+- Add a searchable window overview in Control Center and the command menu.
+  Super+` (grave) toggles it by default, leaving Super+Tab as Previous tag;
+  existing user hotkey files are preserved, with one-entry instructions in the
+  overview guide.
+  Individual cards show titles, applications, tags and monitors; click or use
+  the keyboard to focus existing windows without moving them (#350).
+  Capture static window thumbnails once when the overview opens, including
+  hidden tags, with icon fallback and cleanup on close.
 
 - Ship the `dwm-titus-debug` diagnosis skill next to the Arch `dwm-titus`
   skill, an AI assistant Settings page, actionable crash notifications, and
