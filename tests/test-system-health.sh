@@ -130,6 +130,8 @@ grep -Fq $'check\tdependencies\twarn\tpackage-database\tPackage database\tPackag
 # Reject invalid/unbounded audit durations and preserve valid positive seconds.
 cat >"$work/bin/pacman" <<'SCRIPT'
 #!/bin/sh
+# Only the database audit is recorded; other pacman queries are not audits.
+[ "$1" = -Dk ] || exit 0
 printf 'audit ran\n' >>"${DWM_AUDIT_LOG:?}"
 SCRIPT
 cat >"$work/bin/timeout" <<'SCRIPT'

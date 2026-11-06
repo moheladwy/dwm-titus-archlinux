@@ -12,7 +12,11 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def fixture_environment(base):
-    return {**os.environ, "HOME": str(base),
+    # gnome-keyring ships the PAM module on Arch; check-deps looks for the file.
+    security = base / "security"
+    security.mkdir(exist_ok=True)
+    (security / "pam_gnome_keyring.so").touch()
+    return {**os.environ, "HOME": str(base), "DWM_PAM_SECURITY_DIR": str(security),
             **{"XDG_" + kind + "_HOME": str(base / kind.lower())
                for kind in ("CONFIG", "DATA", "STATE", "CACHE")}}
 
@@ -40,7 +44,7 @@ class DependencyLaunchers(unittest.TestCase):
             tools = base / "bin"
             tools.mkdir()
             for cmd in ("cc", "make", "Xorg", "startx", "xrandr", "xset", "xsetroot", "xkbset",
-                        "quickshell", "picom", "feh", "xsettingsd", "bwrap", "xclip", "xdotool", "maim", "rpm",
+                        "quickshell", "picom", "feh", "xsettingsd", "bwrap", "xclip", "xdotool", "maim", "pacman",
                         "dex", "amixer", "jq", "bluetoothctl", "blueman-applet", "alacritty", "xdg-open"):
                 p = tools / cmd
                 p.write_text("#!/bin/sh\nexit 0\n")
