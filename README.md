@@ -31,7 +31,7 @@ This is a fork of [ChrisTitusTech/dwm-titus](https://github.com/ChrisTitusTech/d
 | **A focused desktop** | Automatic window tiling, nine workspaces, fast keyboard navigation, multi-monitor support, and flexible fullscreen modes. |
 | **Everyday essentials** | A polished panel with a keyboard layout switcher, application launcher, system tray, Control Center, Settings, notifications, screenshots, audio, brightness, and power controls. |
 | **Easy discovery** | A searchable window overview across tags, an interactive keybind viewer, guided display setup, built-in diagnostics, workstation self-heal, and clear unsupported-feature reporting. |
-| **Personal configuration** | Visual layout, per-tag gap and scale controls, plus live-reloading hotkeys, themes, and window rules, with local configuration preserved across upgrades. |
+| **Personal configuration** | Visual layout, per-tag gap and scale controls, optional floating titlebars, plus live-reloading hotkeys, themes, and window rules, with local configuration preserved across upgrades. |
 | **One installation path** | Install Arch Linux, then run one installer that adds the desktop on top. |
 
 > dwm-titus is an X11 desktop. A Wayland-native session is not currently part

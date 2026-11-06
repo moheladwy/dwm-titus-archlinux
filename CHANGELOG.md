@@ -20,6 +20,10 @@ the port.
   live, invalid values show a bad-config notification and keep the even split,
   and dwm publishes each monitor's workspaces as `_DWM_MONITOR_TAGS` so the
   panel shows the same split.
+- Add opt-in native floating-window titlebars with drag and close controls.
+  Configure `titlebars` and `titlebar_tags` in the existing hot-reloaded
+  themes.toml appearance section; tiled/fullscreen defaults remain unchanged
+  and no compositor or new dependency is required (#370).
 - Add mouse-accessible Tile, Floating and Monocle choices, master sizing and
   per-tag tile-gap controls in Settings > Appearance, alongside the existing
   previewable desktop text scale. Changes follow hotkeys without polling (#297).
