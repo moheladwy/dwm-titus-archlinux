@@ -10,22 +10,19 @@ set -eu
 
 repo_dir=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 
-for cmd in xrandr xprop xdotool cc pkg-config; do
-	if ! command -v "$cmd" >/dev/null 2>&1; then
-		printf 'missing required command: %s\n' "$cmd" >&2
-		exit 77
-	fi
-done
-xorg=/usr/lib/Xorg
-dummy_driver=$(find /usr/lib/xorg/modules/drivers /usr/lib64/xorg/modules/drivers \
-	-name dummy_drv.so 2>/dev/null | head -n 1)
-# The pinned test container sets DWM_TEST_REQUIRE_XORG_DUMMY=1, so a missing or
-# failing server is an error there instead of a skip.
+# The pinned test container sets DWM_TEST_REQUIRE_XORG_DUMMY=1, so a missing tool or
+# a failing server is an error there instead of a skip.
 skip() {
 	printf 'skipping: %s\n' "$1" >&2
 	[ "${DWM_TEST_REQUIRE_XORG_DUMMY:-0}" = 1 ] && exit 1
 	exit 77
 }
+for cmd in xrandr xprop xdotool cc pkg-config; do
+	command -v "$cmd" >/dev/null 2>&1 || skip "missing required command: $cmd"
+done
+xorg=/usr/lib/Xorg
+dummy_driver=$(find /usr/lib/xorg/modules/drivers /usr/lib64/xorg/modules/drivers \
+	-name dummy_drv.so 2>/dev/null | head -n 1)
 if [ ! -x "$xorg" ] || [ -z "$dummy_driver" ]; then
 	skip 'Xorg with the dummy video driver is not installed'
 fi
