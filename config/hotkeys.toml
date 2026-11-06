@@ -79,7 +79,7 @@ keys = [
   # ── Files & utilities ─────────────────────────────────────────────────────────
   { mod="SUPER",            key="e",       desc="File manager",            func="spawn",       cmd="xdg-open ." },
   { mod="SUPER",            key="slash",   desc="Keybinds cheatsheet",     func="spawn",       cmd="quickshell ipc --path \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml\" call controlcenter openKeybinds" },
-  { mod="SUPER",            key="F1",      desc="Control center",          func="spawn",       cmd="quickshell ipc --path \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml\" call controlcenter open" },
+  { mod="SUPER",            key="F1",      desc="Control center",          func="spawn",       cmd="quickshell ipc --path \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml\" call controlcenter toggle" },
   { mod="SUPER ALT",        key="F1",      desc="Control center",          func="spawn",       cmd="quickshell ipc --path \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/shell.qml\" call controlcenter open" },
   { mod="SUPER SHIFT",      key="r",       desc="Restart Quickshell",      func="spawn",       cmd="dwm-quickshell-controlcenter action restart-quickshell" },
 

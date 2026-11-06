@@ -282,7 +282,9 @@ static void toggleview(const Arg *arg);
 static void trackoverridewindow(Window win);
 static void unfocus(Client *c, int setfocus);
 static void unmanage(Client *c, int destroyed);
-static void untrackoverridewindow(Window win);
+static int untrackoverridewindow(Window win);
+static void restorefocusafteroverride(void);
+static void focuspanelpopup(Window win);
 static void unswallow(Client *c);
 static int updatealtbar(Monitor *m, Window win, XWindowAttributes *wa);
 static void updatebarpos(Monitor *m);
@@ -972,6 +974,10 @@ clientmessage(XEvent *e)
 		}
 		return;
 	}
+	if (!c && cme->message_type == netatom[NetActiveWindow]) {
+		focuspanelpopup(cme->window);
+		return;
+	}
 	if (!c)
 		return;
 	if (cme->message_type == netatom[NetWMState]) {
@@ -1266,7 +1272,8 @@ destroynotify(XEvent *e)
 	Monitor *m;
 	XDestroyWindowEvent *ev = &e->xdestroywindow;
 
-	untrackoverridewindow(ev->window);
+	if (untrackoverridewindow(ev->window))
+		restorefocusafteroverride();
 	if ((c = wintoclient(ev->window)))
 		unmanage(c, 1);
 	else if ((c = swallowingclient(ev->window)))
@@ -4941,7 +4948,8 @@ unmapnotify(XEvent *e)
 	Monitor *m;
 	XUnmapEvent *ev = &e->xunmap;
 
-	untrackoverridewindow(ev->window);
+	if (untrackoverridewindow(ev->window))
+		restorefocusafteroverride();
 	if ((c = wintoclient(ev->window))) {
 		if (ev->send_event)
 			setclientstate(c, WithdrawnState);
@@ -4975,18 +4983,50 @@ trackoverridewindow(Window win)
 	updateoverridewindow(win);
 }
 
-void
+int
 untrackoverridewindow(Window win)
 {
 	OverrideWindow **ow;
+	OverrideWindow *removed;
 
 	for (ow = &overridewindows; *ow && (*ow)->win != win; ow = &(*ow)->next);
-	if (*ow) {
-		OverrideWindow *removed = *ow;
+	if (!*ow)
+		return 0;
+	removed = *ow;
+	*ow = removed->next;
+	free(removed);
+	return 1;
+}
 
-		*ow = removed->next;
-		free(removed);
-	}
+/* Panel popups are override-redirect, so they cannot take the keyboard through
+ * the window manager on their own. When one asks to be activated, focus it
+ * directly with the current server time; a timestamp from the shell can be
+ * older than dwm's last focus change, which X would silently ignore. */
+void
+focuspanelpopup(Window win)
+{
+	OverrideWindow *ow;
+
+	for (ow = overridewindows; ow && ow->win != win; ow = ow->next);
+	if (!ow || !istransientforbar(win))
+		return;
+	XSetInputFocus(dpy, win, RevertToPointerRoot, CurrentTime);
+}
+
+/* A focused override-redirect window, such as a panel popup that took the
+ * keyboard, reverts X focus to the root when it goes away. Give it back to
+ * the selected client so typing continues where it was. */
+void
+restorefocusafteroverride(void)
+{
+	Window focused;
+	int revert;
+
+	if (!selmon || !selmon->sel)
+		return;
+	XGetInputFocus(dpy, &focused, &revert);
+	if (focused == root || focused == PointerRoot || focused == None)
+		setfocus(selmon->sel);
 }
 
 void

@@ -14,6 +14,17 @@ PopupWindow {
 
     signal dismissed
 
+    // On X11 a popup is override-redirect, so it never gets the keyboard on
+    // its own. Ask for activation: dwm focuses panel popups on that request,
+    // so Escape and keyboard navigation reach the popup, and it hands focus
+    // back to the selected client when the popup closes.
+    function takeKeyboardFocus() {
+        const backing = root._backingWindow;
+        if (root.visible && root.grabFocus && backing) backing.requestActivate();
+    }
+
+    onVisibleChanged: if (visible) Qt.callLater(root.takeKeyboardFocus)
+
     color: Theme.transparent
     grabFocus: true
     implicitWidth: targetWindow ? targetWindow.width : 0

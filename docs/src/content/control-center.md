@@ -11,8 +11,8 @@ The Control Center is a single-card anchored Quickshell menu for launching
 applications, panel settings, system health, quick actions, appearance
 settings, power management, and keybind discovery.
 
-**Open:** <kbd>Super</kbd> + <kbd>F1</kbd>, or run `dwm-controlcenter` from a
-terminal.
+**Open or close:** <kbd>Super</kbd> + <kbd>F1</kbd>, or run `dwm-controlcenter`
+from a terminal. <kbd>Esc</kbd> or a click outside the card also closes it.
 
 The popup opens from the panel logo. Applications, Power, Settings, System
 Health, Keybinds, and System Info are available directly from the main menu.
