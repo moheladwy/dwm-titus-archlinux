@@ -18,7 +18,7 @@ dwm_packages() {
 		dwm_packages "$family" build
 		printf '%s\n' quickshell python dbus util-linux procps-ng \
 			xorg-server-xvfb xdotool xorg-xprop xorg-xrandr xorg-xset xsettingsd \
-			jq inotify-tools gawk noto-fonts
+			jq inotify-tools gawk noto-fonts xorg-setxkbmap xorg-xkbcomp xorg-xmodmap xorg-xinput
 		;;
 	arch:media)
 		printf '%s\n' celluloid mpv sxiv python desktop-file-utils

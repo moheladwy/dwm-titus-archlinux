@@ -401,6 +401,7 @@ modifier, as used by the media keys.
 | `moveorplace` | `i=2` | Mouse: move a floating window or place a tiled one (for `buttons`) |
 | `resizemouse` | — | Mouse: resize window (for `buttons`) |
 | `sigstatusbar` | `i=N` | Send a signal to the `dwmblocks` status process |
+| `cyclelayout` | `i=1` or `i=-1` | Next/previous keyboard layout |
 | `quit` | — | Exit dwm |
 
 `ui` is a tag bitmask: `1` is tag 1, `2` is tag 2, `4` is tag 3, and so on.

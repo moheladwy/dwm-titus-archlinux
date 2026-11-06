@@ -178,7 +178,8 @@ everyday desktop:
   needs explicit Qt and Quickshell import roots; see the repository
   specification.
 - **Headless smoke testing:** `xorg-server-xvfb`, `dbus`, `gawk`, `noto-fonts`,
-  and the build/runtime tools in the `ci-smoke` map. The pinned Arch test
+  `xorg-setxkbmap`, `xorg-xkbcomp`, `xorg-xmodmap`, `xorg-xinput`, and the
+  build/runtime tools in the `ci-smoke` map. The pinned Arch test
   container (`tests/containers/arch/Containerfile`) resolves these from a dated
   Arch Linux Archive snapshot.
 
