@@ -309,6 +309,9 @@ the port.
 - Install `nm-connection-editor` with the recommended profile. The network
   popover already sends Edit Connections and enterprise (802.1X) Wi-Fi to it,
   but stock installs did not have it, so those paths were hidden or failed.
+- Preserve keyboard focus in application menus and combo popups so Steam menus
+  do not immediately dismiss. Notification and fullscreen overlay focus behavior
+  remains unchanged.
 - Report `efivarfs` firmware-variable usage as information in System Health
   instead of a storage error. The fixed-size firmware NVRAM store is not a
   cleanable filesystem, so a nearly full store no longer raises a false
