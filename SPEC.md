@@ -557,8 +557,9 @@ the invoking user's home directory, using `boot$DATE.txt` or
 
 Repairs require an explicit confirmation. User repairs are limited to known
 desktop and audio components plus launching the interactive dependency flow.
-Dependency repair installs only missing Fedora packages from the trusted installed
-package map, with administrator authorization and interactive DNF confirmation.
+Dependency repair installs only missing Arch packages from the trusted installed
+package map, with administrator authorization and pacman's interactive
+confirmation, and only on a fully upgraded system.
 It preserves managed desktop files, installation receipts, and desktop update
 status, and refuses to proceed while a desktop transaction is unfinished.
 Failed user and system services are displayed as individual rows with Start,

@@ -292,13 +292,13 @@ class DesktopUpdate(unittest.TestCase):
                 patch.object(privileged.sys.stdin, "isatty", return_value=True), \
                 patch.object(privileged, "supported_terminal_installed", return_value=True), \
                 patch.object(privileged, "installed_provider_packages", return_value=set()), \
-                patch.object(privileged, "installed_provider_packages", return_value={"xorg-x11-server-Xorg"}), \
+                patch.object(privileged, "installed_provider_packages", return_value={"xorg-server"}), \
                 patch.object(privileged, "install_packages", side_effect=mock_install):
             privileged.perform(["repair-dependencies", generation], 1000)
 
         self.assertEqual(len(calls), 2)
         req_pkgs, _, _ = calls[0]
-        self.assertNotIn("xorg-x11-server-Xorg", req_pkgs)
+        self.assertNotIn("xorg-server", req_pkgs)
 
         # Case 4: No X server installed
         calls.clear()
@@ -314,7 +314,7 @@ class DesktopUpdate(unittest.TestCase):
 
         self.assertEqual(len(calls), 2)
         req_pkgs, _, _ = calls[0]
-        self.assertIn("xorg-x11-server-Xorg", req_pkgs)
+        self.assertIn("xorg-server", req_pkgs)
 
         # Caller-selected custom terminal must not force terminal-primary
         calls.clear()

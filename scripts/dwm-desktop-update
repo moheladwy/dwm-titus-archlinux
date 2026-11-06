@@ -946,8 +946,8 @@ def install_dependencies():
                     repair_args = ["keep-terminal"]
             except (OSError, subprocess.TimeoutExpired):
                 pass
-            print("Install missing desktop dependencies. Review and confirm DNF's package transaction.", flush=True)
-            # The privileged helper bounds each map/RPM/DNF operation. Wait for
+            print("Install missing desktop dependencies. Review and confirm pacman's package transaction.", flush=True)
+            # The privileged helper bounds each map and pacman operation. Wait for
             # its final exit, including both transactions, so this lock cannot
             # be released while a timed-out pkexec leaves package work behind.
             run([*authorization, helper, "repair-dependencies", digest(manifest_path), *repair_args], timeout=None, capture=False)
