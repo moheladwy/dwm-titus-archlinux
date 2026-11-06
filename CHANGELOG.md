@@ -20,6 +20,9 @@ the port.
   live, invalid values show a bad-config notification and keep the even split,
   and dwm publishes each monitor's workspaces as `_DWM_MONITOR_TAGS` so the
   panel shows the same split.
+- Add optional Calendar and Weather panel widgets, off by default, with shared
+  visibility controls. Weather fetches only an explicitly entered city on
+  request and retains the last report through service failures (#358).
 - Add opt-in native floating-window titlebars with drag and close controls.
   Configure `titlebars` and `titlebar_tags` in the existing hot-reloaded
   themes.toml appearance section; tiled/fullscreen defaults remain unchanged
