@@ -69,6 +69,11 @@ the port.
   (`-git`, `-svn`, `-hg`, `-bzr`) as version unknown without counting them,
   and updates with `<helper> -Sua` as the invoking user. It refuses to run as
   root.
+
+- Enable automatic time synchronization with systemd-timesyncd, which Arch
+  ships disabled, during installation. Rerunning the installer preserves an
+  existing chrony, ntpd, ntpsec, or openntpd provider and an explicit
+  systemd-timesyncd mask.
 - Add an optional, unprivileged X11 clipboard observer that rejects password
   manager applications and sensitivity-marked copies before reading text.
   Browser and terminal history remain available; unmarked secrets may be retained.

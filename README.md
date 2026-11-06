@@ -310,3 +310,19 @@ scripts/run-tests
 
 Project requirements and active work are tracked in [SPEC.md](SPEC.md),
 [ROADMAP.md](ROADMAP.md), and [TASKS.md](TASKS.md).
+
+### Automatic time synchronization
+
+The installer enables `systemd-timesyncd.service` for automatic network time
+synchronization. Arch ships the service in `systemd` but leaves it disabled.
+The installer keeps an enabled or active chronyd, chronyd-restricted, ntpd,
+ntpsec, or openntpd provider and preserves an explicit timesyncd mask. It never
+stops an existing provider or edits its servers.
+
+Existing installations can apply the default by rerunning `./install.sh` with
+their usual profile. No migration is needed when an existing provider already
+synchronizes the clock. A preserved mask requires an administrator's decision
+before `sudo systemctl unmask systemd-timesyncd.service` and rerunning installation.
+Check with `timedatectl status` and `systemctl is-enabled systemd-timesyncd.service`;
+on timesyncd systems, `timedatectl show-timesync` reports server and sample details.
+Network access to an NTP server is required; enablement alone does not prove sync.
