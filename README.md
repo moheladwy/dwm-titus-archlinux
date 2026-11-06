@@ -246,6 +246,14 @@ pacman never rolls back, so after an interrupted upgrade check
 `/var/log/pacman.log` and use **Recover** for a fresh `sudo pacman -Syu`. Never
 run `pacman -Sy` on its own.
 
+Control Center's **Install Missing Deps** and System Health's **Open dependency
+installer** open a package-only repair in a terminal. You can also run
+`dwm-desktop-update install-dependencies`. It uses the trusted installed package
+map, installs missing Arch packages after administrator authorization and
+pacman's own confirmation, and preserves desktop files, installation receipts,
+and Update Center status. Like every package install here, it requires a fully
+upgraded system. Finish or recover any active desktop update first.
+
 The same section provides confirmed account, password, and printer tool
 launches. **Manage software sources** is unsupported on Arch, because there is
 no graphical source manager; repositories come from `/etc/pacman.conf` and are

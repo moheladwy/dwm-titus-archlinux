@@ -690,6 +690,7 @@ check-arch-platform:
 	@$(call run_managed_test,tests/test-arch-platform.sh)
 
 check-arch-packages:
+	tests/test-package-provider-policy.sh
 	tests/test-arch-packages.sh
 
 check-install: check-install-manifest
@@ -793,6 +794,7 @@ check-agent-skills:
 check-desktop-update: dwm
 	@python3 tests/test-desktop-update-sandbox.py
 	python3 tests/test-desktop-update.py
+	python3 tests/test-dependency-repair-launchers.py
 	tests/test-desktop-update-ui.sh
 	dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/test-desktop-update-progress.py
 	dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/test-desktop-update-focus.py

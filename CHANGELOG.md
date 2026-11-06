@@ -309,6 +309,15 @@ the port.
 - Install `nm-connection-editor` with the recommended profile. The network
   popover already sends Edit Connections and enterprise (802.1X) Wi-Fi to it,
   but stock installs did not have it, so those paths were hidden or failed.
+
+- Keep dependency-install actions limited to missing Arch packages with
+  pacman's confirmation, preserving desktop files, receipts, and Update Center
+  status. Installed providers such as `tuned-ppd`, a PulseAudio server, or
+  Xlibre are kept instead of being replaced by the default packages.
+- Preserve surviving managed-file records during source reinstalls and recover
+  exact matching omitted files without replacing unrelated destinations.
+- Release rejected desktop update preparations and avoid session restart
+  requirements after recovery when the active desktop was unchanged.
 - Settings > Input no longer lists power, sleep and video buttons as keyboards,
   and shows a device that X splits into several XInput devices on one port
   (same identity) once instead of one card per part with doubled rows. Changes
