@@ -341,6 +341,11 @@ the port.
   pacman's confirmation, preserving desktop files, receipts, and Update Center
   status. Installed providers such as `tuned-ppd`, a PulseAudio server, or
   Xlibre are kept instead of being replaced by the default packages.
+- Decouple desktop installation updates from local Git branches, changes,
+  generated caches, worktrees, and divergent history. Preserve the previous
+  managed data tree for recovery and leave external source checkouts untouched.
+  Show genuine update blockers accurately in Update Center.
+
 - Isolate the managed test runtime directory before starting private D-Bus
   sessions, preventing test document portals from replacing the live desktop's
   portal mount and leaving its service failed.
