@@ -42,7 +42,7 @@ dwm_packages() {
 			alsa-utils brightnessctl dbus inotify-tools jq libpulse pipewire pavucontrol \
 			pipewire-pulse wireplumber libnotify light-locker xf86-input-libinput \
 			bluez bluez-utils blueman playerctl upower power-profiles-daemon flatpak \
-			xdg-desktop-portal-gtk
+			xdg-desktop-portal-gtk nm-connection-editor
 		;;
 	arch:system-management)
 		# pyalpm and pacman-contrib back the native pacman update provider.
