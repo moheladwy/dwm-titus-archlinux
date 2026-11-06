@@ -530,6 +530,7 @@ check-monitor-tags: all
 check-keyboard-layout: all
 	python3 tests/test-keyboard-refresh.py
 	tests/test-keyboard-layout-xvfb.sh
+	tests/test-keyboard-layout-panel-xvfb.sh
 
 check-quickshell-launcher:
 	tests/test-quickshell-launcher.sh
