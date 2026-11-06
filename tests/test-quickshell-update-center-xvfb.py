@@ -336,9 +336,11 @@ with tempfile.TemporaryDirectory(prefix="update-center-xvfb-", dir=tmp_root) as 
         shutil.copy2(REPO / "config" / name, rules / name)
     log = (base / "quickshell.log").open("w+")
     wm = subprocess.Popen([str(REPO / "dwm")], cwd=home, env=env, stdout=log, stderr=log)
+    # dwm can take well over the default ~8 s budget to start while the full
+    # gate loads the host; allow about 30 s before declaring it absent.
     wait_for(lambda: "dwm" in run(env, "xprop", "-root", "_NET_WM_NAME").stdout
              or "window id" in run(env, "xprop", "-root", "_NET_SUPPORTING_WM_CHECK").stdout,
-             "dwm did not start")
+             "dwm did not start", attempts=600)
     shell = subprocess.Popen(["quickshell", "--no-duplicate"], env=env, stdout=log, stderr=log)
     ipc = ("quickshell", "ipc", "--path", str(qml / "shell.qml"), "call", "update-center-test")
 
