@@ -48,7 +48,8 @@ def frontmatter(path):
 
 def commands():
     makefile = (REPO / "Makefile").read_text(encoding="utf-8")
-    block = re.search(r"^INSTALL_COMMANDS = \\\n((?:\t.*\\?\n)+)", makefile, re.M)
+    # Entries may start on the assignment line; continuation lines follow.
+    block = re.search(r"^INSTALL_COMMANDS =((?:.*\\\n)(?:\t.*\\?\n)*)", makefile, re.M)
     if block is None:
         fail("Makefile: INSTALL_COMMANDS was not found")
         return set()
