@@ -341,6 +341,10 @@ the port.
   pacman's confirmation, preserving desktop files, receipts, and Update Center
   status. Installed providers such as `tuned-ppd`, a PulseAudio server, or
   Xlibre are kept instead of being replaced by the default packages.
+- Isolate the managed test runtime directory before starting private D-Bus
+  sessions, preventing test document portals from replacing the live desktop's
+  portal mount and leaving its service failed.
+
 - Show and select symlinked Flatpak desktop entries in Settings defaults while
   retaining desktop-file size limits and avoiding linked-directory traversal.
 
