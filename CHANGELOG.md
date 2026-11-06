@@ -11,14 +11,6 @@ Fedora is no longer supported. See the migration notes under Changed and the
 port decisions in `docs/ARCH-PORT-DECISIONS.md`. Entries below that mention
 Fedora, DNF, PackageKit, Path, or images describe upstream work that predates
 the port.
-### Fixed
-
-- Show the correct panel icon for running applications whose window class is
-  not an icon name, such as Firefox (`org.mozilla.firefox`). The panel now
-  falls back to the matching desktop entry's icon, and unknown applications
-  use the generic executable icon instead of a blank button.
-
-## [0.8.0] - 2026-11-04
 
 ### Added
 
@@ -305,6 +297,11 @@ the port.
   (`Super+Ctrl+R`), the last gaming helper.
 
 ### Fixed
+
+- Show the correct panel icon for running applications whose window class is
+  not an icon name, such as Firefox (`org.mozilla.firefox`). The panel now
+  falls back to the matching desktop entry's icon, and unknown applications
+  use the generic executable icon instead of a blank button.
 
 - Panel popups (Control Center, power, network, Bluetooth, controls, update
   center) now take the keyboard when they open, so Escape closes them and

@@ -265,14 +265,7 @@ else
 		print_package_profile "Optional extras" optional
 		print_package_profile "Supported terminals" terminal
 	fi
-	if [ $MISSING_FONTS -gt 0 ]; then
-		echo ""
-		echo "Non-package dependencies (Meslo Nerd Font):"
-		echo "  Meslo is installed via the automated installer rather than standard packages."
-		echo "  Run: ./install.sh   (automated install includes font setup)"
-	else
-		echo "  Run: ./install.sh   (automated install)"
-	fi
+	echo "  Run: ./install.sh   (automated install)"
 	if [ "$INTERACTIVE" = true ]; then
 		if [ $MISSING_PACKAGES -gt 0 ]; then
 			echo ""
@@ -308,9 +301,6 @@ else
 					if grep -Fq "Package suggestions from the shared dependency map:" <<<"$recheck_output" ||
 						grep -Eq '\(missing\)|missing pam_gnome_keyring|Noto Color Emoji' <<<"$recheck_output"; then
 						printf "\n${RED}Required dependencies are still missing after repair.${NC}\n"
-					elif [ $MISSING_FONTS -gt 0 ] || grep -Fq "Meslo" <<<"$recheck_output"; then
-						printf "\n${YELLOW}Package dependencies installed, but Meslo Nerd Font is still missing.${NC}\n"
-						printf "Run: ./install.sh (automated install includes font setup)\n"
 					else
 						printf "\n${RED}Required dependencies are still missing after repair.${NC}\n"
 					fi

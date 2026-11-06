@@ -79,10 +79,8 @@ The panel now exposes notification action buttons and default body-click actions
 Critical notifications with actions stay available until answered or dismissed,
 including in history while the notification remains open. Saved history after a
 shell restart has no executable actions. Replacing a notification refreshes its
-buttons, urgency, timeout, and history entry. Quickshell 0.2.1 revision `dacfa9d`
-has an upstream defect that discards changed labels for reused action identifiers;
-on that build, applications must replace the action identifier to change its
-label. The desktop follows label-change signals when Quickshell provides them.
+buttons, urgency, timeout, and history entry. The desktop follows label-change
+signals when Quickshell provides them.
 
 ## Disable or recover
 

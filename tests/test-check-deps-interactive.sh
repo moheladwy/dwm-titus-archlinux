@@ -190,8 +190,8 @@ if ! grep -Fq "Missing dependencies found, install now?" <<<"$output"; then
 	echo "FAIL: expected package repair for the Meslo font package" >&2
 	exit 1
 fi
-if ! grep -Fq "Meslo" <<<"$output"; then
-	echo "FAIL: expected Meslo font guidance" >&2
+if ! grep -Fq "Package suggestions from the shared dependency map:" <<<"$output"; then
+	echo "FAIL: expected package suggestions for the Meslo font package" >&2
 	exit 1
 fi
 
