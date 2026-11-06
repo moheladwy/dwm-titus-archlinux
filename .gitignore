@@ -15,6 +15,10 @@ config.h
 nohup.out
 .DS_STORE
 
+# Generated Python bytecode
+__pycache__/
+*.pyc
+
 # Local editor settings that may contain machine-specific absolute paths
 .zed/settings.json
 
