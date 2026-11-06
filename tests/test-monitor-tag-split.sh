@@ -10,7 +10,7 @@ set -eu
 
 repo_dir=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 
-for cmd in xrandr xprop xdotool; do
+for cmd in xrandr xprop xdotool cc pkg-config; do
 	if ! command -v "$cmd" >/dev/null 2>&1; then
 		printf 'missing required command: %s\n' "$cmd" >&2
 		exit 77
@@ -25,7 +25,7 @@ if [ ! -x "$xorg" ] || [ -z "$dummy_driver" ]; then
 fi
 
 work=$(mktemp -d)
-trap 'set +e; [ -n "${dwm_pid:-}" ] && kill "$dwm_pid" 2>/dev/null; [ -n "${xorg_pid:-}" ] && kill "$xorg_pid" 2>/dev/null; rm -rf "$work"' EXIT HUP INT TERM
+trap 'set +e; [ -n "${client_pid:-}" ] && kill "$client_pid" 2>/dev/null; [ -n "${dwm_pid:-}" ] && kill "$dwm_pid" 2>/dev/null; [ -n "${xorg_pid:-}" ] && kill "$xorg_pid" 2>/dev/null; rm -rf "$work"' EXIT HUP INT TERM
 
 home="$work/home"
 hotkeys="$home/.config/dwm-titus/hotkeys.toml"
@@ -41,6 +41,42 @@ cp "$repo_dir/config/hotkeys.toml" "$repo_dir/config/themes.toml" \
 	"$repo_dir/config/window-rules.toml" "$home/.config/dwm-titus/"
 cp "$repo_dir/config/"*.toml "$home/.local/share/dwm-titus/config/"
 cp "$hotkeys" "$work/hotkeys.base"
+
+# A plain client that reports its window id and waits.
+cat >"$work/client.c" <<'EOF'
+#include <stdio.h>
+#include <unistd.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+
+int
+main(int argc, char *argv[])
+{
+	Display *dpy = XOpenDisplay(NULL);
+	XClassHint hint = { "dwmsplit", "DwmSplitClient" };
+	Window win;
+	FILE *out;
+
+	if (argc != 2 || !dpy)
+		return 1;
+	win = XCreateSimpleWindow(dpy, DefaultRootWindow(dpy), 0, 0, 200, 200, 0, 0, 0);
+	XSetClassHint(dpy, win, &hint);
+	XMapWindow(dpy, win);
+	XSync(dpy, False);
+	if (!(out = fopen(argv[1], "w")))
+		return 1;
+	fprintf(out, "0x%lx\n", win);
+	fclose(out);
+	for (;;)
+		pause();
+}
+EOF
+# shellcheck disable=SC2046
+cc "$work/client.c" -o "$work/client" $(pkg-config --cflags --libs x11)
+
+active_window() {
+	DISPLAY=$display xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | sed -n 's/.*# //p'
+}
 
 root_value() {
 	DISPLAY=$display xprop -root "$1" 2>/dev/null | sed -n 's/^[^=]*= //p' | tr -d '[:space:]'
@@ -126,11 +162,36 @@ dwm_pid=$!
 wait_for_value _DWM_MONITOR_TAGS 15,496
 wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,0,1920,0,1920,1080,4
 
+# A focused window on workspace 5 of the second monitor.
+DISPLAY=$display xdotool key Super+5
+wait_for_value _DWM_SELECTED_MONITOR 1
+DISPLAY=$display "$work/client" "$work/client.id" &
+client_pid=$!
+i=0
+until [ -s "$work/client.id" ] && [ "$(active_window)" = "$(cat "$work/client.id")" ]; do
+	i=$((i + 1))
+	[ "$i" -lt 200 ] || {
+		printf '%s\n' 'the test client never became the active window' >&2
+		exit 1
+	}
+	sleep 0.05
+done
+
 # 1-3 on the first monitor, 4-9 on the second, which moves from its old first
-# workspace (5) to its new one (4).
+# workspace (5) to its new one (4). The window stays on the now-hidden
+# workspace 5, so it must lose focus.
 set_monitor_tags '[3, 6]'
 wait_for_value _DWM_MONITOR_TAGS 7,504
 wait_for_value _DWM_MONITOR_DESKTOPS 0,0,1920,1080,0,1920,0,1920,1080,3
+i=0
+while [ "$(active_window)" = "$(cat "$work/client.id")" ]; do
+	i=$((i + 1))
+	[ "$i" -lt 100 ] || {
+		printf '%s\n' 'a window on a hidden workspace kept focus after the split changed' >&2
+		exit 1
+	}
+	sleep 0.05
+done
 
 # Workspace keys land on the monitor that owns the workspace.
 DISPLAY=$display xdotool key Super+5

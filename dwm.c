@@ -5866,6 +5866,7 @@ getmontagmask(int monnum)
 static void
 setmontagcounts(const int *counts, int n)
 {
+	Client *c;
 	Monitor *m;
 	unsigned int *home, mask;
 	int i, nmons, changed = n != nmontagcounts;
@@ -5897,8 +5898,16 @@ setmontagcounts(const int *counts, int n)
 			m->tagset[m->seltags] = mask & (~mask + 1);
 	}
 	free(home);
+	/* As after a monitor change: moved real-fullscreen windows cover their new
+	 * monitor, and focus returns to a visible window. */
 	reconcilemonitortags();
+	updateclientlist();
+	for (m = mons; m; m = m->next)
+		for (c = m->clients; c; c = c->next)
+			if (c->isfullscreen && c->fakefullscreen != 1)
+				resizeclient(c, m->mx, m->my, m->mw, m->mh);
 	arrange(NULL);
+	focus(NULL);
 	updatecurrentdesktop();
 }
 
