@@ -447,7 +447,9 @@ output_tearfree_compatible() {
 
 # RandR names an NVIDIA GPU that renders an X screen NVIDIA-0 and one that only
 # displays frames rendered by another GPU (a reverse PRIME sink) NVIDIA-G0. The
-# answer is cached; it stays unknown when RandR cannot list providers.
+# answer is cached; it stays unknown when RandR cannot list providers. It is
+# GPU-wide: with several NVIDIA GPUs, any rendering one marks the role render,
+# matching the single nvidia-drm OutputClass the generator writes.
 nvidia_provider_role=
 nvidia_is_reverse_prime_sink() {
 	local providers
@@ -456,9 +458,9 @@ nvidia_is_reverse_prime_sink() {
 		nvidia_provider_role=unknown
 		if [[ -n ${DISPLAY:-} ]] && command -v xrandr >/dev/null 2>&1 &&
 			providers=$(xrandr --listproviders 2>/dev/null); then
-			if grep -Eq 'name:NVIDIA-[0-9]+$' <<<"$providers"; then
+			if grep -Eq 'name:NVIDIA-[0-9]+( |$)' <<<"$providers"; then
 				nvidia_provider_role=render
-			elif grep -Eq 'name:NVIDIA-G[0-9]+$' <<<"$providers"; then
+			elif grep -Eq 'name:NVIDIA-G[0-9]+( |$)' <<<"$providers"; then
 				nvidia_provider_role=sink
 			fi
 		fi
@@ -481,6 +483,15 @@ output_full_composition_pipeline_compatible() {
 
 	[[ ${cfg_enabled[$index]} == 1 ]] || return 1
 	driver_full_composition_pipeline_compatible "${cfg_kernel_drivers[$index]}"
+}
+
+enabled_output_uses_nvidia() {
+	local index
+
+	for index in "${!cfg_outputs[@]}"; do
+		[[ ${cfg_enabled[$index]} == 1 && ${cfg_kernel_drivers[$index]} == nvidia ]] && return 0
+	done
+	return 1
 }
 
 full_composition_pipeline_compatible() {
@@ -763,7 +774,8 @@ resolved_full_composition_pipeline() {
 		;;
 	on)
 		if ! full_composition_pipeline_compatible; then
-			if xorg_uses_driver nvidia && nvidia_is_reverse_prime_sink; then
+			if enabled_output_uses_nvidia && xorg_uses_driver nvidia &&
+				nvidia_is_reverse_prime_sink; then
 				die "ForceFullCompositionPipeline was requested, but the NVIDIA outputs are a reverse PRIME display sink (RandR provider NVIDIA-G0)"
 			fi
 			die "ForceFullCompositionPipeline was requested, but the active outputs do not use the NVIDIA Xorg driver"

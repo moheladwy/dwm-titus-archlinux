@@ -107,7 +107,7 @@ confirmed repair buttons. For a source checkout, also run
 | Interrupted system update | Read `/var/log/pacman.log`, then Update Center > **Recover**, or run `sudo pacman -Syu` again. pacman does not roll back. |
 | Settings warns about PackageKit | PackageKit frontends can run `pacman -Sy` behind the user's back. Suggest removing `packagekit` if nothing needs it. |
 | NVIDIA black screen after suspend | `nvidia-suspend-test.sh` diagnoses the setup. |
-| Desktop freezes about 2 s at a time after plugging in a monitor (hybrid laptop) | If `xrandr --listproviders` shows `NVIDIA-G0`, the port is on the NVIDIA GPU while the other GPU renders (reverse PRIME); the NVIDIA display driver can block X in 2 s timeouts. Confirm with `grep 'unsynchronized pixmap' /var/log/Xorg.0.log`. The fix is making NVIDIA the primary GPU (Xorg `PrimaryGPU`, see `docs/src/content/troubleshooting.md`), a system change: ask first, keep a rollback, and remind the user a TTY login recovers a failed start. |
+| Desktop freezes about 2 s at a time after plugging in a monitor (hybrid laptop) | Reverse PRIME: `xrandr --listproviders` shows `NVIDIA-G0` (the other GPU renders) and `dwm-display-setup detect` shows `kernel-driver=nvidia` for the external output. The NVIDIA display driver can then block X in 2 s timeouts; confirm with `grep 'unsynchronized pixmap'` in `/var/log/Xorg.0.log` (display manager) or `~/.local/share/xorg/Xorg.0.log` (rootless `startx`). The workaround is making NVIDIA the primary GPU (Xorg `PrimaryGPU`; see `docs/src/content/troubleshooting.md` in the checkout), at some battery cost. It is a system change: ask first, keep a rollback, and remind the user a TTY login recovers a failed start. |
 
 ## Recovery from a broken session
 

@@ -381,6 +381,9 @@ env "${env_common[@]}" TEST_PROPERTIES="$work/properties-unsupported" \
 	"$BASH_BIN" "$HELPER" capabilities >"$work/capabilities-nvidia-modesetting"
 grep -Fqx $'output\tHDMI-1\tunsupported\tunsupported' \
 	"$work/capabilities-nvidia-modesetting"
+# Without a RandR provider listing (TEST_PROVIDERS unset), the provider role is
+# unknown and NVIDIA outputs keep the composition pipeline. The reverse PRIME
+# and NVIDIA-primary listings are covered below.
 env "${env_common[@]}" TEST_PROPERTIES="$work/properties-unsupported" \
 	DWM_KERNEL_DRIVER=nvidia DWM_XORG_DRIVER=modesetting \
 	DWM_XORG_DRIVERS='modesetting nvidia' TEST_NVIDIA_OUTPUTS='HDMI-1 DP-1 DP-2' \
@@ -433,6 +436,14 @@ if env "${env_reverse_prime[@]}" "$BASH_BIN" "$HELPER" generate "$work/profile-6
 	exit 1
 fi
 grep -Fq 'reverse PRIME display sink' "$work/reverse-prime-error"
+# NVIDIA-G0 exists on such laptops even when no selected output uses it.
+if env "${env_reverse_prime[@]}" DWM_KERNEL_DRIVER=amdgpu \
+	"$BASH_BIN" "$HELPER" generate "$work/profile-60.conf" \
+	--force-full-composition-pipeline on >/dev/null 2>"$work/reverse-prime-amd-error"; then
+	printf '%s\n' 'forced ForceFullCompositionPipeline was accepted for AMD-only outputs' >&2
+	exit 1
+fi
+grep -Fq 'do not use the NVIDIA Xorg driver' "$work/reverse-prime-amd-error"
 env "${env_reverse_prime[@]}" TEST_PROVIDERS="$work/providers-nvidia-primary" \
 	"$BASH_BIN" "$HELPER" generate "$work/profile-60.conf" \
 	>"$work/generated-nvidia-primary.conf"
