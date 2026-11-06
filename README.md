@@ -246,8 +246,9 @@ pacman never rolls back, so after an interrupted upgrade check
 `/var/log/pacman.log` and use **Recover** for a fresh `sudo pacman -Syu`. Never
 run `pacman -Sy` on its own.
 
-Control Center's **Install Missing Deps** and System Health's **Open dependency
-installer** open a package-only repair in a terminal. You can also run
+Control Center's **Check Dependencies** opens an interactive dependency check
+and package repair in a terminal. System Health's dependency **Repair** opens
+package repair directly, including optional tools reported by its scan. You can also run
 `dwm-desktop-update install-dependencies`. It uses the trusted installed package
 map, installs missing Arch packages after administrator authorization and
 pacman's own confirmation, and preserves desktop files, installation receipts,

@@ -153,9 +153,8 @@ root-owned installed helper.
 | Restart Quickshell | Reload the managed Quickshell shell |
 | Reload Wallpaper | Randomize from `~/Pictures/backgrounds/` |
 | Restart NetworkManager | `sudo systemctl restart NetworkManager` in a terminal |
-| Dependency Check | Opens `check-deps.sh` in a terminal |
+| Check Dependencies | Opens `check-deps.sh` in an interactive tiled terminal to verify and repair packages |
 | Self-Heal | Runs the configured self-heal script (`DWM_SELF_HEAL_SCRIPT`, `~/.config/dwm-titus/self-heal.path`, or `dwm-self-heal`) in a terminal |
-| Install Missing Deps | Runs `install.sh` in a terminal |
 | Wallpaper Folder | Open `~/Pictures/backgrounds/` in the file manager |
 | GTK Settings | Launch `nwg-look` for GTK theming; shown only when `nwg-look` is installed |
 
