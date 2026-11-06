@@ -200,6 +200,9 @@ the port.
 - Migration: Update Center cache entries recorded under the old `fedora`
   provider are dropped and rescanned, and retained `fedora` operation receipts
   are converted to `system`, so no Fedora data is shown as current Arch state.
+- Scroll long active-window titles to the right within the panel title pill,
+  with reduced motion preserving right-side elision.
+
 - Reuse existing non-interactive sudo authorization for confirmed desktop
   updates and recovery, falling back to polkit when unavailable. Passwords and
   authorization policy are not stored or changed by the updater.
