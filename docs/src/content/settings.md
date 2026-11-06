@@ -133,6 +133,10 @@ not close a launched tool or undo its changes.
 System information reports SELinux and firewalld as unsupported on Arch, and
 shows the rolling `BUILD_ID` when `os-release` has no version.
 
+The desktop update card above these controls checks official `main` and installs
+managed dwm-titus changes. See [Updates](/updates.html) for the preview,
+authorization, progress, and recovery behavior.
+
 For timezone and system locale, select **Load choices**, filter the reported
 catalog, and select with click or Enter. **Review change** reads a fresh preview;
 it does not apply the selection. Network time offers fixed enable/disable

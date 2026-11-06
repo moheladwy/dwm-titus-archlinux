@@ -523,7 +523,13 @@ hotplug events before replaying saved values for returning devices.
 startx
 ```
 
-The provided `.xinitrc` disables screen blanking, starts the configured Quickshell panel, and runs dwm.
+The installer creates `.xinitrc` from the project template when the file is
+missing and preserves an existing file. dwm launches the project's
+`scripts/autostart.sh`, which applies the saved power and locking policy,
+disables screen blanking and DPMS by default, starts the configured Quickshell
+panel, and activates XDG autostart. For `startx`, the shipped template runs dwm
+under `dbus-run-session`. If the login path already creates a user D-Bus
+session, a custom `.xinitrc` can use `exec dwm` instead.
 
 ## Minimal Session Profile
 

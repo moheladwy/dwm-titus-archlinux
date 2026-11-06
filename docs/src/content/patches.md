@@ -56,14 +56,20 @@ Controlled via window rules in `~/.config/dwm-titus/window-rules.toml`:
 Mark a terminal with `isterminal=1`; add `noswallow=1` to a rule to keep that
 window from ever swallowing its terminal.
 
-### Fullscreen (3-State)
-Three fullscreen modes available:
+### Focus Modes and Fullscreen
+
+`Super` + `M` toggles the monocle layout and the bar; it does not request
+per-window EWMH fullscreen. Actual fullscreen is requested by the application
+or configured through a window rule. The saved pre-focus layout is shared
+across tags and monitors.
 
 | Mode | Keys | Description |
 |------|------|-------------|
 | Fullscreen (monocle) | `Super` + `M` | Switches to the monocle layout and hides the bar; press again to restore |
 | Fake fullscreen | `Super` + `Shift` + `Y` | Looks fullscreen, bar still usable |
-| Monocle layout | — | Single window view, bar visible |
+| EWMH fullscreen | Application or window rule | Real per-window fullscreen; no default binding |
+
+To use monocle without the bar toggle, bind `setlayout` with `layout_idx=2`.
 
 ---
 

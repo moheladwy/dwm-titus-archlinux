@@ -58,6 +58,8 @@ cd dwm-titus-archlinux
 ```
 
 The dry run shows the dependency and installation plan before anything changes.
+Run both commands from the cloned directory: `./install.sh` resolves relative to
+the current directory, so a new terminal must `cd dwm-titus-archlinux` first.
 The installer accepts only Arch Linux's `/etc/os-release` identity
 (`ID=arch`) and rejects every other operating-system identity before making
 changes. It preserves existing personal configuration and installs the managed

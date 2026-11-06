@@ -39,7 +39,8 @@ Tags 1-9 act as workspaces. Use `Super` + a number from `1` through `9` to switc
 
 ## Layouts
 
-Three layouts are available — switch between them instantly.
+Tiling and floating layouts have direct shortcuts. `Super` + `M` toggles the
+monocle layout and the bar. It does not make an individual window fullscreen.
 
 | Layout | Keys |
 |--------|------|

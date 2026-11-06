@@ -423,7 +423,7 @@ modifier, as used by the media keys.
 | `setcfact` | `f=0.25` / `f=-0.25` / `f=0.00` | Resize window slot |
 | `setlayout` | `layout_idx=0/1/2` | 0=tile, 1=float, 2=monocle |
 | `togglefloating` | — | Float/tile window |
-| `fullscreen` | — | True fullscreen |
+| `fullscreen` | — | Toggle monocle focus mode and the bar |
 | `togglefakefullscreen` | — | Fullscreen with bar |
 | `togglebar` | — | Show/hide bar |
 | `focusmon` | `i=1` or `i=-1` | Focus monitor |
@@ -440,6 +440,10 @@ modifier, as used by the media keys.
 
 `ui` is a tag bitmask: `1` is tag 1, `2` is tag 2, `4` is tag 3, and so on.
 `tag_keys` below generates the per-tag bindings for you.
+
+The `fullscreen` hotkey function toggles the monocle layout and the bar; it does
+not request EWMH fullscreen. Use a `fullscreen=1` window rule, or let the
+application request fullscreen, for real per-window fullscreen.
 
 ### Tag Bindings
 
