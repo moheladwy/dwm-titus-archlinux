@@ -154,7 +154,7 @@ Everyday entry points:
 | Command | Purpose |
 | --- | --- |
 | `dwm-settings open` | Open Settings |
-| `dwm-controlcenter` | Toggle the Control Center (`Super+F1` opens it) |
+| `dwm-controlcenter` | Toggle the Control Center (same as `Super+F1`) |
 | `dwm-diagnostics` | Required and optional health checks |
 | `dwm-default-apps status` | Default browser, terminal, file manager |
 | `dwm-settings-theme apply NAME` | Switch theme |

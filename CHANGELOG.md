@@ -220,6 +220,12 @@ the port.
 
 ### Fixed
 
+- Panel popups (Control Center, power, network, Bluetooth, controls, update
+  center) now take the keyboard when they open, so Escape closes them and
+  keyboard navigation works. Before, keys went to the window underneath. dwm
+  returns focus to that window when the popup closes. `Super+F1` now toggles
+  the Control Center, so pressing it again closes it.
+
 - `dwm-display-setup` no longer enables NVIDIA `ForceFullCompositionPipeline`
   for outputs on an NVIDIA GPU that is only a reverse PRIME display sink
   (RandR provider `NVIDIA-G0`), as on hybrid laptops whose external port is

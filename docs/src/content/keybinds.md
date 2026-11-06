@@ -28,7 +28,7 @@ listed on this page.
 | `Super` + `E` | File manager |
 | `Super` + `B` | Browser |
 | `Super` + `/` | Keybind viewer |
-| `Super` + `F1` | Control Center |
+| `Super` + `F1` | Toggle Control Center |
 | `Super` + `Alt` + `F1` | Control Center |
 | `Super` + `W` | Looking Glass client (`looking-glass-client -F`) |
 | `Super` + `Shift` + `W` | Randomize wallpaper |
