@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """Check popup boundaries, click-away, and keyboard focus in an isolated X11 session."""
-import os, shutil, subprocess, sys, tempfile, time
+import os, re, shutil, subprocess, sys, tempfile, time
 from pathlib import Path
 repo=Path(__file__).resolve().parents[1]
 if os.environ.get("DWM_PANEL_POPUP_NESTED") != "1":
@@ -23,15 +23,22 @@ assert 'root.selectedPanelWindow = panel;' in selection
 assert 'UpdateCenterWindow {' in shell_source
 assert 'panelWindow: root.activePanelWindow' in shell_source
 assert 'onExclusiveOpenRequested: root.selectPanelPopup(root.activePanelWindow, "updatecenter")' in shell_source
-for handler in ('onVisibleChanged: if (visible) updateCenterModel.close()',
-                'onUtilityVisibleChanged: if (utilityVisible) updateCenterModel.close()',
-                'onHistoryVisibleChanged: if (historyVisible) updateCenterModel.close()'):
- assert handler in shell_source
-assert shell_source.count('onVisibleChanged: if (visible) updateCenterModel.close()') >= 6
-assert 'commandMenuModel.close();\n                updateCenterModel.close();' in shell_source
-with tempfile.TemporaryDirectory(prefix='panel-popup-', dir=os.environ.get('TMPDIR', str(Path.home()/'tmp'))) as temp:
+for handler, visible in (('onVisibleChanged', 'visible'),
+                         ('onUtilityVisibleChanged', 'utilityVisible'),
+                         ('onHistoryVisibleChanged', 'historyVisible')):
+ matches = re.findall(rf'{handler}:\s*if\s*\({visible}\)\s*\{{([^}}]*)\}}', shell_source)
+ assert matches, handler
+ for body in matches:
+  assert 'updateCenterModel.close();' in body, handler
+  assert 'clipboardModel.close();' in body, handler
+ if handler == 'onVisibleChanged': assert len(matches) >= 6
+assert 'commandMenuModel.close();\n                clipboardModel.close();\n                updateCenterModel.close();' in shell_source
+# Keep the AF_UNIX IPC path below 108 bytes even with a long HOME.
+# Fixtures stay under the managed root; only this private runtime uses /tmp.
+with tempfile.TemporaryDirectory(prefix='pp-', dir='/tmp') as ipc_runtime, \
+     tempfile.TemporaryDirectory(prefix='panel-popup-', dir=os.environ.get('TMPDIR', str(Path.home()/'tmp'))) as temp:
  base=Path(temp); config=base/'config'; qml=config/'quickshell'; qml.mkdir(parents=True)
- runtime=base/'runtime'; runtime.mkdir(mode=0o700)
+ runtime=Path(ipc_runtime)
  shutil.copytree(repo/'config/quickshell/core',qml/'core')
  (qml/'shell.qml').write_text('''import QtQuick
 import Quickshell
@@ -81,7 +88,7 @@ int main(void) {
 }
 ''')
  subprocess.run(['cc',str(base/'client.c'),'-o',str(base/'client'),'-lX11'],check=True)
- env={**os.environ,'XDG_RUNTIME_DIR':str(runtime),'HOME':str(base),'XDG_CONFIG_HOME':str(config),'XDG_DATA_HOME':str(base/'data'),'XDG_STATE_HOME':str(base/'state'),'QT_QPA_PLATFORM':'xcb','QT_QPA_PLATFORMTHEME':''}
+ env={**os.environ,'XDG_RUNTIME_DIR':str(runtime),'HOME':str(base),'XDG_CONFIG_HOME':str(config),'XDG_DATA_HOME':str(base/'data'),'XDG_STATE_HOME':str(base/'state'),'XDG_CACHE_HOME':str(base/'cache'),'QT_QPA_PLATFORM':'xcb','QT_QPA_PLATFORMTHEME':''}
  log=(base/'runtime.log').open('w+')
  wm=subprocess.Popen([str(repo/'dwm')],env=env,stdout=log,stderr=log)
  client_log=(base/'client.log').open('w+')

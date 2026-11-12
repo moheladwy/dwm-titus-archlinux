@@ -90,7 +90,11 @@ or image tooling remain in the tree.
 The installed session must provide:
 
 - Standard dwm tiling, floating, monocle, tagging, focus, and monitor behavior.
-- Per-tag layout state and sizing.
+- Per-tag layout state and sizing, including tile gaps (zero by default).
+  Settings > Appearance must offer layout selection and master sizing without
+  replacing existing hotkeys. State updates are event-driven; changes name the
+  edited monitor and view so stale requests cannot affect another tag. Layout
+  state is session-local; desktop font/text scale retains its preview workflow.
 - EWMH desktop and active-window integration for external bars and tools.
 - Xinerama multi-monitor support.
 - Window swallowing.
@@ -117,7 +121,47 @@ The installed session must provide:
   appear above real fullscreen clients without becoming managed or taking focus.
   Ordinary shell popups and EWMH above hints retain their existing priority.
 - Window icons from `_NET_WM_ICON`.
+- A searchable window overview with individual cards across all tags. The
+  default Super+grave binding toggles it and Super+Tab stays Previous tag;
+  upgrades preserve existing user hotkey files and document the one-entry
+  addition. Selecting
+  a card chooses its actual monitor, retains an already-visible assigned tag
+  or selects its lowest assigned tag, and focuses the existing window without
+  changing assignments. Keyboard selection and Escape dismissal are supported.
+  The overview tracks clients through X11 events only while open and releases
+  its window list and delegates when closed. Static window thumbnails are
+  captured once per opening in a bounded helper outside dwm's event loop, with
+  XRender scaling to at most 320x180 before readback. Capture uses existing
+  compositor pixmaps, never changes redirection, and falls back to icon/title
+  cards when unavailable. Search, metadata changes and repaints do not recapture.
+  Closing cancels capture and removes private temporary images. No capture
+  polling or thumbnail activity is allowed while closed.
+- Keyboard layout group state for the panel, when the X server has XKB. dwm
+  selects `XkbStateNotify` for group changes (the group comes from the event)
+  and new keyboard, map, names and controls notifications (a full re-read; map
+  covers `xmodmap` adding or dropping groups), and publishes on the root window
+  only values that changed:
+  `_DWM_KEYBOARD_GROUP` (CARDINAL: effective group wrapped into range, group
+  count from the keyboard controls), `_DWM_KEYBOARD_GROUP_NAMES` (UTF8_STRING,
+  one NUL-terminated name per group) and `_DWM_KEYBOARD_SYMBOLS` (the loaded
+  keymap's symbols name). `_XKB_RULES_NAMES` is only a hint and never sets the
+  group count. A client switches by setting the 8-bit root property
+  `_DWM_KEYBOARD_GROUP_REQUEST` to `next`, `prev` or a zero-based group index;
+  dwm reads at most 16 bytes and deletes the value in the same read; a longer
+  value is deleted under a server grab, so a newer request is never lost. It
+  ignores invalid (including NUL inside the value) or out-of-range values, and
+  requests set before dwm reads the previous one coalesce. Switches
+  change the locked group, so a held group-shift key or latch still adds to the
+  effective group until released. The `cyclelayout` func (`i=1` or `i=-1`)
+  cycles the same way. Without XKB the properties are removed and requests are
+  ignored.
 - Configured border suppression and cursor-warp behavior.
+- Optional native titlebars for floating windows and floating layouts, disabled
+  by default. The themes.toml appearance section controls enablement and an
+  allowed workspace mask. A titlebar provides mouse movement and the normal
+  dwm close action, reserves visible space above the client, follows its theme
+  and geometry, and hides on unselected tags and in fullscreen. Existing tiled
+  behavior, client ownership and window assignments are preserved.
 - Stable handling of applications that omit optional X properties.
 
 ### 5.2 Runtime Configuration
@@ -167,6 +211,13 @@ Settings tab offers a persistent Float update terminal toggle that applies to
 the next update or recovery terminal; those terminals default to tiled.
 Update Center and the other anchored control popups must close on Escape and
 on a click outside their visible card under X11.
+Calendar and Weather are optional panel widgets, disabled by default. Their
+visibility uses the shared panel-settings protocol, preserving older files.
+Calendar uses the shared clock, supports month navigation and highlights today.
+Weather requires an explicit city and Fetch action, uses a bounded HTTPS JSON
+request, never automatically geolocates or polls, and preserves the last report
+on failure. Both popups use normal Escape and click-away dismissal.
+
 Visible shell surfaces must be opaque and follow the active theme selected in
 the user `themes.toml` file.
 
@@ -262,6 +313,9 @@ The supported installation flow must:
 11. Set ownership to the invoking user for files in that user's home.
 12. Support repeated execution without destructive side effects.
 13. Print a summary, skipped optional features, and actionable next steps.
+14. Provide automatic time synchronization through systemd-timesyncd, which
+    Arch ships in `systemd` but leaves disabled. Preserve an existing enabled
+    or active alternative provider and explicit systemd-timesyncd masks.
 14. Offer interactive Xorg display setup when installation runs inside an
     active X11 session. The setup must support resolution, refresh rate,
     position, rotation, primary-output selection, and compatible TearFree
@@ -310,6 +364,19 @@ contract for every developer deployment. Every live update must:
 5. After a required session restart, verify that the new dwm executable is
    active and that the graphical-session and XDG autostart lifecycle starts
    tray clients for the new X11 session.
+
+### 5.5.1 Optional AI assistance
+
+Ship the Arch `dwm-titus` customization skill and the titstack-derived
+read-only `dwm-titus-debug` diagnosis skill with the managed user data. Prefer a
+separately installed `/usr/share/dwm-titus/agents/skills` tree when present.
+Retarget only links to the two managed skill trees; preserve custom agent skill
+paths.
+Offer crash diagnosis only after an explicit notification action; keep X11
+`_NET_WM_PING` hang detection opt-in. Preserve agent approval and sandbox policy,
+keep untrusted window titles out of prompts, and never kill an application-supplied
+PID. The Settings frontend remains unprivileged. Optional agent installation
+uses an existing mise installation without adding system repositories.
 
 ### 5.6 Build System
 
@@ -538,6 +605,11 @@ the invoking user's home directory, using `boot$DATE.txt` or
 
 Repairs require an explicit confirmation. User repairs are limited to known
 desktop and audio components plus launching the interactive dependency flow.
+Dependency repair installs only missing Arch packages from the trusted installed
+package map, with administrator authorization and pacman's interactive
+confirmation, and only on a fully upgraded system.
+It preserves managed desktop files, installation receipts, and desktop update
+status, and refuses to proceed while a desktop transaction is unfinished.
 Failed user and system services are displayed as individual rows with Start,
 Stop, Restart, Disable, and Enable actions. A service action is allowed only
 while that exact `.service` unit is in the corresponding failed-unit set;
@@ -725,9 +797,16 @@ files, install and verify them, and activate Quickshell through the managed
 control path. Personal TOML, application settings, `.xinitrc`, and `config.h`
 remain preserved. Mutable source commands run in a Bubblewrap/libseccomp build
 sandbox without host authorization services or socket access; sandbox setup
-failure stops the update instead of running an unconfined build. Git checkouts
-must be clean, on `main`, and fast-forwardable;
-linked worktrees require the documented source update procedure.
+failure stops the update instead of running an unconfined build.
+
+Desktop GUI updates must build a fixed official upstream revision independently
+of the local source checkout. Local Git branches, edits, ignored or generated
+files, worktree metadata, and divergent history must not block installation
+updates. Replace the managed data and shell trees transactionally, retaining the
+complete previous data tree for recovery. Preserve Git metadata and unrelated
+files in the data directory without advancing local Git HEAD, and leave external
+source checkouts untouched. Continue validating installation paths, ownership,
+authorization, and transaction integrity before replacement.
 
 A root-owned installed helper accepts existing managed destinations and additions
 within its desktop-owned namespaces: dwm-prefixed commands and helpers, Dwm
@@ -855,6 +934,39 @@ The AUR policy is:
 - AUR-only packages are listed only in the `aur-optional` profile (Section
   5.8). Without an AUR helper or without opt-in, they are reported as skipped.
 
+### Optional clipboard-history privacy contract
+
+Clipboard history is opt-in and text-only. A separate unprivileged
+`dwm-clipboard-observer` backend observes XFixes CLIPBOARD ownership events;
+it never observes PRIMARY and never imports an existing clipboard on startup.
+The C window-manager event loop does not perform clipboard work. The backend
+uses existing libxcb runtime libraries and XRes 1.2 server-supplied local client
+PIDs, not window titles, WM_CLASS, active-window guesses or _NET_WM_PID.
+
+Before requesting text, verify same-user process identity and bounded TARGETS
+metadata. Reject sensitive-content markers and identifiable password-manager
+executables or launch arguments, including Bitwarden and KeePass-family apps.
+Inspect bounded same-user parent ancestry to exclude clipboard helpers still
+owned by those applications. Missing XRes/XFixes, remote displays, failed
+identity reads, timeouts, malformed or oversized replies, INCR transfers and
+ownership changes fail closed. Rejected owners' text is not requested or logged.
+
+Ordinary browser and terminal copies remain eligible by explicit maintainer
+choice. Unmarked password-manager browser-extension copies and secrets copied
+from a terminal or detached generic helper can be indistinguishable from normal
+text and may enter history. The frontend must disclose this limitation before
+opt-in. Marker-based exclusion and identifiable-application filtering are
+best-effort retention protections, not a guarantee to detect every password.
+
+Only admitted UTF-8 payloads of at most 65,536 bytes are emitted to the frontend.
+Capture defaults off independently of optional disk persistence; the frontend
+must stop the observer when disabled and must not fall back to a raw clipboard
+text listener. Older, unfiltered history cannot be imported. A separate frontend
+change must document opt-in, retention, deletion and migration before enabling
+this backend. X11 does not preserve provenance after another application
+recopies text, and this is not protection against hostile same-session clients.
+See `docs/CLIPBOARD-PRIVACY.md` for policy, source evidence, protocol and tests.
+
 ## 6. Filesystem and Installation Contract
 
 Default system installation locations:
@@ -918,6 +1030,11 @@ configuration and unrelated application configuration by default.
 - Third-party executable installers must run as the target user in an isolated
   staging directory. Both the reviewed installer and resulting binary must
   match repository-pinned checksums before the binary is installed.
+- The explicitly requested optional AI agent path in Section 5.5.1 is an
+  exception to the preceding download/checksum requirements: the desktop user
+  delegates installation to their existing mise and its registry verification.
+  These agent artifacts are not pinned or checksum-reviewed by dwm-titus.
+  This exception adds no system repositories and never runs as root.
 - Do not run user configuration or desktop helpers as root.
 - Quote paths and arguments that may contain whitespace.
 - Prevent command injection through distribution metadata, configuration

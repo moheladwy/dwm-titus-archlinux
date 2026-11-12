@@ -29,9 +29,9 @@ This is a fork of [ChrisTitusTech/dwm-titus](https://github.com/ChrisTitusTech/d
 | Experience | What it includes |
 | --- | --- |
 | **A focused desktop** | Automatic window tiling, nine workspaces, fast keyboard navigation, multi-monitor support, and flexible fullscreen modes. |
-| **Everyday essentials** | A polished panel, application launcher, system tray, Control Center, Settings, notifications, screenshots, audio, brightness, and power controls. |
-| **Easy discovery** | An interactive keybind viewer, guided display setup, built-in diagnostics, workstation self-heal, and clear unsupported-feature reporting. |
-| **Personal configuration** | Live-reloading hotkeys, themes, and window rules, with local configuration preserved across upgrades. |
+| **Everyday essentials** | A polished panel with a keyboard layout switcher, application launcher, system tray, Control Center, Settings, notifications, screenshots, audio, brightness, and power controls. |
+| **Easy discovery** | A searchable window overview across tags, an interactive keybind viewer, guided display setup, built-in diagnostics, workstation self-heal, and clear unsupported-feature reporting. |
+| **Personal configuration** | Visual layout, per-tag gap and scale controls, optional floating titlebars, plus live-reloading hotkeys, themes, and window rules, with local configuration preserved across upgrades. |
 | **One installation path** | Install Arch Linux, then run one installer that adds the desktop on top. |
 
 > dwm-titus is an X11 desktop. A Wayland-native session is not currently part
@@ -58,6 +58,8 @@ cd dwm-titus-archlinux
 ```
 
 The dry run shows the dependency and installation plan before anything changes.
+Run both commands from the cloned directory: `./install.sh` resolves relative to
+the current directory, so a new terminal must `cd dwm-titus-archlinux` first.
 The installer accepts only Arch Linux's `/etc/os-release` identity
 (`ID=arch`) and rejects every other operating-system identity before making
 changes. It preserves existing personal configuration and installs the managed
@@ -144,7 +146,8 @@ ${XDG_CONFIG_HOME:-$HOME/.config}/dwm-titus/
 
 Hotkeys, themes, and window rules reload when their TOML files are saved.
 Advanced compile-time preferences live in the user-owned `config.h`, which the
-installer and future upgrades preserve.
+installer and future upgrades preserve. `${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/` is managed
+by dwm-titus and replaced on every update, so don't keep local edits there.
 
 The installer also provides `dwm-settings-display` and its root-owned
 `libexec/dwm-titus/dwm-settings-display-root` persistence helper. Live display
@@ -243,6 +246,15 @@ pacman never rolls back, so after an interrupted upgrade check
 `/var/log/pacman.log` and use **Recover** for a fresh `sudo pacman -Syu`. Never
 run `pacman -Sy` on its own.
 
+Control Center's **Check Dependencies** opens an interactive dependency check
+and package repair in a terminal. System Health's dependency **Repair** opens
+package repair directly, including optional tools reported by its scan. You can also run
+`dwm-desktop-update install-dependencies`. It uses the trusted installed package
+map, installs missing Arch packages after administrator authorization and
+pacman's own confirmation, and preserves desktop files, installation receipts,
+and Update Center status. Like every package install here, it requires a fully
+upgraded system. Finish or recover any active desktop update first.
+
 The same section provides confirmed account, password, and printer tool
 launches. **Manage software sources** is unsupported on Arch, because there is
 no graphical source manager; repositories come from `/etc/pacman.conf` and are
@@ -258,7 +270,9 @@ cannot be canceled. Cancel only dismisses the preview, and closing Settings does
 not undo an action. An uncertain result requires fresh status and new confirmation,
 not automatic retry. Locale changes apply to new sessions; log out manually when
 ready. Synchronization status is labeled as the last read.
-The panel and System Settings share one minute-level local clock. A newly
+The panel and System Settings share one local clock. It is minute-level unless
+seconds are turned on for the panel (Settings > Appearance or Control Center >
+Bar Widgets); the Settings readout stays minute-level. A newly
 reported timezone refreshes both displays without restarting Quickshell.
 
 Start with the built-in diagnostic report:
@@ -281,6 +295,12 @@ If the problem remains, [open an issue](https://github.com/moheladwy/dwm-titus-a
 and include the relevant diagnostic output. Review it first and remove any
 private system information.
 
+## AI assistance
+
+Packaged customization and diagnosis skills, optional crash/hang diagnosis, and
+agent setup are documented in [AI assistance](docs/AI-ASSIST.md). Open Settings >
+AI assistant or run `dwm-agent setup`. Diagnosis preserves normal agent approvals.
+
 ## Contributing
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the
@@ -296,3 +316,19 @@ scripts/run-tests
 
 Project requirements and active work are tracked in [SPEC.md](SPEC.md),
 [ROADMAP.md](ROADMAP.md), and [TASKS.md](TASKS.md).
+
+### Automatic time synchronization
+
+The installer enables `systemd-timesyncd.service` for automatic network time
+synchronization. Arch ships the service in `systemd` but leaves it disabled.
+The installer keeps an enabled or active chronyd, chronyd-restricted, ntpd,
+ntpsec, or openntpd provider and preserves an explicit timesyncd mask. It never
+stops an existing provider or edits its servers.
+
+Existing installations can apply the default by rerunning `./install.sh` with
+their usual profile. No migration is needed when an existing provider already
+synchronizes the clock. A preserved mask requires an administrator's decision
+before `sudo systemctl unmask systemd-timesyncd.service` and rerunning installation.
+Check with `timedatectl status` and `systemctl is-enabled systemd-timesyncd.service`;
+on timesyncd systems, `timedatectl show-timesync` reports server and sample details.
+Network access to an NTP server is required; enablement alone does not prove sync.

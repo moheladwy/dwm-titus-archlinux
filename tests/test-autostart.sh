@@ -61,7 +61,7 @@ cleanup() {
 		*) kill "$watcher_pid" 2>/dev/null || true ;;
 		esac
 	fi
-	for identity_file in "$work"/*/state/dwm-status-runtime.identities; do
+	for identity_file in "$work"/*/state/dwm-status-runtime.identities "$work"/*/state/dwm-crash-watch-runtime.identities; do
 		[ -f "$identity_file" ] || continue
 		while IFS= read -r runtime_identity; do
 			test_identity_matches "$runtime_identity" || continue
@@ -78,7 +78,7 @@ cleanup() {
 		done <"$identity_file"
 	done
 	sleep 0.05
-	for identity_file in "$work"/*/state/dwm-status-runtime.identities; do
+	for identity_file in "$work"/*/state/dwm-status-runtime.identities "$work"/*/state/dwm-crash-watch-runtime.identities; do
 		[ -f "$identity_file" ] || continue
 		while IFS= read -r runtime_identity; do
 			test_identity_matches "$runtime_identity" || continue
@@ -122,14 +122,17 @@ EOF
 	chmod +x "$work/bin/$name"
 }
 
+# Waits allow 10 seconds: the full gate runs this beside heavy suites, and each
+# autostart now also launches the crash watcher.
 wait_for_marker() {
 	marker=$1
 	i=0
-	while [ "$i" -lt 50 ]; do
+	while [ "$i" -lt 500 ]; do
 		[ -f "$marker" ] && return 0
 		i=$((i + 1))
 		sleep 0.02
 	done
+	printf 'Timed out waiting for %s\n' "$marker" >&2
 	return 1
 }
 
@@ -137,7 +140,7 @@ wait_for_count() {
 	count_path=$1
 	expected_count=$2
 	attempt=0
-	while [ "$attempt" -lt 100 ]; do
+	while [ "$attempt" -lt 500 ]; do
 		[ "$(cat "$count_path" 2>/dev/null || :)" != "$expected_count" ] || return 0
 		attempt=$((attempt + 1))
 		sleep 0.02
@@ -149,12 +152,13 @@ wait_for_count() {
 wait_for_quickshell_executable() {
 	process_pid=$1
 	i=0
-	while [ "$i" -lt 50 ]; do
+	while [ "$i" -lt 1000 ]; do
 		executable=$(readlink "/proc/$process_pid/exe" 2>/dev/null || :)
 		[ "${executable##*/}" = quickshell ] && return 0
 		i=$((i + 1))
 		sleep 0.01
 	done
+	printf 'Timed out waiting for process %s to run quickshell\n' "$process_pid" >&2
 	return 1
 }
 
@@ -304,6 +308,10 @@ while :; do
 done
 EOF
 chmod +x "$work/bin/dwm-status"
+# Keep crash watching inside the fixture, including its display-scoped identity
+# and cleanup. Never follow the host journal from these mocked X sessions.
+sed 's/dwm-status/dwm-crash-watch/g' "$work/bin/dwm-status" >"$work/bin/dwm-crash-watch"
+chmod +x "$work/bin/dwm-crash-watch"
 
 cat >"$work/bin/quickshell" <<'EOF'
 #!/bin/sh

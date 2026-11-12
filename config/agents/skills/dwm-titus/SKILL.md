@@ -40,6 +40,12 @@ Read the matching guide before acting. They live next to this file.
   apps; web apps; autostart; launching apps from a key.
 - [`maintenance.md`](maintenance.md): system, AUR, and desktop updates,
   diagnostics, logs, recovery, and reinstalling.
+- [`references/ai-assist.md`](references/ai-assist.md): the "Diagnose with
+  AI" agent launcher (`dwm-agent`), crash notifications, and optional hang
+  detection.
+
+For diagnosing a broken app or desktop part without changing anything, use
+the companion `$dwm-titus-debug` skill.
 
 ## Orient yourself first
 

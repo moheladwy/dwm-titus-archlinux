@@ -34,8 +34,15 @@ NetworkManager connections, scans visible Wi-Fi networks, and connects to open
 or WPA personal networks directly. Successful Wi-Fi connections are saved as
 NetworkManager profiles, so they reconnect normally in later sessions.
 
-Hidden SSIDs and enterprise Wi-Fi are handled through the optional
-`nm-connection-editor` fallback when it is installed.
+To join a network that does not broadcast its name, use **Hidden network...**
+at the end of the Wi-Fi list. Enter the network name, pick WPA2 Personal, WPA3
+Personal, WEP, or Open, choose the Wi-Fi device when there is more than one,
+and enter the password. The new profile is saved with hidden-network probing
+enabled, so it reconnects like any other saved network. A wrong password or
+name removes the new profile again and reopens the form with the reason.
+
+Enterprise (802.1X) Wi-Fi and advanced settings open `nm-connection-editor`
+(Edit Connections).
 
 ## Bluetooth Popover
 
@@ -46,10 +53,13 @@ paired device, and disconnect a connected device through `bluetoothctl`.
 ## Panel Widgets
 
 The Bar Widgets page can show or hide the workspace, volume, Bluetooth,
-network, and power widgets. Those choices are stored in the project-owned
+network, power, and keyboard layout widgets. The keyboard layout pill only
+appears when two or more layouts are set (Settings > Input). Those choices are stored in the project-owned
 `~/.config/dwm-titus/panel-widgets.conf` state and apply to every monitor and
-future Quickshell session. Settings Appearance exposes the same shared controls
-and can restore the safe all-on default. The redesigned panel retains the
+future Quickshell session. The Clock seconds row adds seconds to the panel
+clock; it is off by default. Settings Appearance exposes the same shared
+controls; its **Show all widgets** button turns every widget back on and
+leaves the clock seconds setting as it is. The redesigned panel retains the
 active-window title, status segments, and system tray, and shows all nine dwm
 tags (workspaces). Hovering icon-only panel controls displays a text tooltip.
 After a panel restart, the tray runs `dwm-quickshell-tray resync` once to
@@ -95,7 +105,9 @@ The dashboard groups checks into:
 
 - Boot and kernel errors from `journalctl`, with `dmesg` as a fallback
 - Failed user and system services, one service per row
-- Memory, pressure, load, swap, filesystem space, and inode use
+- Memory, pressure, load, swap, filesystem space, and inode use; firmware
+  variable storage (`efivarfs`) is reported as information rather than as a
+  cleanable disk error
 - Local routing, resolver, and NetworkManager state
 - X11, D-Bus, dwm, Quickshell, Picom, audio, and managed configuration
 - Required commands, libraries, terminals, and package-database consistency
@@ -141,9 +153,8 @@ root-owned installed helper.
 | Restart Quickshell | Reload the managed Quickshell shell |
 | Reload Wallpaper | Randomize from `~/Pictures/backgrounds/` |
 | Restart NetworkManager | `sudo systemctl restart NetworkManager` in a terminal |
-| Dependency Check | Opens `check-deps.sh` in a terminal |
+| Check Dependencies | Opens `check-deps.sh` in an interactive tiled terminal to verify and repair packages |
 | Self-Heal | Runs the configured self-heal script (`DWM_SELF_HEAL_SCRIPT`, `~/.config/dwm-titus/self-heal.path`, or `dwm-self-heal`) in a terminal |
-| Install Missing Deps | Runs `install.sh` in a terminal |
 | Wallpaper Folder | Open `~/Pictures/backgrounds/` in the file manager |
 | GTK Settings | Launch `nwg-look` for GTK theming; shown only when `nwg-look` is installed |
 

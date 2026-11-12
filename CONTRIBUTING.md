@@ -28,6 +28,26 @@ make
 scripts/run-tests
 ```
 
+The managed runner replaces `XDG_CONFIG_HOME`, `XDG_DATA_HOME`,
+`XDG_STATE_HOME`, `XDG_CACHE_HOME`, and `XDG_RUNTIME_DIR` with private directories
+in its temporary workspace. It retains `HOME` for toolchain discovery. A fixture that changes
+`HOME` or drops privileges must also supply all four XDG homes for that fixture;
+never inherit the invoking desktop's receipt, build configuration, or caches.
+The runtime directory is mode `0700` and is set before private D-Bus sessions
+start, including for their activated services. A fixture that drops privileges
+must also supply a runtime directory owned by that fixture's user. Tests that
+use session services must still create a private D-Bus session.
+The desktop smoke and panel-popup tests use separate private `/tmp/qs-*` and
+`/tmp/pp-*` runtimes to keep
+Quickshell IPC sockets below Linux's 108-byte path limit, even with a long test
+root. Their fixture workspaces remain under the managed root; each runtime is
+removed on success, failure, and handled interruption.
+The desktop smoke fixture exposes the panel helpers but excludes the real
+`autostart.sh` and `autostop.sh` session hooks, and uses private XDG configuration
+and data search paths. It starts its own panel; it must not launch host XDG
+autostart applications such as light-locker on its private Xvfb display.
+Session lifecycle behavior is covered separately by `make check-session-guards`.
+
 Use `./install.sh --dry-run --non-interactive --profile core` to inspect the
 dependency plan without changing the system.
 
@@ -45,7 +65,7 @@ submitting a pull request.
 | C or build configuration | `scripts/run-tests make clean all`, then `scripts/run-tests` |
 | Shell or installer | `scripts/run-tests make check-shell check-format` and focused tests |
 | NVIDIA suspend helper | `scripts/run-tests make check-nvidia-suspend-test` |
-| X11 behavior | `scripts/run-tests make check-xvfb-runtime check-monitor-tags` |
+| X11 behavior | `scripts/run-tests make check-xvfb-runtime check-monitor-tags check-keyboard-layout` |
 | Settings loading, search, and section navigation | `scripts/run-tests make check-quickshell-settings-responsiveness-xvfb` plus the full Settings runtime gate |
 | Quickshell QML | `scripts/run-tests make check-quickshell-qml` plus real or nested X11 runtime validation |
 | System update UI | `scripts/run-tests make check-quickshell-system-management` (runs `tests/test-quickshell-update-ui-xvfb.sh`, which can also run alone as the focused native fixture), plus configured QML lint |

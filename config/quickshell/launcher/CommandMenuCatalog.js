@@ -3,6 +3,7 @@
 var menus = {
     "root": [
         { "id": "apps", "label": "Apps", "detail": "Browse installed applications", "kind": "submenu", "target": "apps", "provider": "applications", "keywords": "applications launch programs", "enabled": true, "current": false },
+        { "id": "window-overview", "label": "Window overview", "detail": "Find windows across all tags", "kind": "action", "actionType": "ipc", "target": "windowOverview", "action": "open", "argument": "", "keywords": "windows mission control overview focus tags", "enabled": true, "current": false },
         { "id": "settings", "label": "Settings", "detail": "Open desktop settings", "kind": "action", "actionType": "ipc", "target": "settings", "action": "open", "argument": "", "keywords": "preferences configuration", "enabled": true, "current": false },
         { "id": "display-input", "label": "Display / Input", "detail": "Monitors, keyboard, pointer, and touchpad", "kind": "submenu", "target": "display-input", "keywords": "screen monitor mouse keyboard touchpad", "enabled": true, "current": false },
         { "id": "network", "label": "Network", "detail": "Wi-Fi and wired connections", "kind": "action", "actionType": "ipc", "target": "network", "action": "open", "argument": "", "keywords": "wifi ethernet vpn connections", "enabled": true, "current": false },
@@ -10,6 +11,7 @@ var menus = {
         { "id": "audio", "label": "Audio", "detail": "Volume, microphone, and media", "kind": "action", "actionType": "ipc", "target": "controls", "action": "open", "argument": "", "keywords": "sound volume microphone media", "enabled": true, "current": false },
         { "id": "health", "label": "System Health", "detail": "Desktop diagnostics and status", "kind": "action", "actionType": "ipc", "target": "systemhealth", "action": "open", "argument": "", "keywords": "diagnostics status services", "enabled": true, "current": false },
         { "id": "keybindings", "label": "Keybindings", "detail": "Search the active keyboard shortcuts", "kind": "action", "actionType": "ipc", "target": "controlcenter", "action": "keybindings", "argument": "", "keywords": "hotkeys shortcuts keys", "enabled": true, "current": false },
+        { "id": "clipboard", "label": "Clipboard History", "detail": "Browse copied text", "kind": "action", "actionType": "ipc", "target": "clipboard", "action": "open", "argument": "", "keywords": "clipboard paste copy history pano", "enabled": true, "current": false },
         { "id": "screenshots", "label": "Screenshots", "detail": "Capture a monitor, desktop, or region", "kind": "submenu", "target": "screenshots", "keywords": "capture image clipboard", "enabled": true, "current": false },
         { "id": "system", "label": "System", "detail": "Lock, power, and system settings", "kind": "submenu", "target": "system", "keywords": "lock logout reboot shutdown power", "enabled": true, "current": false }
     ],

@@ -24,6 +24,20 @@ if os.geteuid() != 0 or not (Path("/run/.containerenv").exists() or Path("/.dock
 REPO = Path(__file__).resolve().parents[1]
 
 
+
+PACMAN_ENV = {"PATH": "/usr/bin:/bin", "HOME": "/root", "LANG": "C.UTF-8"}
+
+
+def pacman_query(args, installed):
+    """Answer the helper's read-only pacman queries: -T, -Qu, and -Sp."""
+    if args[:3] == ["/usr/bin/pacman", "-T", "--"] and len(args) == 4:
+        return subprocess.CompletedProcess(args, 0 if args[3] in installed else 127)
+    if args == ["/usr/bin/pacman", "-Qu"]:
+        return subprocess.CompletedProcess(args, 1, "")
+    if args[:5] == ["/usr/bin/pacman", "-Sp", "--print-format", "%n", "--"] and len(args) == 6:
+        return subprocess.CompletedProcess(args, 0)
+    return None
+
 class Security(unittest.TestCase):
     def setUp(self):
         # Model a normal root-owned installation even under run-tests' umask 077.
@@ -138,6 +152,84 @@ class Security(unittest.TestCase):
         self.assertIn("already exists", result.stderr)
         self.assertEqual(self.added.read_bytes(), b"user theme")
         self.assertEqual(self.binary.read_bytes(), b"original")
+
+    def helper_collision_archive(self):
+        self.added = self.prefix / "bin/dwm-migrate-update-center-window-rule"
+        candidate = copy.deepcopy(self.manifest)
+        candidate["revision"] = "b" * 40
+        candidate["files"][str(self.added)] = {"mode": 0o755, "sha256": hashlib.sha256(b"helper").hexdigest()}
+        payload = {str(self.binary): b"updated", str(self.added): b"helper"}
+        items = [("manifest.json", json.dumps(candidate).encode())]
+        items.extend((str(i), payload[name]) for i, name in enumerate(sorted(candidate["files"])))
+        with tarfile.open(self.bundle, "w:") as archive:
+            for name, content in items:
+                item = tarfile.TarInfo(name)
+                item.size = len(content)
+                archive.addfile(item, io.BytesIO(content))
+        os.chown(self.bundle, 1000, 1000)
+        self.added.write_bytes(b"helper")
+        self.added.chmod(0o755)
+
+    def test_exact_root_owned_omitted_helper_is_recorded_without_replacement(self):
+        self.helper_collision_archive()
+        original_manifest = self.manifest_path.read_bytes()
+        original_inode = self.added.stat().st_ino
+        result = self.apply()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        candidate = json.loads(self.manifest_path.read_text())
+        self.assertIn(str(self.added), candidate["files"])
+        self.assertEqual(self.added.stat().st_ino, original_inode)
+        result = self.command("rollback", self.operation)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.manifest_path.read_bytes(), original_manifest)
+        self.assertEqual(self.added.read_bytes(), b"helper")
+        self.assertEqual(self.added.stat().st_ino, original_inode)
+
+    def test_omitted_helper_collision_rejects_content_mode_owner_and_symlink_drift(self):
+        for kind in ("content", "mode", "owner", "symlink"):
+            with self.subTest(kind=kind):
+                self.helper_collision_archive()
+                if kind == "content":
+                    self.added.write_bytes(b"personal helper")
+                elif kind == "mode":
+                    self.added.chmod(0o644)
+                elif kind == "owner":
+                    os.chown(self.added, 1000, 1000)
+                else:
+                    self.added.unlink()
+                    self.added.symlink_to("dwm")
+                before = self.added.lstat()
+                result = self.apply()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("New managed destination already exists: " + str(self.added), result.stderr)
+                self.assertEqual(self.added.lstat().st_ino, before.st_ino)
+                self.assertEqual(self.binary.read_bytes(), b"original")
+                self.added.unlink()
+                shutil.rmtree(Path("/var/lib/dwm-titus/desktop-updates") / self.operation)
+
+    def test_omitted_helper_changed_after_validation_is_preserved(self):
+        self.helper_collision_archive()
+        module = runpy.run_path(str(self.helper))
+        module["STATE"].mkdir(parents=True, exist_ok=True, mode=0o700)
+        apply = module["apply_archive"]
+        original_write = apply.__globals__["write_json"]
+        changed = False
+
+        def change_after_validation(path, value):
+            nonlocal changed
+            original_write(path, value)
+            if path.name == "journal.json" and value["state"] == "applying" and not changed:
+                changed = True
+                self.added.write_bytes(b"changed after validation")
+
+        with patch.dict(apply.__globals__, {"write_json": change_after_validation}):
+            with self.assertRaisesRegex(RuntimeError, "New managed destination already exists: " + str(self.added)):
+                apply(self.bundle, hashlib.sha256(self.manifest_path.read_bytes()).hexdigest(), self.operation,
+                      1000, hashlib.sha256(self.bundle.read_bytes()).hexdigest(), "b" * 40)
+        self.assertTrue(changed)
+        self.assertEqual(self.added.read_bytes(), b"changed after validation")
+        self.assertEqual(self.binary.read_bytes(), b"original")
+        self.assertEqual(json.loads(self.manifest_path.read_text())["revision"], "a" * 40)
 
     def test_migration_rejects_symlink_parent(self):
         self.migration_archive()
@@ -310,6 +402,190 @@ raise SystemExit(17)
             with self.assertRaisesRegex(RuntimeError, "active"):
                 guard("", ["/usr/bin/false"], "nobody", str(state))
         self.assertEqual(os.geteuid(), 0)
+
+    def dependency_repair_fixture(self):
+        mapping = self.prefix / "bin/dwm-packages.sh"
+        shutil.copy2(REPO / "scripts/dwm-packages.sh", mapping)
+        mapping.chmod(0o755)
+        self.manifest["files"][str(mapping)] = {
+            "mode": 0o755, "sha256": hashlib.sha256(mapping.read_bytes()).hexdigest()}
+        self.manifest_path.write_text(json.dumps(self.manifest))
+        perform = runpy.run_path(str(self.helper))["perform"]
+        perform.__globals__["STATE"] = self.prefix / "transactions"
+        return mapping, perform, hashlib.sha256(self.manifest_path.read_bytes()).hexdigest()
+
+    def test_interactive_dependency_repair_only_installs_missing_packages(self):
+        mapping, perform, generation = self.dependency_repair_fixture()
+        original = {p: p.read_bytes() for p in (self.binary, self.helper, self.manifest_path, mapping)}
+        real_run = subprocess.run
+        profiles, packages, transactions = [], [], []
+
+        def package_command(args, **kwargs):
+            if args[0] == "/usr/bin/bash":
+                self.assertEqual(args[:3], ["/usr/bin/bash", str(mapping), "arch"])
+                self.assertIn(args[3], ("required", "source-update", "desktop", "system-management", "theme", "fonts",
+                                        "terminal-primary", "screenshot-optional", "theme-gtk", "provider-policy"))
+                profiles.append(args[3])
+                return real_run(args, **kwargs)
+            if args[:2] == ["/usr/bin/pacman", "-T"]:
+                packages.append(args[3])
+            answer = pacman_query(args, {"gcc"})
+            if answer is not None:
+                return answer
+            # Interactive repair: pacman's own prompt, never --noconfirm.
+            self.assertEqual(args[:4], ["/usr/bin/pacman", "-S", "--needed", "--"])
+            self.assertTrue(len(args[4:]) > 0)
+            self.assertIsNone(kwargs["stdin"])
+            self.assertEqual(kwargs["env"], PACMAN_ENV)
+            self.assertTrue(kwargs["check"])
+            transactions.append(args)
+            return subprocess.CompletedProcess(args, 0)
+
+        with patch.object(subprocess, "run", side_effect=package_command), \
+                patch.object(shutil, "which", side_effect=lambda cmd, path=None: "/usr/bin/" + cmd if cmd == "alacritty" else None), \
+                patch.object(sys.stdin, "isatty", return_value=True):
+            perform(["repair-dependencies", generation], 1000)
+            perform(["repair-dependencies", generation], 1000)
+        expected_profiles = ["provider-policy", "required", "source-update", "desktop", "system-management", "theme", "fonts", "screenshot-optional", "theme-gtk"]
+        self.assertEqual(profiles, expected_profiles * 2)
+        self.assertIn("quickshell", packages)
+        self.assertIn("xorg-setxkbmap", packages)
+        self.assertNotIn("xkbset", packages)  # AUR-only, never in a required repair
+        # Required then optional packages, in each of the two runs.
+        self.assertEqual(len(transactions), 4)
+        self.assertEqual({p: p.read_bytes() for p in original}, original)
+        self.assertFalse(list((self.prefix / "transactions").glob("*/journal.json")))
+        self.assertFalse((self.prefix / "transactions/latest.json").exists())
+
+    def test_dependency_repair_is_a_noop_when_all_packages_are_installed(self):
+        _, perform, generation = self.dependency_repair_fixture()
+        original = self.manifest_path.read_bytes()
+        real_run = subprocess.run
+
+        def installed(args, **kwargs):
+            if args[0] == "/usr/bin/bash":
+                return real_run(args, **kwargs)
+            self.assertEqual(args[0:3], ["/usr/bin/pacman", "-T", "--"])
+            self.assertEqual(len(args), 4)
+            return subprocess.CompletedProcess(args, 0)
+
+        with patch.object(sys.stdin, "isatty", return_value=True), \
+                patch.object(subprocess, "run", side_effect=installed):
+            perform(["repair-dependencies", generation], 1000)
+            perform(["repair-dependencies", generation], 1000)
+        self.assertEqual(self.manifest_path.read_bytes(), original)
+        self.assertEqual(self.binary.read_bytes(), b"original")
+        self.assertFalse(list((self.prefix / "transactions").glob("*/journal.json")))
+        self.assertFalse((self.prefix / "transactions/latest.json").exists())
+
+    def test_dependency_repair_requires_terminal_and_preserves_package_decline(self):
+        _, perform, generation = self.dependency_repair_fixture()
+        with patch.object(sys.stdin, "isatty", return_value=False), patch.object(subprocess, "run") as command, \
+                self.assertRaisesRegex(RuntimeError, "^Dependency repair requires an interactive terminal$"):
+            perform(["repair-dependencies", generation], 1000)
+        command.assert_not_called()
+        original = self.manifest_path.read_bytes()
+        real_run = subprocess.run
+
+        def declined(args, **kwargs):
+            if args[0] == "/usr/bin/bash":
+                return real_run(args, **kwargs)
+            answer = pacman_query(args, set())
+            if answer is not None:
+                return answer
+            self.assertEqual(args[:4], ["/usr/bin/pacman", "-S", "--needed", "--"])
+            self.assertIsNone(kwargs["stdin"])
+            raise subprocess.CalledProcessError(1, args)
+
+        with patch.object(sys.stdin, "isatty", return_value=True), \
+                patch.object(subprocess, "run", side_effect=declined), self.assertRaises(subprocess.CalledProcessError):
+            perform(["repair-dependencies", generation], 1000)
+        self.assertEqual(self.manifest_path.read_bytes(), original)
+        self.assertEqual(self.binary.read_bytes(), b"original")
+
+    def test_dependency_repair_expands_terminal_when_no_terminal_is_installed(self):
+        _, perform, generation = self.dependency_repair_fixture()
+        real_run = subprocess.run
+        profiles = []
+
+        def package_command(args, **kwargs):
+            if args[0] == "/usr/bin/bash":
+                profiles.append(args[3])
+                return real_run(args, **kwargs)
+            answer = pacman_query(args, set())
+            if answer is not None:
+                return answer
+            return subprocess.CompletedProcess(args, 0)
+
+        with patch.object(subprocess, "run", side_effect=package_command), \
+                patch.object(shutil, "which", return_value=None), \
+                patch.object(sys.stdin, "isatty", return_value=True):
+            perform(["repair-dependencies", generation], 1000)
+        self.assertIn("terminal-primary", profiles)
+
+    def test_dependency_repair_filters_power_profiles_daemon_when_provider_is_present(self):
+        _, perform, generation = self.dependency_repair_fixture()
+        real_run = subprocess.run
+        installed_packages = []
+
+        def package_command(args, **kwargs):
+            if args[0] == "/usr/bin/bash":
+                return real_run(args, **kwargs)
+            # tuned-ppd provides power-profiles-daemon.
+            answer = pacman_query(args, {"power-profiles-daemon"})
+            if answer is not None:
+                return answer
+            if args[:4] == ["/usr/bin/pacman", "-S", "--needed", "--"]:
+                installed_packages.extend(args[4:])
+            return subprocess.CompletedProcess(args, 0)
+
+        with patch.object(subprocess, "run", side_effect=package_command), \
+                patch.object(sys.stdin, "isatty", return_value=True):
+            perform(["repair-dependencies", generation], 1000)
+        self.assertNotIn("power-profiles-daemon", installed_packages)
+
+    def test_dependency_repair_rejects_stale_preview_and_untrusted_package_map(self):
+        mapping, perform, generation = self.dependency_repair_fixture()
+        with patch.object(sys.stdin, "isatty", return_value=True), patch.object(subprocess, "run") as command:
+            with self.assertRaisesRegex(RuntimeError, "^Dependency preview changed; check again$"):
+                perform(["repair-dependencies", "0" * 64], 1000)
+            for kind in ("content", "mode", "owner", "symlink"):
+                with self.subTest(kind=kind):
+                    saved = mapping.read_bytes()
+                    if kind == "content":
+                        mapping.write_bytes(saved + b"\n# changed\n")
+                    elif kind == "mode":
+                        mapping.chmod(0o777)
+                    elif kind == "owner":
+                        os.chown(mapping, 1000, 1000)
+                    else:
+                        mapping.unlink()
+                        mapping.symlink_to("dwm")
+                    with self.assertRaises(RuntimeError):
+                        perform(["repair-dependencies", generation], 1000)
+                    mapping.unlink()
+                    mapping.write_bytes(saved)
+                    mapping.chmod(0o755)
+            command.assert_not_called()
+
+    def test_dependency_repair_blocks_unfinished_transactions_and_invalid_map_output(self):
+        _, perform, generation = self.dependency_repair_fixture()
+        state = self.prefix / "transactions"
+        journal = state / self.operation / "journal.json"
+        journal.parent.mkdir(parents=True)
+        with patch.object(sys.stdin, "isatty", return_value=True), patch.object(subprocess, "run") as command:
+            for status in ("preparing", "applying", "applied", "rolling-back", "rolled-back-pending", "invalid"):
+                journal.write_text(json.dumps({"state": status}))
+                with self.assertRaisesRegex(RuntimeError, "^Another desktop transaction must finish or recover first$"):
+                    perform(["repair-dependencies", generation], 1000)
+            command.assert_not_called()
+            journal.unlink()
+            for output in ("", "--noconfirm", "/tmp/untrusted.pkg.tar.zst", "https://example.org/pkg.pkg.tar.zst"):
+                command.reset_mock()
+                command.return_value = subprocess.CompletedProcess([], 0, stdout=output)
+                with self.assertRaises(RuntimeError):
+                    perform(["repair-dependencies", generation], 1000)
+                self.assertTrue(all(call.args[0][0] == "/usr/bin/bash" for call in command.call_args_list))
 
     def test_dependency_action_rejects_unfinished_transactions_before_package_commands(self):
         marker = self.prefix / "package-commands.json"

@@ -210,7 +210,13 @@ ShellRoot {{
         function buttonPosition(name: string): string {{
             const button = harness.findItem(updateWindow.contentItem, name);
             const point = button.mapToGlobal(button.width / 2, button.height / 2);
-            return JSON.stringify({{ x: Math.round(point.x), y: Math.round(point.y) }});
+            const viewport = harness.findItem(updateWindow.contentItem, "updateCenterSettingsViewport");
+            const local = button.mapToItem(viewport, 0, 0);
+            return JSON.stringify({{ x: Math.round(point.x), y: Math.round(point.y),
+                enabled: button.enabled, visible: button.visible, popupVisible: updateWindow.visible,
+                pending: updateWindow.savePending, error: model.settingsError,
+                localY: local.y, height: button.height, viewportHeight: viewport.height,
+                exposed: local.y >= 0 && local.y + button.height <= viewport.height }});
         }}
         function viewportBounds(settings: bool): string {{
             const card = harness.findItem(updateWindow.contentItem, "updateCenterCard");
@@ -263,6 +269,15 @@ ShellRoot {{
                 detail: "", restart: value, items: []
             }};
             return probeRow.Accessible.name + "|" + probeRow.visibleDetail();
+        }}
+        function probeBlockedUpdate(): string {{
+            const original = probeRow.provider;
+            probeRow.provider = {{ id: "dwm-titus", name: "DWM-Titus", status: "restricted", pending: 1, managed: 1,
+                freshness: "fresh", lastSuccess: 30, updateAvailable: false, errorCode: "",
+                detail: "Managed system directories are missing. Run the source installer to restore them.", restart: "none", items: [] }};
+            const label = probeRow.statusLabel();
+            probeRow.provider = original;
+            return label;
         }}
         function probeStatusLabel(): string {{ return probeRow.statusLabel(); }}
         function probeStatusLabelColor(): string {{ return String(probeRow.statusLabelColor()); }}
@@ -412,6 +427,7 @@ with tempfile.TemporaryDirectory(prefix="update-center-xvfb-", dir=tmp_root) as 
         assert call("setProbeRestart", "session") == "Arch Linux, Restart session|Sign out and back in to complete this update."
         assert call("setProbeRestart", "system") == "Arch Linux, Restart system|Restart the system to complete this update."
         assert call("setProbeRestart", "none") == "Arch Linux, Up to date|"
+        assert call("probeBlockedUpdate") == "Restricted", "Blocked update was advertised as available"
         assert call("probeStatusLabel") == "Up to date"
         call("setProbeScanning", "true")
         assert call("probeStatusLabel") == "Checking"
@@ -579,10 +595,23 @@ with tempfile.TemporaryDirectory(prefix="update-center-xvfb-", dir=tmp_root) as 
         run(env, "xdotool", "key", "Tab", check=True)
         for attempt in range(2):
             _, previous_saves = map(int, call("counts").split(":"))
-            position = json.loads(call("buttonPosition", "updateCenterSave"))
+            initial_position = json.loads(call("buttonPosition", "updateCenterSave"))
+            if not initial_position["exposed"]:
+                print("Save retry requires scrolling after error layout:", initial_position)
+            # An error banner increases the scrollable content. Reveal Save
+            # before retrying, just as a user would, then observe settled geometry.
+            call("viewportBounds", "true")
+            def exposed_save():
+                value = json.loads(call("buttonPosition", "updateCenterSave"))
+                return value if value["exposed"] else None
+            position = wait_for(exposed_save, "Save button did not become fully visible")
             run(env, "xdotool", "mousemove", str(position["x"]), str(position["y"]), "click", "1", check=True)
-            wait_for(lambda: int(call("counts").split(":")[1]) == previous_saves + 1,
-                     "Repeated save error left the button disabled")
+            try:
+                wait_for(lambda: int(call("counts").split(":")[1]) == previous_saves + 1,
+                         "Repeated save error left the button disabled")
+            except AssertionError as error:
+                raise AssertionError(f"{error}; attempt={attempt}; before={position}; "
+                    f"after={call('buttonPosition', 'updateCenterSave')}; counts={call('counts')}") from error
             wait_for(lambda: call("savePending") == "false", "Failed save never completed")
             assert call("saveStatus") == "", "Failed save claimed success"
 

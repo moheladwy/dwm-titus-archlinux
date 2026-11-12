@@ -74,6 +74,7 @@ helpers and service APIs perform the underlying operations.
 | Audio engine | `pipewire`, `wireplumber`, `pipewire-pulse` | Desktop. Audio processing, device/session policy, and PulseAudio compatibility. An installed `pulseaudio` is retained; the conflicting `pipewire-pulse` is skipped. |
 | Audio tools | `alsa-utils`, `libpulse`, `pavucontrol` | Desktop. Mixer commands, audio controls, and a standalone configuration interface. |
 | Network connections | `networkmanager` | Full and source-update reconciliation. Backend for networking controls. Arch packages Wi-Fi support in `networkmanager` itself. It may already be present on an existing system. |
+| Network editor | `nm-connection-editor` | Desktop. The advanced NetworkManager editor behind the network popover's Edit Connections action and the enterprise (802.1X) Wi-Fi path. |
 | Bluetooth | `bluez`, `bluez-utils`, `blueman` | Desktop. Bluetooth services, command-line tools, and device management. |
 | Battery and power profiles | `upower`, `power-profiles-daemon` | Desktop. Battery state and performance/power profiles. An installed provider such as `tuned-ppd` is retained rather than replaced. |
 | Brightness | `brightnessctl` | Desktop. Backlight control where supported by the hardware. The brightness keys run `dwm-brightness 10%+` and `dwm-brightness 10%-`, which use `brightnessctl` on the backlight of the enabled internal panel, so hybrid-graphics laptops with two backlights change the right one. |
@@ -178,7 +179,8 @@ everyday desktop:
   needs explicit Qt and Quickshell import roots; see the repository
   specification.
 - **Headless smoke testing:** `xorg-server-xvfb`, `dbus`, `gawk`, `noto-fonts`,
-  and the build/runtime tools in the `ci-smoke` map. The pinned Arch test
+  `xorg-setxkbmap`, `xorg-xkbcomp`, `xorg-xmodmap`, `xorg-xinput`, and the
+  build/runtime tools in the `ci-smoke` map. The pinned Arch test
   container (`tests/containers/arch/Containerfile`) resolves these from a dated
   Arch Linux Archive snapshot.
 

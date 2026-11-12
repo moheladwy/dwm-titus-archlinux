@@ -7,9 +7,18 @@
 - One root `PanelSettingsModel` is instantiated in `shell.qml`. Every `DwmPanel`,
   Control Center, and Settings Appearance consumes that same model, so a change
   is immediately consistent across monitors without duplicate providers.
-- The five persisted choices are Workspaces, Volume, Bluetooth, Network, and
-  Power. Active-window title, status segments, clock, and tray remain outside
+- The six persisted choices are Workspaces, Volume, Bluetooth, Network, Power,
+  and Keyboard layout. Files from before Keyboard layout list exactly the other
+  five; it then defaults to enabled. Any other count, a missing legacy widget
+  or a duplicate is malformed. The helper only writes the `keyboard-layout`
+  line while it is disabled, so a file with the default still loads in an
+  older helper; an older helper reading a file with it disabled falls back to
+  all-on defaults. Active-window title, status segments, clock, and tray remain outside
   this setting and retain their existing behavior.
+- Protocol 1.1 adds one `option` line, `clock-seconds` (default disabled), after
+  the widget lines. 1.0 files are still read with their widget choices. While
+  every option is at its default the helper keeps writing 1.0, so an older
+  helper after a downgrade still reads the widget choices.
 
 ## Safety and migration
 
@@ -61,3 +70,17 @@ The workstation exposed one active 1920x1080 monitor during this acceptance
 check, so real multi-monitor persistence was not exercised. Shared model and
 persistence behavior across panel consumers remains covered by the passing
 nested-X11 validation.
+
+## Optional calendar and weather (protocol 1.2)
+
+Status now includes eight widget records: the original six plus `calendar` and
+`weather`, both off by default. The reader retains 1.0 and 1.1 files and treats
+absent optional records as disabled. Enabled optional widgets are persisted in
+a 1.2 file, including the clock-seconds option record. When both optional widgets
+are off, writes retain the existing 1.0/1.1 representation. Existing visibility
+and seconds choices survive an independent calendar/weather change. Show all
+widgets explicitly enables all eight and keeps the seconds option. An older
+helper cannot consume an enabled optional widget; preserve the file and upgrade
+again, or turn both optional widgets off before downgrading.
+
+See [Calendar and weather](CALENDAR-WEATHER.md) for network behavior and validation.

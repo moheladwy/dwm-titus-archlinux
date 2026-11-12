@@ -3,6 +3,7 @@
     property bool checkedDisplayRecovery: false
     property bool checkedInputRecovery: false
     property string delayedSection: ""
+    property int responseSectionIndex: 0
     property int delayedFrames: 0
     property bool checkedPolicyRead: false
     property bool checkedUpdaterRead: false
@@ -13,6 +14,7 @@
     property var scaleNotificationPopup: null
     property int scaleNotificationDismissed: -1
     property var scaleNetworkPopup: null
+    property var scaleHiddenNetworkPopup: null
     property var scaleAudioPopup: null
     property var scaleRows: []
     property var scaleBluetoothPane: null
@@ -36,7 +38,7 @@
         return result;
     }
     function responsePaneItems() {
-        return responseItems(settingsWindow.contentItem, item => /^(Display|Input|Network|Bluetooth|Audio|Power|Defaults|Appearance|System)SettingsPane_QML/.test(String(item)));
+        return responseItems(settingsWindow.contentItem, item => /^(Display|Input|Network|Bluetooth|Audio|Power|Defaults|Agent|Appearance|System)SettingsPane_QML/.test(String(item)));
     }
     function setTypographyScale(scale) {
         const token = scale === 1 ? "1.0" : scale.toString();
@@ -153,10 +155,16 @@
                 const panes = root.responsePaneItems();
                 if (!panes.some(item => String(item).startsWith("DisplaySettingsPane"))) return;
                 const initialPane = panes.find(item => String(item).startsWith("DisplaySettingsPane"));
+                // Recursive QObject traversal can see an incubating component
+                // before Loader publishes item and applies its visibility bindings.
+                if (initialPane.parent.item !== initialPane) return;
                 const viewport = initialPane.parent;
                 if (settingsModel.testInitialLoading) {
                     root.responseCheck(initialPane.opacity === 0 && !initialPane.enabled,
-                        "Initial controls stay hidden and disabled while data is delayed");
+                        "Initial controls stay hidden and disabled while data is delayed: "
+                            + JSON.stringify({opacity:initialPane.opacity, enabled:initialPane.enabled,
+                                status:initialPane.parent.status, assigned:initialPane.parent.item === initialPane,
+                                presented:initialPane.parent.presented, loading:initialPane.parent.dataLoading}));
                     const bounds = [viewport.x, viewport.y, viewport.width, viewport.height];
                     if (root.loadingFrames === 0) root.loadingBounds = bounds;
                     else root.responseCheck(JSON.stringify(bounds) === JSON.stringify(root.loadingBounds),
@@ -198,10 +206,13 @@
                 root.responseFirstPane.profileName = "Unsaved display profile";
                 root.responseStage = 2;
                 settingsModel.setSearch("");
-            } else if (root.responseStage >= 2 && root.responseStage <= 10) {
-                const index = root.responseStage - 2;
+            } else if (root.responseStage === 2) {
+                const index = root.responseSectionIndex;
                 const section = settingsModel.sections[index];
                 if (root.delayedSection !== section.id) {
+                    // Drain the startup mock command before manually holding
+                    // updater flags; its onExited handler also clears them.
+                    if (section.id === "system" && desktopUpdateModel.initialLoading) return;
                     root.delayedSection = section.id;
                     root.delayedFrames = 0;
                     if (section.id === "input") settingsModel.recoverInputPreview();
@@ -214,7 +225,7 @@
                     }
                     if (section.id === "power") powerModel.refresh();
                 }
-                const expected = ["Display", "Input", "Network", "Bluetooth", "Audio", "Power", "Defaults", "Appearance", "System"][index];
+                const expected = ["Display", "Input", "Network", "Bluetooth", "Audio", "Power", "Defaults", "Agent", "Appearance", "System"][index];
                 const pane = root.responsePaneItems().find(item => String(item).startsWith(expected + "SettingsPane"));
                 if (pane && !pane.parent.presented && section.id === "input" && settingsModel.inputActionBusy) {
                     root.responseCheck(pane.opacity === 0 && !pane.enabled,
@@ -259,7 +270,7 @@
                     root.responseCheck(settingsModel.testInputReads === reads + 1, "Explicit Refresh reloads input state");
                 }
                 root.responsePanes.push(pane);
-                root.responseStage++;
+                if (++root.responseSectionIndex === settingsModel.sections.length) root.responseStage = 11;
             } else if (root.responseStage === 11) {
                 root.responseCheck(!settingsWindow.testEarlyPresentation, "First presentation waits for every pending provider");
                 root.responseCheck(root.checkedDisplayRecovery && root.checkedInputRecovery,
@@ -273,11 +284,11 @@
                     "Exercised panel/accessibility reads finishing after other Appearance data");
                 settingsModel.testInitialLoading = true;
                 settingsModel.close();
-                root.responseCheck(root.responsePaneItems().length === 9, "Closing retains visited panes");
+                root.responseCheck(root.responsePaneItems().length === settingsModel.sections.length, "Closing retains visited panes");
                 settingsModel.openWindow();
                 root.responseStage++;
             } else if (root.responseStage === 12) {
-                root.responseCheck(root.responsePaneItems().length === 9, "Reopening does not duplicate panes");
+                root.responseCheck(root.responsePaneItems().length === settingsModel.sections.length, "Reopening does not duplicate panes");
                 root.responseCheck(root.responseFirstPane.opacity === 1 && root.responseFirstPane.enabled,
                     "Previously loaded controls stay usable when reopening during a refresh");
                 settingsModel.testInitialLoading = false;
@@ -360,9 +371,25 @@
                     root.scaleNetworkPopup = network.createObject(root, {panelWindow: root.defaultPanelWindow,
                         networkModel: {visible: true, busy: false, actionsAvailable: true, editorAvailable: false,
                             wifiPasswordPromptVisible: true, wifiPasswordPromptOrigin: "panel", wifiPassword: "",
+                            promptVisible: true, hiddenPromptVisible: false, hiddenPromptOrigin: "", wifiDevices: [],
+                            hiddenSsid: "", hiddenSecurity: "wpa-psk", hiddenDevice: "", hiddenError: "",
+                            hiddenSsidError: "", hiddenPasswordError: "", hiddenFormValid: false,
                             statusText: "Online", message: "", activeConnections: [], savedProfiles: [], wifiNetworks: [],
                             selectedWifiIndex: -1, selectedWifiNetwork: () => ({ssid: "Test network"}),
                             cancelWifiPasswordPrompt: () => {}, close: () => {}}});
+                    root.scaleHiddenNetworkPopup = network.createObject(root, {panelWindow: root.defaultPanelWindow,
+                        networkModel: {visible: true, busy: false, actionsAvailable: true, editorAvailable: false,
+                            wifiPasswordPromptVisible: false, wifiPasswordPromptOrigin: "", wifiPassword: "",
+                            promptVisible: true, hiddenPromptVisible: true, hiddenPromptOrigin: "panel",
+                            hiddenSsid: "Hidden network", hiddenSecurity: "wpa-psk", hiddenDevice: "wlan0",
+                            hiddenError: "authentication to Hidden network failed; check the password and security type",
+                            hiddenSsidError: "", hiddenPasswordError: "8 to 63 characters, or 64 hex digits",
+                            hiddenFormValid: false,
+                            wifiDevices: [{device: "wlan0", type: "wifi", state: "disconnected", connection: ""},
+                                {device: "wlan1", type: "wifi", state: "disconnected", connection: ""}],
+                            statusText: "Online", message: "", activeConnections: [], savedProfiles: [], wifiNetworks: [],
+                            selectedWifiIndex: -1, selectedWifiNetwork: () => null,
+                            cancelWifiPasswordPrompt: () => {}, cancelHiddenPrompt: () => {}, close: () => {}}});
                     const audio = Qt.createComponent("controls/ControlsWindow.qml");
                     root.scaleAudioPopup = audio.createObject(root, {panelWindow: root.defaultPanelWindow,
                         controlsModel: {visible: true, busy: false, volumeMuted: false, volumeDisplayText: "50%",
@@ -451,6 +478,20 @@
                 root.responseCheck(actionPosition.y >= -1
                     && actionPosition.y + connect.height <= passwordViewport.height + 1,
                     "Wi-Fi Connect action is reachable at maximum scale");
+                const hiddenSurface = root.scaleHiddenNetworkPopup.popupContent.find(item => item.content !== undefined);
+                const hiddenPrompt = hiddenSurface.content.find(item => item.title === "dwm network password"
+                    && item.origin !== undefined);
+                root.responseCheck(hiddenPrompt && hiddenPrompt.visible && hiddenPrompt.height <= hiddenPrompt.screen.height,
+                    "200 percent hidden Wi-Fi prompt fits the screen");
+                const hiddenViewport = root.responseItems(hiddenPrompt.contentItem,
+                    item => item.objectName === "hiddenViewport")[0];
+                const hiddenConnect = root.responseItems(hiddenPrompt.contentItem, item => item.label === "Connect")[0];
+                root.responseCheck(hiddenViewport && hiddenConnect, "Hidden Wi-Fi prompt keeps its action controls");
+                hiddenViewport.contentY = Math.max(0, hiddenViewport.contentHeight - hiddenViewport.height);
+                const hiddenActionPosition = hiddenConnect.mapToItem(hiddenViewport, 0, 0);
+                root.responseCheck(hiddenActionPosition.y >= -1
+                    && hiddenActionPosition.y + hiddenConnect.height <= hiddenViewport.height + 1,
+                    "Hidden Wi-Fi Connect action is reachable at maximum scale");
                 const notificationViewport = root.responseItems(root.scaleNotificationPopup.contentItem,
                     item => item.objectName === "notificationViewport")[0];
                 root.responseCheck(root.scaleNotificationPopup.height + Theme.panelHeight
@@ -468,6 +509,7 @@
                 root.responseCheck(root.scaleNotificationDismissed === 3, "Final notification dismiss reaches its model");
                 root.scaleNotificationPopup.destroy();
                 root.scaleNetworkPopup.destroy();
+                root.scaleHiddenNetworkPopup.destroy();
                 root.scaleAudioPopup.destroy();
                 for (const row of root.scaleRows) row.destroy();
                 root.scaleBluetoothPane.destroy();

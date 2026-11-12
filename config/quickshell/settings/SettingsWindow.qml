@@ -16,6 +16,7 @@ FloatingWindow {
     required property var powerMenuModel
     required property var defaultsModel
     required property var autostartModel
+    required property var agentModel
     required property var appearanceModel
     required property var accessibilityModel
     required property var notificationModel
@@ -339,6 +340,7 @@ FloatingWindow {
                                 windowVisible: root.visible
                                 sourceComponent: DisplaySettingsPane {
                                     settingsModel: root.settingsModel
+                                    systemBatteryPresent: root.powerModel.systemBatteryPresent
                                 }
                             }
 
@@ -413,12 +415,24 @@ FloatingWindow {
                             DeferredSettingsPane {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
+                                selected: root.settingsModel.selectedSectionId === "agent"
+                                dataLoading: root.agentModel.initialLoading
+                                windowVisible: root.visible
+                                sourceComponent: AgentSettingsPane {
+                                    agentModel: root.agentModel
+                                }
+                            }
+
+                            DeferredSettingsPane {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
                                 selected: root.settingsModel.selectedSectionId === "appearance"
                                 dataLoading: root.appearanceModel.initialLoading || root.accessibilityModel.initialLoading
                                     || root.panelSettingsModel.initialLoading || root.notificationModel.initialLoading || root.settingsModel.busy
                                     || root.settingsModel.capabilityRefreshPending
                                 windowVisible: root.visible
                                 sourceComponent: AppearanceSettingsPane {
+                                    windowVisible: root.visible && root.settingsModel.selectedSectionId === "appearance"
                                     appearanceModel: root.appearanceModel
                                     accessibilityModel: root.accessibilityModel
                                     notificationModel: root.notificationModel
@@ -460,6 +474,7 @@ FloatingWindow {
                                     && root.settingsModel.selectedSectionId !== "audio"
                                     && root.settingsModel.selectedSectionId !== "power"
                                     && root.settingsModel.selectedSectionId !== "defaults"
+                                    && root.settingsModel.selectedSectionId !== "agent"
                                     && root.settingsModel.selectedSectionId !== "appearance"
                                     && root.settingsModel.selectedSectionId !== "system"
                                 clip: true

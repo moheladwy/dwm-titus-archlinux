@@ -16,6 +16,7 @@ Flickable {
     required property var capabilities
     required property var textScaleCapability
     required property var notificationCapability
+    property bool windowVisible: false
     property string selectedThemeId: ""
     property string selectedWallpaperPath: ""
     property string selectedWallpaperFit: "fill"
@@ -870,6 +871,11 @@ Flickable {
             }
         }
 
+        LayoutSettingsPane {
+            Layout.fillWidth: true
+            active: root.windowVisible && root.visible
+        }
+
         SectionLabel { label: "Font and text size" }
 
         UiText {
@@ -1251,6 +1257,43 @@ Flickable {
                         accessibleName: panelWidgetRow.modelData.label
                         accessibleDescription: "Show this widget in the managed panel"
                         onToggled: root.panelSettingsModel.toggleWidget(panelWidgetRow.modelData.id)
+                    }
+                }
+            }
+        }
+
+        Repeater {
+            model: root.panelSettingsModel.options
+
+            delegate: Rectangle {
+                id: panelOptionRow
+                required property var modelData
+
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.scaledSize(48)
+                color: Theme.controlNormalFill
+                border.color: Theme.controlNormalBorder
+                border.width: Theme.controlBorderWidth
+                radius: Theme.controlRadius
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.spacingLg
+                    anchors.rightMargin: Theme.spacingLg
+
+                    UiText {
+                        Layout.fillWidth: true
+                        text: panelOptionRow.modelData.label
+                        color: Theme.menuText
+                    }
+
+                    PanelToggleSwitch {
+                        checked: root.panelSettingsModel.optionEnabled(panelOptionRow.modelData.id)
+                        busy: root.panelSettingsModel.busy
+                        enabled: root.panelSettingsModel.mutationReady
+                        accessibleName: panelOptionRow.modelData.label
+                        accessibleDescription: "Change how the managed panel shows this item"
+                        onToggled: root.panelSettingsModel.toggleOption(panelOptionRow.modelData.id)
                     }
                 }
             }

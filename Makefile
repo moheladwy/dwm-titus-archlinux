@@ -22,7 +22,7 @@ run_managed_test = if [ -n "$${DWM_TEST_WORKSPACE:-}" ] && [ -n "$${DWM_TEST_RUN
 SRC = drw.c dwm.c util.c tomlparser.c
 OBJ = ${SRC:.c=.o}
 
-INSTALL_COMMANDS = \
+INSTALL_COMMANDS = dwm-clipboard-observer \
 	scripts/active-audio \
 	scripts/dwm-accessibility-settings \
 	scripts/check-deps.sh \
@@ -35,8 +35,12 @@ INSTALL_COMMANDS = \
 	scripts/dwm-display-profile \
 	scripts/dwm-display-setup \
 	scripts/dwm-keybinds \
+	scripts/dwm-weather \
+	scripts/dwm-layout-settings \
+	scripts/dwm-window-overview \
 	scripts/dwm-lock \
 	scripts/dwm-lock-watch \
+	scripts/dwm-migrate-clipboard-surface \
 	scripts/dwm-migrate-update-center-window-rule \
 	scripts/dwm-panel-settings \
 	scripts/dwm-update-center \
@@ -70,6 +74,10 @@ INSTALL_COMMANDS = \
 	scripts/dwm-settings-theme \
 	scripts/dwm-settings-provider \
 	scripts/dwm-session-launch \
+	scripts/dwm-agent \
+	scripts/dwm-agent-diagnose \
+	scripts/dwm-crash-watch \
+	scripts/dwm-hang-event \
 	scripts/dwm-xsettings \
 	scripts/dwm-terminal \
 	scripts/dwm-utils.sh \
@@ -77,6 +85,7 @@ INSTALL_COMMANDS = \
 	scripts/dwm-flatpak-setup \
 	scripts/install-gearlever \
 	scripts/install-herdr \
+	scripts/dwm-install-ai-agent \
 	scripts/nvidia-gpu \
 	scripts/nvidia-suspend-test.sh \
 	scripts/nvidia-temp \
@@ -100,7 +109,9 @@ RELEASE_NAME = dwm-titus-${VERSION}
 RELEASE_ARCHIVE = release/${RELEASE_NAME}.tar.gz
 SOURCE_DATE_EPOCH ?= $(shell git log -1 --format=%ct 2>/dev/null || printf '0')
 
-all: dwm
+CLIPBOARD_MODULES = xcb xcb-xfixes xcb-res
+
+all: dwm dwm-clipboard-observer
 
 .c.o:
 	${CC} ${CPPFLAGS} ${CFLAGS} -c $<
@@ -117,12 +128,18 @@ config.h:
 dwm: check-build-deps ${OBJ}
 	${CC} -o $@ ${OBJ} ${LDFLAGS} ${LDLIBS}
 
+dwm-clipboard-observer: clipboard-observer.c config.mk Makefile
+	${CC} ${CPPFLAGS} ${CFLAGS} -o $@ clipboard-observer.c ${LDFLAGS} $$( ${PKG_CONFIG} --cflags --libs ${CLIPBOARD_MODULES} )
+
+check-clipboard-observer: dwm-clipboard-observer
+	$(call run_managed_test,python3 tests/test-clipboard-observer.py)
+
 check-build-deps:
 	@command -v "${PKG_CONFIG}" >/dev/null 2>&1 || { \
 		echo "Missing required command: ${PKG_CONFIG}" >&2; \
 		exit 1; \
 	}
-	@missing="$$(for module in ${PKG_MODULES}; do \
+	@missing="$$(for module in ${PKG_MODULES} ${CLIPBOARD_MODULES}; do \
 		"${PKG_CONFIG}" --exists "$$module" || printf '%s ' "$$module"; \
 	done)"; \
 	if [ -n "$$missing" ]; then \
@@ -132,7 +149,7 @@ check-build-deps:
 	fi
 
 clean:
-	rm -f dwm ${OBJ} *.orig *.rej
+	rm -f dwm dwm-clipboard-observer ${OBJ} *.orig *.rej
 
 native:
 	$(MAKE) clean
@@ -196,6 +213,11 @@ install-system:
 	/usr/bin/python3 -I scripts/dwm-desktop-update guard-system-install --destdir "${DESTDIR}" -- $(MAKE) install-system-files
 
 install-system-files:
+	@test -x dwm-clipboard-observer || { echo "Clipboard observer is not built. Run make before install-system." >&2; exit 1; }
+	@for input in clipboard-observer.c config.mk Makefile; do \
+		test -e "$$input" || { echo "Clipboard observer build input is missing: $$input" >&2; exit 1; }; \
+		if [ "$$input" -nt dwm-clipboard-observer ]; then echo "Clipboard observer is stale. Run make before install-system." >&2; exit 1; fi; \
+	done
 	@test -x dwm || { echo "dwm is not built. Run make before install-system." >&2; exit 1; }
 	@for input in ${SRC} ${OBJ} drw.h util.h tomlparser.h config.h config.mk Makefile; do \
 		test -e "$$input" || { echo "dwm build input is missing: $$input. Run make before install-system." >&2; exit 1; }; \
@@ -357,6 +379,10 @@ install-user-files:
 	HOME="${USER_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
 		scripts/dwm-migrate-update-center-window-rule || \
 		echo "  Preserving existing window rules after migration warning."
+	@echo "==> Migrating clipboard history configuration..."
+	HOME="${USER_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
+		scripts/dwm-migrate-clipboard-surface || \
+		echo "  Preserving existing hotkeys and window rules after migration warning."
 	@echo "==> Migrating legacy graphical-session startup..."
 	HOME="${USER_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" scripts/migrate-graphical-session.sh
 	@echo "==> Installing Meslo font aliases..."
@@ -401,6 +427,9 @@ install-user-files:
 			find "${CFG_DIR}/$$b" \( -name '*.sh' -o -name '*.py' \) -print0 2>/dev/null | xargs -0 -r chmod +x; \
 		fi; \
 	done
+	@echo "==> Linking agent skills..."
+	HOME="${USER_HOME}" XDG_DATA_HOME="${XDG_DATA_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
+		scripts/dwm-agent link-skills || echo "  Skipping agent skill links."
 	@echo "==> Applying initial theme convergence..."
 	HOME="${USER_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" scripts/theme-apply.sh
 	HOME="${USER_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" XDG_DATA_HOME="${XDG_DATA_HOME}" XDG_STATE_HOME="${XDG_STATE_HOME}" \
@@ -436,12 +465,13 @@ uninstall-files:
 	done
 	rm -f "${DESTDIR}${PREFIX}/share/dwm-titus/desktop-install.json"
 
-release: dwm
+release: all
 	@work="$$(mktemp -d)"; \
 	trap 'rm -rf "$$work"' EXIT; \
 	root="$$work/${RELEASE_NAME}"; \
 	mkdir -p "$$root" release; \
 	install -Dm755 dwm "$$root/dwm"; \
+	install -Dm755 dwm-clipboard-observer "$$root/dwm-clipboard-observer"; \
 	install -Dm644 scripts/.xinitrc "$$root/.xinitrc"; \
 	sed "s|@PREFIX@|${PREFIX}|g" dwm.desktop > "$$root/dwm.desktop"; \
 	cp -a assets config scripts "$$root/"; \
@@ -454,10 +484,13 @@ release: dwm
 	echo "==> Created ${RELEASE_ARCHIVE}"
 
 check-shell:
-	shellcheck install.sh scripts/dwm-accessibility-settings scripts/dwm-brightness scripts/dwm-default-apps scripts/dwm-diagnostics scripts/dwm-display-profile scripts/dwm-display-setup scripts/dwm-lock scripts/dwm-lock-watch scripts/dwm-keybinds scripts/dwm-panel-settings scripts/dwm-quickshell-launcher scripts/dwm-quickshell-controls scripts/dwm-quickshell-controlcenter scripts/dwm-quickshell-network scripts/dwm-quickshell-pointer scripts/dwm-quickshell-state scripts/dwm-quickshell-tray scripts/dwm-quickshell-version-check scripts/dwm-settings scripts/dwm-settings-appearance scripts/dwm-settings-font scripts/dwm-settings-personalization scripts/dwm-settings-wallpaper scripts/dwm-settings-theme scripts/dwm-settings-provider scripts/dwm-session-launch scripts/dwm-status scripts/dwm-system-health scripts/dwm-terminal scripts/dwm-xdg-autostart scripts/dwm-xsettings scripts/install-herdr scripts/quickshell-qmllint scripts/run-tests scripts/run-tests-podman scripts/webapp-launch scripts/*.sh tests/*.sh
+	shellcheck install.sh scripts/dwm-accessibility-settings scripts/dwm-agent scripts/dwm-agent-diagnose scripts/dwm-crash-watch scripts/dwm-hang-event scripts/dwm-brightness scripts/dwm-default-apps scripts/dwm-diagnostics scripts/dwm-display-profile scripts/dwm-display-setup scripts/dwm-lock scripts/dwm-lock-watch scripts/dwm-keybinds scripts/dwm-panel-settings scripts/dwm-quickshell-launcher scripts/dwm-quickshell-controls scripts/dwm-quickshell-controlcenter scripts/dwm-quickshell-network scripts/dwm-quickshell-pointer scripts/dwm-quickshell-state scripts/dwm-quickshell-tray scripts/dwm-quickshell-version-check scripts/dwm-settings scripts/dwm-settings-appearance scripts/dwm-settings-font scripts/dwm-settings-personalization scripts/dwm-settings-wallpaper scripts/dwm-settings-theme scripts/dwm-settings-provider scripts/dwm-session-launch scripts/dwm-status scripts/dwm-system-health scripts/dwm-terminal scripts/dwm-xdg-autostart scripts/dwm-xsettings scripts/install-herdr scripts/quickshell-qmllint scripts/run-tests scripts/run-tests-podman scripts/webapp-launch scripts/*.sh tests/*.sh
 
 check-format:
-	shfmt -d install.sh scripts/dwm-accessibility-settings scripts/dwm-brightness scripts/dwm-default-apps scripts/dwm-diagnostics scripts/dwm-display-profile scripts/dwm-display-setup scripts/dwm-lock scripts/dwm-lock-watch scripts/dwm-keybinds scripts/dwm-panel-settings scripts/dwm-quickshell-launcher scripts/dwm-quickshell-controls scripts/dwm-quickshell-controlcenter scripts/dwm-quickshell-network scripts/dwm-quickshell-pointer scripts/dwm-quickshell-state scripts/dwm-quickshell-tray scripts/dwm-quickshell-version-check scripts/dwm-settings scripts/dwm-settings-appearance scripts/dwm-settings-font scripts/dwm-settings-personalization scripts/dwm-settings-wallpaper scripts/dwm-settings-theme scripts/dwm-settings-provider scripts/dwm-session-launch scripts/dwm-status scripts/dwm-system-health scripts/dwm-terminal scripts/dwm-xdg-autostart scripts/dwm-xsettings scripts/install-herdr scripts/quickshell-qmllint scripts/run-tests scripts/run-tests-podman scripts/webapp-launch scripts/*.sh tests/*.sh
+	shfmt -d install.sh scripts/dwm-accessibility-settings scripts/dwm-agent scripts/dwm-agent-diagnose scripts/dwm-crash-watch scripts/dwm-hang-event scripts/dwm-brightness scripts/dwm-default-apps scripts/dwm-diagnostics scripts/dwm-display-profile scripts/dwm-display-setup scripts/dwm-lock scripts/dwm-lock-watch scripts/dwm-keybinds scripts/dwm-panel-settings scripts/dwm-quickshell-launcher scripts/dwm-quickshell-controls scripts/dwm-quickshell-controlcenter scripts/dwm-quickshell-network scripts/dwm-quickshell-pointer scripts/dwm-quickshell-state scripts/dwm-quickshell-tray scripts/dwm-quickshell-version-check scripts/dwm-settings scripts/dwm-settings-appearance scripts/dwm-settings-font scripts/dwm-settings-personalization scripts/dwm-settings-wallpaper scripts/dwm-settings-theme scripts/dwm-settings-provider scripts/dwm-session-launch scripts/dwm-status scripts/dwm-system-health scripts/dwm-terminal scripts/dwm-xdg-autostart scripts/dwm-xsettings scripts/install-herdr scripts/quickshell-qmllint scripts/run-tests scripts/run-tests-podman scripts/webapp-launch scripts/*.sh tests/*.sh
+
+check-timesync:
+	tests/test-timesync.sh
 
 check-session-guards:
 	tests/test-autostart.sh
@@ -527,11 +560,37 @@ check-monitor-tags: all
 		if [ "$$status" -eq 77 ]; then exit 0; fi; \
 		exit "$$status"
 
+check-clipboard: dwm-clipboard-observer
+	python3 tests/test-clipboard-migration.py
+	python3 tests/test-clipboard-runtime.py
+	python3 tests/test-clipboard-end-to-end.py
+check-calendar-weather: all
+	$(call run_managed_test,python3 tests/test-weather.py)
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 tests/test-calendar-weather.py)
+check-titlebars: all
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 tests/test-titlebars.py)
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -screen 1 800x600x24 +xinerama" python3 tests/test-titlebars.py)
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x1600x24" python3 tests/test-titlebars-vertical.py)
+check-layout-settings: all
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 tests/test-layout-settings.py)
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -screen 1 800x600x24 +xinerama" python3 tests/test-layout-settings.py)
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 tests/test-layout-capabilities.py)
+check-window-overview: all
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 tests/test-window-overview.py)
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -screen 1 800x600x24 +xinerama" python3 tests/test-window-overview.py)
+	$(call run_managed_test,dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 tests/test-window-overview-feedback.py)
+
+check-keyboard-layout: all
+	python3 tests/test-keyboard-refresh.py
+	tests/test-keyboard-layout-xvfb.sh
+	tests/test-keyboard-layout-panel-xvfb.sh
+
 check-quickshell-launcher:
 	tests/test-quickshell-launcher.sh
 
 check-quickshell-network:
 	tests/test-quickshell-network.sh
+	python3 tests/test-hidden-network-model.py
 
 check-quickshell-connectivity:
 	tests/test-quickshell-connectivity.sh
@@ -561,6 +620,18 @@ check-quickshell-session-actions:
 check-quickshell-defaults-model:
 	tests/test-quickshell-defaults-model.sh
 
+check-ai-assist:
+	$(call run_managed_test,python3 tests/test-ai-assist.py)
+
+check-notification-actions-xvfb: all
+	$(call run_managed_test,python3 tests/test-notification-actions-xvfb.py)
+
+check-ai-assist-xvfb: all
+	$(call run_managed_test,python3 tests/test-ai-assist-xvfb.py)
+
+check-quickshell-agent-settings:
+	tests/test-quickshell-agent-settings.sh
+
 check-quickshell-appearance-model:
 	tests/test-quickshell-appearance-model.sh
 
@@ -569,6 +640,7 @@ check-quickshell-design-system:
 
 check-quickshell-large-surfaces:
 	tests/test-quickshell-large-surfaces.sh
+	tests/test-quickshell-health-category-badges.sh
 
 check-quickshell-large-surfaces-xvfb: all
 	status=0; tests/test-quickshell-large-surfaces-xvfb.sh || status=$$?; \
@@ -684,6 +756,7 @@ check-arch-platform:
 	@$(call run_managed_test,tests/test-arch-platform.sh)
 
 check-arch-packages:
+	tests/test-package-provider-policy.sh
 	tests/test-arch-packages.sh
 
 check-install: check-install-manifest
@@ -779,7 +852,7 @@ check-install-manifest: all
 	echo "==> Install manifest, retired-path removal, and uninstall symmetry validated."
 
 check-install-preservation:
-	tests/test-install-preservation.sh
+	tests/test-install-state-isolation.sh
 
 check-agent-skills:
 	/usr/bin/python3 tests/test-agent-skills.py
@@ -787,6 +860,8 @@ check-agent-skills:
 check-desktop-update: dwm
 	@python3 tests/test-desktop-update-sandbox.py
 	python3 tests/test-desktop-update.py
+	python3 tests/test-dependency-repair-launchers.py
+	tests/test-check-deps-interactive.sh
 	tests/test-desktop-update-ui.sh
 	dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/test-desktop-update-progress.py
 	dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/test-desktop-update-focus.py
@@ -836,6 +911,7 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-desktop-update
 	$(MAKE) clean
 	$(MAKE) all
+	$(MAKE) check-timesync
 	$(MAKE) check-shell
 	$(MAKE) check-format
 	$(MAKE) check-build-config
@@ -848,6 +924,12 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-display-profile
 	$(MAKE) check-display-setup
 	$(MAKE) check-monitor-tags
+	$(MAKE) check-clipboard
+	$(MAKE) check-clipboard-observer
+	$(MAKE) check-keyboard-layout
+	$(MAKE) check-titlebars
+	$(MAKE) check-layout-settings
+	$(MAKE) check-window-overview
 	$(MAKE) check-quickshell-launcher
 	$(MAKE) check-quickshell-controls
 	$(MAKE) check-quickshell-audio
@@ -856,6 +938,10 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-quickshell-power-model
 	$(MAKE) check-quickshell-session-actions
 	$(MAKE) check-quickshell-defaults-model
+	$(MAKE) check-quickshell-agent-settings
+	$(MAKE) check-ai-assist
+	$(MAKE) check-ai-assist-xvfb
+	$(MAKE) check-notification-actions-xvfb
 	$(MAKE) check-quickshell-appearance-model
 	$(MAKE) check-quickshell-settings-xvfb
 	$(MAKE) check-quickshell-settings-responsiveness-xvfb
@@ -864,6 +950,7 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-quickshell-large-surfaces-xvfb
 	$(MAKE) check-quickshell-panel-menus
 	$(MAKE) check-quickshell-panel-settings
+	$(MAKE) check-calendar-weather
 	$(MAKE) check-update-center-settings
 	$(MAKE) check-update-center
 	$(MAKE) check-update-center-terminal
@@ -912,6 +999,16 @@ check: check-picom check-picom-xvfb
 	check-update-center-settings \
 	check-display-profile check-display-setup check-arch-packages check-arch-platform check-format check-install \
 	check-gearlever-install check-herdr-install check-install-manifest check-install-preservation check-agent-skills check-lock \
-	check-session-guards check-session-migration check-screenshot check-brightness check-window-rules check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
-	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-nvidia-suspend-test check-terminal check-xvfb-runtime install install-system install-user \
+	check-timesync check-session-guards check-session-migration check-screenshot check-brightness check-window-rules check-release-helper check-shell check-webapp-launch check-diagnostics check-status check-system-health check-system-management check-quickshell-system-management check-settings \
+	check-quickshell-launcher check-quickshell-controls check-quickshell-audio check-quickshell-controlcenter check-quickshell-power check-quickshell-power-backend check-quickshell-power-model check-quickshell-session-actions check-quickshell-defaults-model check-quickshell-appearance-model check-quickshell-design-system check-quickshell-large-surfaces check-quickshell-large-surfaces-xvfb check-quickshell-panel-menus check-quickshell-panel-settings check-quickshell-command-menu check-quickshell-notifications check-quickshell-tray check-quickshell-health-xvfb check-quickshell-settings-xvfb check-quickshell-settings-responsiveness-xvfb check-quickshell-network check-quickshell-connectivity check-quickshell-qml check-lightdm-config check-nvidia-suspend-test check-terminal check-xvfb-runtime check-keyboard-layout install install-system install-user \
 	install-cursors install-app-themes check-app-themes native release release-check uninstall uninstall-files
+
+.PHONY: check-clipboard
+.PHONY: check-clipboard-observer
+
+.PHONY: check-ai-assist check-ai-assist-xvfb check-notification-actions-xvfb
+
+.PHONY: check-calendar-weather
+.PHONY: check-titlebars
+.PHONY: check-layout-settings
+.PHONY: check-window-overview

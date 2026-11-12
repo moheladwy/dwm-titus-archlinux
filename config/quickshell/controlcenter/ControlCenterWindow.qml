@@ -13,6 +13,8 @@ ClickAwayPopup {
     required property var panelWindow
     required property var powerMenuModel
     required property var powerModel
+    signal windowOverviewRequested(var screen)
+
     required property var settingsModel
 
     readonly property int cardWidth: Theme.controlCenterWidth
@@ -246,6 +248,16 @@ ClickAwayPopup {
                     MenuRow {
                         Layout.fillWidth: true
                         implicitHeight: root.compactRowHeight
+                        label: "Window overview"
+                        onActivated: {
+                            const screen = root.panelWindow ? root.panelWindow.screen : null;
+                            root.controlCenterModel.close();
+                            Qt.callLater(function() { root.windowOverviewRequested(screen); });
+                        }
+                    }
+                    MenuRow {
+                        Layout.fillWidth: true
+                        implicitHeight: root.compactRowHeight
                         label: "Power"
                         navigates: true
                         onActivated: root.openSessionPower()
@@ -322,7 +334,7 @@ ClickAwayPopup {
                     spacing: 2
 
                     Repeater {
-                        model: ["Volume", "Bluetooth", "Network", "Power", "Workspaces"]
+                        model: ["Volume", "Bluetooth", "Network", "Power", "Keyboard layout", "Workspaces", "Calendar", "Weather"]
 
                         delegate: MenuRow {
                             required property string modelData
@@ -337,6 +349,18 @@ ClickAwayPopup {
                                     && !root.controlCenterModel.panelSettingsModel.busy)
                             onActivated: root.controlCenterModel.toggleWidget(modelData)
                         }
+                    }
+
+                    MenuRow {
+                        Layout.fillWidth: true
+                        implicitHeight: root.compactRowHeight
+                        label: "Clock seconds"
+                        detail: root.controlCenterModel.optionEnabled("clock-seconds") ? "On" : "Off"
+                        active: root.controlCenterModel.optionEnabled("clock-seconds")
+                        enabled: !!root.controlCenterModel.panelSettingsModel
+                            && root.controlCenterModel.panelSettingsModel.mutationReady
+                            && !root.controlCenterModel.panelSettingsModel.busy
+                        onActivated: root.controlCenterModel.toggleOption("clock-seconds")
                     }
                 }
 

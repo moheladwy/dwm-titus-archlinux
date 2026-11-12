@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Services.SystemTray
 import qs.accessibility
 import qs.appearance
+import qs.clipboard
 import qs.controlcenter
 import qs.controls
 import qs.core
@@ -13,6 +14,7 @@ import qs.defaults
 import qs.health
 import qs.launcher
 import qs.network
+import qs.overview
 import qs.notifications
 import qs.panel
 import qs.power
@@ -36,6 +38,11 @@ ShellRoot {
         ? activePanelWindow.screen
         : (Quickshell.screens.length > 0 ? Quickshell.screens[0] : null)
 
+    function closePanelWidgets() {
+        calendarModel.close();
+        weatherModel.close();
+    }
+
     function selectPanelPopup(panel, popupId) {
         if (!panel || !panel.screen) {
             return;
@@ -43,8 +50,11 @@ ShellRoot {
 
         commandMenuModel.close();
         launcherModel.close();
+        clipboardModel.close();
         notificationModel.closeHistory();
         controlCenterModel.closeUtility();
+        if (popupId !== "calendar") calendarModel.close();
+        if (popupId !== "weather") weatherModel.close();
         if (popupId !== "bluetooth") bluetoothModel.close();
         if (popupId !== "controlcenter") controlCenterModel.close();
         if (popupId !== "controls") controlsModel.close();
@@ -58,7 +68,14 @@ ShellRoot {
         const samePanel = root.activePanelWindow === panel;
         const updateCenterWasVisible = updateCenterModel.visible;
         root.selectPanelPopup(panel, popupId);
-        if (popupId === "updatecenter") {
+        if (popupId === "calendar") {
+            if (!samePanel) calendarModel.close();
+            calendarModel.toggle();
+        } else if (popupId === "weather") {
+            if (!samePanel) weatherModel.close();
+            weatherModel.toggle();
+        }
+        else if (popupId === "updatecenter") {
             root.updateCenterAnchorX = panel.updateCenterAnchorX();
             if (updateCenterWasVisible && samePanel) updateCenterModel.close();
             else updateCenterModel.open();
@@ -66,12 +83,15 @@ ShellRoot {
     }
 
     function openCommandMenu(screen) {
+        calendarModel.close();
+        weatherModel.close();
         networkModel.close();
         bluetoothModel.close();
         controlCenterModel.close();
         controlsModel.close();
         powerMenuModel.close("panel");
         launcherModel.close();
+        clipboardModel.close();
         if (screen) commandMenuModel.openOnScreen(screen); else commandMenuModel.open();
     }
 
@@ -102,6 +122,8 @@ ShellRoot {
         if (target === "settings" && (action === "open" || action === "select")) {
             settingsModel.openOnScreen(screen);
             if (action === "select") settingsModel.selectSection(argument);
+        } else if (target === "windowOverview" && action === "open") {
+            windowOverviewModel.openOnScreen(screen || dwmState.focusedScreen());
         } else if (target === "network" && action === "open") {
             if (panel) root.selectPanelPopup(panel, "network");
             networkModel.open();
@@ -115,6 +137,8 @@ ShellRoot {
             systemHealthModel.openOnScreen(screen);
         } else if (target === "controlcenter" && action === "keybindings") {
             controlCenterModel.openKeybindsOnScreen(screen);
+        } else if (target === "clipboard" && action === "open") {
+            clipboardModel.openOnScreen(screen);
         } else if (target === "power" && action === "open") {
             if (panel) root.selectPanelPopup(panel, "power");
             powerMenuModel.open("panel");
@@ -125,9 +149,38 @@ ShellRoot {
         id: dwmState
     }
 
+    CalendarModel { id: calendarModel; timestamp: clock.timestamp }
+    WeatherModel { id: weatherModel }
+    WindowOverviewModel {
+        id: windowOverviewModel
+        workspaceNames: dwmState.workspaceNames
+        onVisibleChanged: if (visible) {
+            root.closePanelWidgets();
+            launcherModel.close();
+            commandMenuModel.close();
+            clipboardModel.close();
+            controlCenterModel.close();
+            updateCenterModel.close();
+            settingsModel.close();
+            systemHealthModel.close();
+        }
+    }
+    LazyLoader {
+        active: windowOverviewModel.visible
+        component: WindowOverviewWindow { model: windowOverviewModel }
+    }
+    IpcHandler {
+        target: "windowOverview"
+        function open(): void { windowOverviewModel.openOnScreen(dwmState.focusedScreen()); }
+        function close(): void { windowOverviewModel.close(); }
+        function toggle(): void { windowOverviewModel.toggle(dwmState.focusedScreen()); }
+        function visible(): bool { return windowOverviewModel.visible; }
+    }
+
     ClockModel {
         id: clock
         timezoneState: systemManagementModel.nativeStates.timezone || null
+        showSeconds: panelSettingsModel.optionEnabled("clock-seconds")
     }
 
     LauncherModel {
@@ -135,7 +188,9 @@ ShellRoot {
 
         onVisibleChanged: {
             if (visible) {
+                root.closePanelWidgets();
                 commandMenuModel.close();
+                clipboardModel.close();
                 updateCenterModel.close();
             }
         }
@@ -144,7 +199,7 @@ ShellRoot {
     CommandMenuModel {
         id: commandMenuModel
         launcherModel: launcherModel
-        onVisibleChanged: if (visible) updateCenterModel.close()
+        onVisibleChanged: if (visible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
         currentEntryIds: {
             const ids = [];
 
@@ -164,6 +219,7 @@ ShellRoot {
             if (networkModel.visible) ids.push("network");
             if (bluetoothModel.visible) ids.push("bluetooth");
             if (controlsModel.visible) ids.push("audio");
+            if (clipboardModel.visible) ids.push("clipboard");
             if (systemHealthModel.visible) ids.push("health");
             if (controlCenterModel.utilityVisible && controlCenterModel.utilityPage === "keybinds") ids.push("keybindings");
             if (powerMenuModel.visible) {
@@ -176,10 +232,28 @@ ShellRoot {
         onIpcActionRequested: (target, action, argument, screen) => root.runCommandMenuAction(target, action, argument, screen)
     }
 
+    ClipboardModel {
+        id: clipboardModel
+
+        onVisibleChanged: {
+            if (visible) {
+                root.closePanelWidgets();
+                launcherModel.close();
+                commandMenuModel.close();
+                updateCenterModel.close();
+                networkModel.close();
+                bluetoothModel.close();
+                controlsModel.close();
+                controlCenterModel.close();
+                powerMenuModel.close("panel");
+            }
+        }
+    }
+
     PowerMenuModel {
         id: powerMenuModel
         powerModel: powerModel
-        onVisibleChanged: if (visible) updateCenterModel.close()
+        onVisibleChanged: if (visible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
     }
 
     PowerModel {
@@ -194,6 +268,12 @@ ShellRoot {
         id: autostartModel
     }
 
+    AgentSettingsModel {
+        id: agentModel
+        settingsVisible: settingsModel.visible && settingsModel.selectedSectionId === "agent"
+        onTerminalOpened: settingsModel.close()
+    }
+
     AppearanceModel {
         id: appearanceModel
     }
@@ -204,29 +284,33 @@ ShellRoot {
 
     PanelSettingsModel {
         id: panelSettingsModel
+        onValuesChanged: {
+            if (!widgetEnabled("calendar")) calendarModel.close();
+            if (!widgetEnabled("weather")) weatherModel.close();
+        }
     }
 
     NetworkModel {
         id: networkModel
-        onVisibleChanged: if (visible) updateCenterModel.close()
+        onVisibleChanged: if (visible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
     }
 
     ControlsModel {
         id: controlsModel
-        onVisibleChanged: if (visible) updateCenterModel.close()
+        onVisibleChanged: if (visible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
     }
 
     BluetoothModel {
         id: bluetoothModel
-        onVisibleChanged: if (visible) updateCenterModel.close()
+        onVisibleChanged: if (visible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
     }
 
     ControlCenterModel {
         id: controlCenterModel
         powerModel: powerModel
         panelSettingsModel: panelSettingsModel
-        onVisibleChanged: if (visible) updateCenterModel.close()
-        onUtilityVisibleChanged: if (utilityVisible) updateCenterModel.close()
+        onVisibleChanged: if (visible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
+        onUtilityVisibleChanged: if (utilityVisible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
     }
 
     SystemHealthModel {
@@ -253,11 +337,13 @@ ShellRoot {
 
     UpdateCenterModel {
         id: updateCenterModel
+        onVisibleChanged: if (visible) root.closePanelWidgets();
         desktopUpdateModel: desktopUpdateModel
     }
 
     SettingsModel {
         id: settingsModel
+        onVisibleChanged: if (visible) root.closePanelWidgets();
         networkModel: networkModel
         bluetoothModel: bluetoothModel
         controlsModel: controlsModel
@@ -285,7 +371,7 @@ ShellRoot {
 
     NotificationModel {
         id: notificationModel
-        onHistoryVisibleChanged: if (historyVisible) updateCenterModel.close()
+        onHistoryVisibleChanged: if (historyVisible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
     }
 
     IpcHandler {
@@ -309,6 +395,42 @@ ShellRoot {
 
         function toggle(): void {
             launcherModel.toggle();
+        }
+    }
+
+    IpcHandler {
+        target: "clipboard"
+
+        function clear(): void {
+            clipboardModel.clearAll();
+        }
+
+        function close(): void {
+            clipboardModel.close();
+        }
+
+        function count(): int {
+            return clipboardModel.entries.length;
+        }
+
+        function open(): void {
+            clipboardModel.open();
+        }
+
+        function persistence(): bool {
+            return clipboardModel.persistenceEnabled;
+        }
+
+        function setPersistence(enabled: bool): void {
+            clipboardModel.setPersistence(enabled);
+        }
+
+        function status(): string {
+            return clipboardModel.status;
+        }
+
+        function toggle(): void {
+            clipboardModel.toggle();
         }
     }
 
@@ -369,6 +491,11 @@ ShellRoot {
 
         function open(): void {
             networkModel.open();
+        }
+
+        function openHiddenPrompt(): void {
+            if (!networkModel.visible) networkModel.open();
+            networkModel.openHiddenPrompt("panel");
         }
 
         function refresh(): void {
@@ -1064,6 +1191,14 @@ ShellRoot {
             panelSettingsModel.setWidget(widget, enabled);
         }
 
+        function panelOptionEnabled(option: string): bool {
+            return panelSettingsModel.optionEnabled(option);
+        }
+
+        function panelOptionSet(option: string, enabled: bool): void {
+            if (panelSettingsModel.validOption(option)) panelSettingsModel.setWidget(option, enabled);
+        }
+
         function panelWidgetsReset(): void {
             panelSettingsModel.reset();
         }
@@ -1160,6 +1295,10 @@ ShellRoot {
         commandMenuModel: commandMenuModel
     }
 
+    ClipboardWindow {
+        clipboardModel: clipboardModel
+    }
+
     PowerMenuWindow {
         powerMenuModel: powerMenuModel
         panelWindow: root.activePanelWindow
@@ -1186,8 +1325,12 @@ ShellRoot {
             updateCenterModel: updateCenterModel
             primaryPanel: modelData === Quickshell.screens[0]
             onPopupRequested: (panel, popupId) => root.requestPanelPopup(panel, popupId)
+            onSettingsSectionRequested: (panel, section) => root.runCommandMenuAction("settings", "select", section, panel.screen)
         }
     }
+
+    CalendarWindow { model: calendarModel; panelWindow: root.activePanelWindow }
+    WeatherWindow { model: weatherModel; panelWindow: root.activePanelWindow }
 
     NetworkWindow {
         networkModel: networkModel
@@ -1228,6 +1371,7 @@ ShellRoot {
         powerModel: powerModel
         healthModel: systemHealthModel
         settingsModel: settingsModel
+        onWindowOverviewRequested: screen => windowOverviewModel.openOnScreen(screen)
     }
 
     UtilityDetailWindow {
@@ -1250,6 +1394,7 @@ ShellRoot {
         powerMenuModel: powerMenuModel
         defaultsModel: defaultsModel
         autostartModel: autostartModel
+        agentModel: agentModel
         appearanceModel: appearanceModel
         accessibilityModel: accessibilityModel
         notificationModel: notificationModel

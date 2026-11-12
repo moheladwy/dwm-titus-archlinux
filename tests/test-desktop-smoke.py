@@ -22,9 +22,9 @@ def main():
         if not shutil.which(command):
             raise RuntimeError(f"Missing required smoke-test command: {command}")
     # Quickshell's IPC socket must fit Linux's 108-byte Unix socket path limit.
-    # Keep runtime files out of the deeply nested managed test workspace.
-    runtime_parent = os.environ["XDG_RUNTIME_DIR"]
-    with tempfile.TemporaryDirectory(prefix="qs-", dir=runtime_parent) as runtime, \
+    # Only this private IPC runtime uses /tmp; fixtures stay in the managed
+    # workspace, whose path can be too long even before the socket suffix.
+    with tempfile.TemporaryDirectory(prefix="qs-", dir="/tmp") as runtime, \
             tempfile.TemporaryDirectory(prefix="desktop-smoke-") as directory:
         work = Path(directory)
         config = work / "config"
@@ -33,19 +33,29 @@ def main():
         (config / "dwm-titus").mkdir()
         for source in (REPO / "config").glob("*.toml"):
             shutil.copy(source, config / "dwm-titus")
-        (data / "dwm-titus").mkdir(parents=True)
-        (data / "dwm-titus/scripts").symlink_to(REPO / "scripts", target_is_directory=True)
+        helpers = data / "dwm-titus/scripts"
+        helpers.mkdir(parents=True)
+        # This fixture starts and owns its panel explicitly. Exposing the real
+        # session hooks also starts host XDG apps (including light-locker) on
+        # Xvfb, which has no login session, and can leave detached helpers behind.
+        for source in (REPO / "scripts").iterdir():
+            if source.name not in ("autostart.sh", "autostop.sh"):
+                (helpers / source.name).symlink_to(source)
+        for hook in ("autostart.sh", "autostop.sh"):
+            assert not (helpers / hook).exists(), \
+                f"Desktop smoke must not expose the real session hook: {hook}"
         applications = data / "applications"
         applications.mkdir()
         (applications / "smoke.desktop").write_text(
             "[Desktop Entry]\nType=Application\nName=DwmSmokeApp\n"
             f'Exec=touch "{work}/launched"\nTerminal=false\nCategories=Utility;\n')
         env = {**os.environ, "HOME": str(work), "XDG_CONFIG_HOME": str(config),
+               "XDG_CONFIG_DIRS": str(config),
                "XDG_DATA_HOME": str(data), "XDG_DATA_DIRS": str(data),
                "XDG_STATE_HOME": str(work / "state"), "XDG_CACHE_HOME": str(work / "cache"),
                "XDG_RUNTIME_DIR": runtime, "QT_QPA_PLATFORM": "xcb",
                "QT_QUICK_BACKEND": "software", "QT_QPA_PLATFORMTHEME": "",
-               "PATH": f"{REPO / 'scripts'}:{os.environ['PATH']}"}
+               "PATH": f"{helpers}:{os.environ['PATH']}"}
         processes = []
         with (work / "desktop.log").open("w+") as log:
             def start(args, **kwargs):

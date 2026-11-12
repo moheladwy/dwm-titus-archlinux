@@ -18,6 +18,18 @@ menu. You can also run:
 dwm-settings open
 ```
 
+To find an existing application, press **Super+`** (the key above Tab), or choose
+**Window overview** from Control Center or the command menu. Each window has its own card showing its title, application,
+tags and monitor. Type to filter, use Tab or arrow keys to select and Enter to
+focus, or click a card. Escape and Close leave the previous tag and focus in
+place. Selection switches to the window's existing tag without moving it.
+Static thumbnails refresh only when the overview opens. They require a running
+X11 compositor such as Picom; unavailable captures keep an icon and title.
+You can also run `dwm-window-overview toggle` or bind that command in your own
+`hotkeys.toml`. Existing user hotkey files are preserved; see the
+[overview guide](https://github.com/moheladwy/dwm-titus-archlinux/blob/main/docs/WINDOW-OVERVIEW.md)
+to update just the former Previous tag binding.
+
 The Displays section discovers connected outputs and their advertised modes,
 lets you edit resolution, refresh rate, position, rotation, primary state, and
 output enablement, and manages named layouts. Choose **Apply changes** to test
@@ -70,12 +82,62 @@ separate direct action that restores and persists the driver's default. Kept
 values are reapplied idempotently at session startup when the device exposes a
 stable udev or physical sysfs identity. Devices without one remain
 session-configurable and report that persistence is unavailable. Unsupported
-per-device properties remain visible with an explanation.
+per-device properties remain visible with an explanation. Power, sleep and
+video buttons, which X lists as keyboards, are not shown. A device that X
+splits into several XInput devices with the same identity on the same port (a
+VMware PS/2 mouse, for example) is one entry: a change applies to every part
+that supports it, and Revert puts each identifiable part back to its own value.
+After re-enumeration, parts with the same signature can be restored together
+when their captured values agree. If identities or old values cannot be
+resolved safely (including a new part without a snapshot), Revert retains
+recovery and changes no parts; reconnect the original device before retrying.
+It does not guess a value for an uncaptured part. Devices that
+share an identity without sharing a port cannot be told apart, so they are
+listed once with an explanation and are not changed.
 
 The same section exposes session-wide XKB accessibility shortcuts, sticky keys,
 slow keys, bounce keys, and mouse keys when `xkbset` can reach the X11 session.
 These controls use the same 15-second preview and reset workflow, but are not
 tied to one physical keyboard. Kept choices are restored at the next login.
+
+To type in more than one language, enter a comma-separated list in Keyboard
+layout, for example `us,gr`, and pick a key under Switch layout with: Alt+Shift,
+Ctrl+Shift, Caps Lock (Shift+Caps Lock is then Caps Lock), Shift+Caps Lock,
+both Shifts, Right Alt, Right Ctrl or Menu. Layout LED lights Caps Lock, Scroll
+Lock or Num Lock while a layout other than the first is active. Both only change
+the `grp:` and `grp_led:` part of Modifier options and use the same preview, so
+any other `grp:` option can still be typed there. Win+Space and the other Space
+chords are not offered because dwm still runs its own binding on them
+(Super+Space toggles floating). Keep a layout with Latin
+letters first, because dwm matches its hotkeys against the first layout. With
+two or more layouts the panel shows a keyboard layout pill with the active
+layout (US, GR, ...): click it or scroll on it to switch, middle-click for the
+first layout, right-click to open this section. The pill reads the layout from
+the running keymap, so layouts set with `setxkbmap` by hand show up too. It can
+be hidden like the other panel widgets.
+
+Enable **Calendar** or **Weather** in Control Center > Bar Widgets or
+Appearance > Panel widgets to add their panel icons. Both start off. Calendar
+opens a month view with previous/next, Today and arrow-key navigation. Weather
+asks for a city and an explicit Fetch action before sending that city to
+wttr.in. It displays Celsius or Fahrenheit, the fetch time and the last saved
+report when offline. Opening the popup makes no weather request; there is no
+automatic location lookup or background refresh. Escape and clicking outside
+close either popup.
+
+Optional floating-window titlebars are configured in the `[appearance]`
+section of your `~/.config/dwm-titus/themes.toml` (or the corresponding
+`XDG_CONFIG_HOME` path). Set `titlebars = 1` to enable drag and close controls;
+`titlebar_tags = 511` allows all nine workspaces, while `1` allows only workspace
+1 and `3` allows workspaces 1 and 2. Save to hot reload. Set `titlebars = 0` to
+disable them. Tiled and fullscreen windows remain undecorated. The close button
+uses the normal application close request; it does not target an application PID.
+In Appearance, **Window layout** offers Tile, Floating and Monocle choices,
+master-area sizing and tile gaps. These settings apply to the current monitor
+and tag for this dwm session; changing tags restores their own choices. Gaps
+start at zero after restarting dwm. **Font and text size** below provides the
+existing preview and rollback controls for desktop scale. Layout hotkeys keep
+working, and the visual controls follow them automatically.
 
 The Appearance section also manages notification behavior. **Do Not Disturb**
 suppresses low and normal urgency popups without discarding their history;
@@ -117,6 +179,10 @@ not close a launched tool or undo its changes.
 System information reports SELinux and firewalld as unsupported on Arch, and
 shows the rolling `BUILD_ID` when `os-release` has no version.
 
+The desktop update card above these controls checks official `main` and installs
+managed dwm-titus changes. See [Updates](/updates.html) for the preview,
+authorization, progress, and recovery behavior.
+
 For timezone and system locale, select **Load choices**, filter the reported
 catalog, and select with click or Enter. **Review change** reads a fresh preview;
 it does not apply the selection. Network time offers fixed enable/disable
@@ -125,7 +191,8 @@ A sent change cannot be canceled; Cancel only dismisses the preview. Uncertain
 results require fresh status and a new confirmation, never automatic retry or
 rollback. Locale changes apply to new sessions without automatic logout. NTP
 synchronization is explicitly labeled as last-read status.
-The local date and time readout shares the panel's minute-level clock. A newly
+The local date and time readout shares the panel's clock and stays minute-level
+even when **Clock: show seconds** is on for the panel. A newly
 reported timezone refreshes both displays without restarting the shell. This
 does not add background timezone discovery while System Settings is closed.
 

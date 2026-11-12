@@ -9,6 +9,15 @@ dwm_packages() {
 	# Arch Linux is the supported platform. Every package below is in the
 	# official core/extra repositories; AUR-only packages live only in
 	# aur-optional and are never required.
+	arch:provider-policy)
+		# package, provided capability (pacman -T), alternative commands.
+		# tuned-ppd provides power-profiles-daemon and conflicts with it;
+		# pipewire-pulse conflicts with an installed pulseaudio server, which is
+		# kept because replacing an audio server is a user decision.
+		printf '%s\n' $'power-profiles-daemon\tpower-profiles-daemon\t-' \
+			$'pipewire-pulse\tpulseaudio\t-' \
+			$'xorg-server\txorg-server\tXorg,Xlibre'
+		;;
 	arch:build)
 		printf '%s\n' \
 			gcc make pkgconf libx11 libxft libxinerama libxrender imlib2 libxcb \
@@ -18,7 +27,7 @@ dwm_packages() {
 		dwm_packages "$family" build
 		printf '%s\n' quickshell python dbus util-linux procps-ng \
 			xorg-server-xvfb xdotool xorg-xprop xorg-xrandr xorg-xset xsettingsd \
-			jq inotify-tools gawk noto-fonts
+			jq inotify-tools gawk noto-fonts xorg-setxkbmap xorg-xkbcomp xorg-xmodmap xorg-xinput xorg-xwininfo
 		;;
 	arch:media)
 		printf '%s\n' celluloid mpv sxiv python desktop-file-utils
@@ -42,7 +51,7 @@ dwm_packages() {
 			alsa-utils brightnessctl dbus inotify-tools jq libpulse pipewire pavucontrol \
 			pipewire-pulse wireplumber libnotify light-locker xf86-input-libinput \
 			bluez bluez-utils blueman playerctl upower power-profiles-daemon flatpak \
-			xdg-desktop-portal-gtk
+			xdg-desktop-portal-gtk nm-connection-editor
 		;;
 	arch:system-management)
 		# pyalpm and pacman-contrib back the native pacman update provider.
@@ -147,14 +156,9 @@ dwm_install_package_profile() {
 
 	while IFS= read -r package; do
 		[[ -n $package ]] || continue
-		if [[ $package == power-profiles-daemon ]] && dwm_power_profiles_provider_installed; then
+		if dwm_package_provider_installed "$package"; then
 			printf '%s\n' \
-				'Retaining installed Power Profiles provider; skipping power-profiles-daemon.' >&2
-			continue
-		fi
-		if [[ $package == pipewire-pulse ]] && dwm_pulseaudio_server_installed; then
-			printf '%s\n' \
-				'Retaining the installed PulseAudio server; skipping conflicting pipewire-pulse.' >&2
+				"Retaining installed provider; skipping $package." >&2
 			continue
 		fi
 		packages+=("$package")
@@ -167,18 +171,20 @@ dwm_install_package_profile() {
 	install_packages "${packages[@]}"
 }
 
-# tuned-ppd provides power-profiles-daemon and conflicts with it, so an
-# installed provider must not be replaced by the default package.
-dwm_power_profiles_provider_installed() {
-	command -v pacman >/dev/null 2>&1 &&
-		pacman -T power-profiles-daemon >/dev/null 2>&1
-}
-
-# pipewire-pulse conflicts with pulseaudio. Replacing an existing audio server
-# is a user decision, so keep the installed server instead.
-dwm_pulseaudio_server_installed() {
-	command -v pacman >/dev/null 2>&1 &&
-		pacman -Q pulseaudio >/dev/null 2>&1
+dwm_package_provider_installed() {
+	local package=$1 candidate capability commands command
+	local -a alternatives=()
+	while IFS=$'\t' read -r candidate capability commands; do
+		[[ $candidate == "$package" ]] || continue
+		IFS=, read -r -a alternatives <<<"$commands"
+		for command in "${alternatives[@]}"; do
+			[[ $command == - ]] || { command -v "$command" >/dev/null 2>&1 && return 0; }
+		done
+		# pacman -T also matches packages that provide the capability.
+		command -v pacman >/dev/null 2>&1 && pacman -T "$capability" >/dev/null 2>&1
+		return $?
+	done < <(dwm_packages arch provider-policy)
+	return 1
 }
 
 dwm_install_aur_profile() {
