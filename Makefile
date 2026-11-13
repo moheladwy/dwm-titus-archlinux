@@ -670,6 +670,7 @@ check-quickshell-notifications:
 check-quickshell-tray:
 	tests/test-quickshell-tray.sh
 	tests/test-quickshell-tray-resync-xvfb.sh
+	tests/test-quickshell-tray-dedupe-xvfb.sh
 
 check-cursor-reload:
 	xvfb-run -a /usr/bin/python3 tests/test-cursor-reload.py
