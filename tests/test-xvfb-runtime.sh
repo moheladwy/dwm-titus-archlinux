@@ -695,6 +695,14 @@ win=$(cat "$work/window-id")
 wait_for_active_window "$win"
 DISPLAY=$display xprop -root _NET_CLIENT_LIST | grep -q "$win"
 
+# Panel workspace buttons and running-app buttons go through the state helper,
+# which must work with the required xdotool alone (no wmctrl).
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" switch 2
+wait_for_current_desktop 2
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" focus "$win"
+wait_for_current_desktop 0
+wait_for_active_window "$win"
+
 # Keep the floating layer above tiled clients while preserving focus order
 # within that layer and the higher real-fullscreen priority.
 DISPLAY=$display "$work/xclient" >"$work/floating-window-id" \
