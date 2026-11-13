@@ -756,6 +756,13 @@ sleep 0.3
 wait_for_active_window "$win"
 DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" focus "$floating_win"
 wait_for_active_window "$floating_win"
+# Activating a window beneath a real-fullscreen peer reveals it instead of
+# focusing it while hidden.
+DISPLAY=$display "$work/xclient" state "$win" 1 _NET_WM_STATE_FULLSCREEN
+wait_for_window_state "$win" _NET_WM_STATE_FULLSCREEN
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" focus "$floating_win"
+wait_for_window_state_absent "$win" _NET_WM_STATE_FULLSCREEN
+wait_for_active_window "$floating_win"
 
 # Explicit floating toggles shrink around the tile center and retile without drift.
 tiled_geometry=$(DISPLAY=$display xdotool getwindowgeometry --shell "$floating_win")

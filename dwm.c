@@ -1127,11 +1127,14 @@ cleanupmon(Monitor *mon)
 }
 
 /* Focus a client for a pager or panel request: select its monitor, show
- * one of its tags there if none is visible, then focus and raise it. */
+ * one of its tags there if none is visible, then focus and raise it. Like
+ * an explicit overview selection, it leaves real fullscreen on visible
+ * peers so the client is not focused while hidden beneath them. */
 void
 activateclient(Client *c)
 {
 	unsigned int target;
+	Client *other;
 	Arg arg;
 
 	if (selmon != c->mon) {
@@ -1145,6 +1148,11 @@ activateclient(Client *c)
 		arg.ui = target & (~target + 1U);
 		view(&arg);
 	}
+	for (other = selmon->clients; other; other = other->next)
+		if (other != c && ISVISIBLE(other) && other->isfullscreen
+		&& other->fakefullscreen != 1)
+			setfullscreen(other, 0);
+	arrange(selmon);
 	focus(c);
 	restack(selmon);
 	updatecurrentdesktop();
