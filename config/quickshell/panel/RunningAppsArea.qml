@@ -11,19 +11,6 @@ RowLayout {
     required property var desktopState
     spacing: Theme.panelGap
 
-    // The tray item of the same app, if any, so the button can offer its menu.
-    function trayItemFor(appClass) {
-        const items = SystemTray.items.values;
-
-        for (let i = 0; i < items.length; i++) {
-            if (Icons.trayItemMatchesApp(items[i], appClass)) {
-                return items[i];
-            }
-        }
-
-        return null;
-    }
-
     Repeater {
         model: root.desktopState.runningApps
 
@@ -31,7 +18,8 @@ RowLayout {
             required property var modelData
             app: modelData
             active: modelData.appClass === root.desktopState.activeWindowClass
-            trayItem: root.trayItemFor(modelData.appClass)
+            // The same item TrayArea hides, so its menu stays reachable here.
+            trayItem: Icons.trayItemForApp(SystemTray.items.values, modelData.appClass)
             onFocusRequested: windowId => root.desktopState.focusWindow(windowId)
         }
     }

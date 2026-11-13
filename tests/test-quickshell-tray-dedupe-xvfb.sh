@@ -1,6 +1,8 @@
 #!/bin/sh
 # An app with an open window shows one panel icon: its tray icon is hidden
 # while the running-app button is shown, and returns when the window closes.
+# Only the one item the button takes over is hidden; a second tray item of
+# the same app stays in the tray so its menu remains reachable.
 # Tray-only apps stay visible, and a window class never claims a tray item
 # whose name merely starts with the same letters.
 set -eu
@@ -65,12 +67,12 @@ run_shell --no-duplicate --path "$work/qml/shell.qml" >"$work/shell.log" 2>&1 &
 pids="$pids $!"
 wait_for 'busctl --user status org.kde.StatusNotifierWatcher >/dev/null 2>&1' 'Quickshell watcher'
 
-for id in lark_status_icon_1 background-only zenity; do
+for id in lark_status_icon_1 lark_status_icon_2 background-only zenity; do
 	python3 -I "$repo/tests/fixtures/sni-item.py" --id "$id" --ready "$work/$id.ready" &
 	pids="$pids $!"
 done
 # shellcheck disable=SC2016 # expanded later by wait_for
-wait_for '[ -s "$work/lark_status_icon_1.ready" ] && [ -s "$work/background-only.ready" ] && [ -s "$work/zenity.ready" ]' \
+wait_for '[ -s "$work/lark_status_icon_1.ready" ] && [ -s "$work/lark_status_icon_2.ready" ] && [ -s "$work/background-only.ready" ] && [ -s "$work/zenity.ready" ]' \
 	'tray item fixtures'
 
 latest() {
@@ -81,16 +83,23 @@ expected_match='MATCH lark:yes timedoctor:yes title:yes dns:yes prefix:no empty:
 [ "$(latest MATCH)" = "$expected_match" ] ||
 	fail "Unexpected tray name matching: $(latest MATCH)"
 
-# Lark has a window, so only the tray-only app and zenity remain.
-# shellcheck disable=SC2016 # expanded later by wait_for
-wait_for '[ "$(latest VISIBLE)" = "VISIBLE background-only,zenity" ]' \
-	'Lark tray icon hidden while its window is open'
+# Lark has a window, so its button takes over one of its two tray items
+# (whichever registered first); the other stays visible with the tray-only
+# app and zenity.
+one_lark_hidden() {
+	case $(latest VISIBLE) in
+	'VISIBLE background-only,lark_status_icon_1,zenity' | \
+		'VISIBLE background-only,lark_status_icon_2,zenity') return 0 ;;
+	esac
+	return 1
+}
+wait_for one_lark_hidden 'one Lark tray icon hidden while its window is open'
 
 # Closing the windows brings the tray icon back.
 run_shell ipc --path "$work/qml/shell.qml" call test closeWindows >/dev/null 2>&1 ||
 	fail 'IPC call closeWindows failed'
 # shellcheck disable=SC2016 # expanded later by wait_for
-wait_for '[ "$(latest VISIBLE)" = "VISIBLE background-only,lark_status_icon_1,zenity" ]' \
-	'Lark tray icon shown after its window closes'
+wait_for '[ "$(latest VISIBLE)" = "VISIBLE background-only,lark_status_icon_1,lark_status_icon_2,zenity" ]' \
+	'Lark tray icons shown after its window closes'
 
 printf 'Quickshell tray hides icons of apps with open windows: PASS\n'

@@ -213,6 +213,19 @@ Singleton {
         return false;
     }
 
+    // The one tray item a running-app button takes over: the first match in
+    // tray order. The tray hides only this item, so any further items of the
+    // same app stay reachable in the tray.
+    function trayItemForApp(trayItems, appClass) {
+        for (let i = 0; i < trayItems.length; i++) {
+            if (trayItemMatchesApp(trayItems[i], appClass)) {
+                return trayItems[i];
+            }
+        }
+
+        return null;
+    }
+
     function trayIconSources(trayItem) {
         const icon = trayItem && trayItem.icon;
         const sources = [];

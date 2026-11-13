@@ -32,9 +32,9 @@ grep -Fq 'item.status === undefined || item.status === null ? "" : item.status' 
 # The tray stays independent: it hides only items whose app has a running-app
 # button (which then offers the tray menu), so tray-only apps stay visible.
 # tests/test-quickshell-tray-dedupe-xvfb.sh checks the behavior.
-grep -Fq '!root.hasRunningApp(item)' "$tray_area"
-grep -Fq 'Icons.trayItemMatchesApp(item, root.runningApps[i].appClass)' "$tray_area"
-grep -Fq 'trayItem: root.trayItemFor(modelData.appClass)' "$running_area"
+grep -Fq 'root.claimedItems.indexOf(item) === -1' "$tray_area"
+grep -Fq 'return Icons.trayItemForApp(SystemTray.items.values, app.appClass);' "$tray_area"
+grep -Fq 'trayItem: Icons.trayItemForApp(SystemTray.items.values, modelData.appClass)' "$running_area"
 grep -Fq 'menu: root.trayItem ? root.trayItem.menu : null' "$running_item"
 if grep -Fq 'Repeater' "$running_item" || grep -Fq 'SystemTray.items' "$running_item"; then
 	printf 'Running-window buttons must not render tray items themselves.\n' >&2
