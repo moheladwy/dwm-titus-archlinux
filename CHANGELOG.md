@@ -172,9 +172,12 @@ the port.
 ### Changed
 
 - An app with an open window shows one panel icon instead of two. Its tray
-  icon is hidden while the running-app button is shown, and right-clicking
-  that button opens the app's tray menu. The tray icon returns when the last
-  window closes, and apps that only live in the tray are unaffected.
+  icon is hidden while the running-app button is shown, and the button takes
+  over its actions: right-click opens the app's tray menu (or activates an
+  icon without one) and middle-click sends the icon's secondary action. The
+  tray icon returns when the last window closes, a second tray icon of the
+  same app stays in the tray, and apps that only live in the tray are
+  unaffected.
 - The panel menu button shows the Arch Linux logo instead of the Chris Titus
   Tech logo. It uses `/usr/share/pixmaps/archlinux-logo.svg` from Arch's
   `filesystem` package and shows "Arch" if that file is missing.

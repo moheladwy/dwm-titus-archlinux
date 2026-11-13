@@ -10,9 +10,26 @@ Rectangle {
     required property var app
     required property bool active
     // The app's tray item, when it has one; its icon is hidden from the tray
-    // while this button is shown, so right-click opens its menu here.
+    // while this button is shown, so the button forwards its actions:
+    // right-click opens its menu (or activates an item without one) and
+    // middle-click sends its secondary activation. Left-click focuses the
+    // window, which is what a tray icon's own activation usually does.
     property var trayItem: null
     signal focusRequested(string windowId)
+
+    function trayAction(button) {
+        if (!root.trayItem) {
+            return;
+        }
+
+        if (button === Qt.MiddleButton) {
+            root.trayItem.secondaryActivate();
+        } else if (root.trayItem.hasMenu) {
+            trayMenu.open();
+        } else {
+            root.trayItem.activate();
+        }
+    }
 
     Layout.preferredWidth: Theme.pillHeight
     Layout.preferredHeight: Theme.pillHeight
@@ -41,18 +58,20 @@ Rectangle {
         id: appMouse
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: root.trayItem && root.trayItem.hasMenu
-            ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
+        acceptedButtons: root.trayItem
+            ? Qt.LeftButton | Qt.MiddleButton | Qt.RightButton : Qt.LeftButton
         cursorShape: Qt.PointingHandCursor
         onPressed: mouse => {
             if (mouse.button === Qt.RightButton) {
-                trayMenu.open();
+                root.trayAction(mouse.button);
                 mouse.accepted = true;
             }
         }
         onClicked: mouse => {
             if (mouse.button === Qt.LeftButton) {
                 root.focusRequested(root.app.windowId);
+            } else if (mouse.button === Qt.MiddleButton) {
+                root.trayAction(mouse.button);
             }
         }
     }

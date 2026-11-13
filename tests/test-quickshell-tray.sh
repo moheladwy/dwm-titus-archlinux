@@ -36,6 +36,10 @@ grep -Fq 'root.claimedItems.indexOf(item) === -1' "$tray_area"
 grep -Fq 'return Icons.trayItemForApp(SystemTray.items.values, app.appClass);' "$tray_area"
 grep -Fq 'trayItem: Icons.trayItemForApp(SystemTray.items.values, modelData.appClass)' "$running_area"
 grep -Fq 'menu: root.trayItem ? root.trayItem.menu : null' "$running_item"
+# The button forwards every action of the tray item it hides.
+grep -Fq 'root.trayItem.secondaryActivate();' "$running_item"
+grep -Fq 'root.trayItem.activate();' "$running_item"
+grep -Fq 'Qt.LeftButton | Qt.MiddleButton | Qt.RightButton : Qt.LeftButton' "$running_item"
 if grep -Fq 'Repeater' "$running_item" || grep -Fq 'SystemTray.items' "$running_item"; then
 	printf 'Running-window buttons must not render tray items themselves.\n' >&2
 	exit 1
