@@ -70,7 +70,7 @@ submitting a pull request.
 | Quickshell QML | `scripts/run-tests make check-quickshell-qml` plus real or nested X11 runtime validation |
 | System update UI | `scripts/run-tests make check-quickshell-system-management` (runs `tests/test-quickshell-update-ui-xvfb.sh`, which can also run alone as the focused native fixture), plus configured QML lint |
 | Audio and volume display | `scripts/run-tests make check-quickshell-audio` (includes `tests/test-quickshell-volume-xvfb.sh` against a private PipeWire graph) |
-| Tray | `scripts/run-tests make check-quickshell-tray` (includes tray resync after a Quickshell restart) |
+| Tray | `scripts/run-tests make check-quickshell-tray` (includes tray resync after a Quickshell restart and hiding tray icons of apps with open windows) |
 | Control Center | `scripts/run-tests make check-quickshell-controlcenter` (includes the theme result UI test) |
 | Brightness | `scripts/run-tests make check-brightness` |
 | Window rules | `scripts/run-tests make check-window-rules` (every shipped rule key must be one dwm reads) |

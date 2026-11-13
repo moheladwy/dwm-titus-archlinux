@@ -28,7 +28,7 @@ Usage: dwm-agent [--inline] [--prompt TEXT]
        dwm-agent list
        dwm-agent install <codex|opencode|gemini|claude|cursor-agent|hermes>
        dwm-agent login [codex|opencode|gemini|claude|cursor-agent|hermes]
-       dwm-agent link-skills
+       dwm-agent link-skills [--existing]
        dwm-agent status
        dwm-agent set <crash-notifications|hang-detection> <on|off>
 EOF
@@ -189,10 +189,28 @@ login_agent() {
 	esac
 }
 
+# Whether an agent that reads a skills folder is already set up: its home
+# folder exists. ~/.agents/skills serves Codex, Gemini CLI and OpenCode as
+# well as agents that use ~/.agents directly.
+skills_target_ready() {
+	case $1 in
+	"$skills_target")
+		[[ -d $HOME/.agents || -d $HOME/.codex || -d $HOME/.gemini ||
+			-d ${XDG_CONFIG_HOME:-$HOME/.config}/opencode ]]
+		;;
+	*) [[ -d ${1%/skills} ]] ;;
+	esac
+}
+
+# With "existing", link only for agents that are already set up, as installs
+# and desktop updates do; otherwise create every skills folder.
 link_skills() {
-	local skill name target dir
+	local mode=${1:-all} skill name target dir
 	[[ -d $skills_source ]] || die "no skills in $skills_source"
 	for dir in "${skills_targets[@]}"; do
+		if [[ $mode == existing ]] && ! skills_target_ready "$dir"; then
+			continue
+		fi
 		mkdir -p "$dir"
 		for skill in "$skills_source"/*/; do
 			name=$(basename "$skill")
@@ -456,7 +474,19 @@ login)
 	known_agent "$agent" || die "unknown agent '$agent'"
 	login_agent "$agent"
 	;;
-link-skills) link_skills ;;
+link-skills)
+	case ${2:-} in
+	'')
+		(($# == 1)) || die "usage: dwm-agent link-skills [--existing]"
+		link_skills
+		;;
+	--existing)
+		(($# == 2)) || die "usage: dwm-agent link-skills [--existing]"
+		link_skills existing
+		;;
+	*) die "usage: dwm-agent link-skills [--existing]" ;;
+	esac
+	;;
 status) status ;;
 set)
 	(($# == 3)) || die "usage: dwm-agent set <crash-notifications|hang-detection> <on|off>"

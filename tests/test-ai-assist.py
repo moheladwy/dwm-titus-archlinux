@@ -56,6 +56,23 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(os.readlink(link), str(self.work / "missing-user-target"))
         self.assertTrue((self.home / ".claude/skills/dwm-titus/SKILL.md").is_file())
 
+    def test_install_links_only_for_agents_already_set_up(self):
+        (self.home / ".claude").mkdir()
+        self.run_helper("dwm-agent", "link-skills", "--existing")
+        self.assertTrue((self.home / ".claude/skills/dwm-titus/SKILL.md").is_file())
+        for folder in (".agents", ".cursor", ".hermes"):
+            self.assertFalse((self.home / folder).exists(), folder)
+        # Codex, Gemini CLI and OpenCode all read ~/.agents/skills.
+        for setup in (self.home / ".codex", self.home / ".gemini",
+                      self.work / "config/opencode"):
+            setup.mkdir(parents=True)
+            self.run_helper("dwm-agent", "link-skills", "--existing")
+            self.assertTrue((self.home / ".agents/skills/dwm-titus/SKILL.md").is_file(), setup)
+            shutil.rmtree(self.home / ".agents")
+            setup.rmdir()
+        rejected = self.run_helper("dwm-agent", "link-skills", "--bogus", check=False)
+        self.assertNotEqual(rejected.returncode, 0)
+
     def test_managed_system_link_follows_package_removal(self):
         skills = self.home / ".agents/skills"
         skills.mkdir(parents=True)

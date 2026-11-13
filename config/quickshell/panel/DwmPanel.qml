@@ -278,7 +278,7 @@ PanelWindow {
 
                     Loader {
                         active: root.primaryPanel
-                        sourceComponent: TrayArea {}
+                        sourceComponent: TrayArea { runningApps: root.state.runningApps }
                     }
 
                     PanelPill {

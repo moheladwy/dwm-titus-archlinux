@@ -655,6 +655,35 @@ EOF
 # shellcheck disable=SC2046
 cc "$work/xclient.c" -o "$work/xclient" $(pkg-config --cflags --libs x11)
 
+# Sends _NET_ACTIVE_WINDOW for a window with the given EWMH source indication
+# (1 = application, 2 = pager), as an application or panel would.
+cat >"$work/netactive.c" <<'EOF'
+#include <X11/Xlib.h>
+#include <stdlib.h>
+
+int
+main(int argc, char *argv[])
+{
+	Display *dpy;
+	XEvent ev = { 0 };
+
+	if (argc != 3 || !(dpy = XOpenDisplay(NULL)))
+		return 1;
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = (Window)strtoul(argv[1], NULL, 0);
+	ev.xclient.message_type = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = strtol(argv[2], NULL, 10);
+	ev.xclient.data.l[1] = CurrentTime;
+	XSendEvent(dpy, DefaultRootWindow(dpy), False,
+		SubstructureNotifyMask | SubstructureRedirectMask, &ev);
+	XCloseDisplay(dpy);
+	return 0;
+}
+EOF
+# shellcheck disable=SC2046
+cc "$work/netactive.c" -o "$work/netactive" $(pkg-config --cflags --libs x11)
+
 display=":$((($$ % 500) + 150))"
 Xvfb "$display" -screen 0 1024x768x24 -nolisten tcp -extension GLX \
 	>"$work/xvfb.log" 2>&1 &
@@ -695,6 +724,14 @@ win=$(cat "$work/window-id")
 wait_for_active_window "$win"
 DISPLAY=$display xprop -root _NET_CLIENT_LIST | grep -q "$win"
 
+# Panel workspace buttons and running-app buttons go through the state helper,
+# which must work with the required xdotool alone (no wmctrl).
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" switch 2
+wait_for_current_desktop 2
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" focus "$win"
+wait_for_current_desktop 0
+wait_for_active_window "$win"
+
 # Keep the floating layer above tiled clients while preserving focus order
 # within that layer and the higher real-fullscreen priority.
 DISPLAY=$display "$work/xclient" >"$work/floating-window-id" \
@@ -707,6 +744,24 @@ while [ "$i" -lt 100 ] && [ ! -s "$work/floating-window-id" ]; do
 done
 floating_win=$(cat "$work/floating-window-id")
 [ -n "$floating_win" ]
+wait_for_active_window "$floating_win"
+
+# With two windows on one tag, a panel running-app click (pager source 2, as
+# xdotool sends) focuses the clicked window, while an application request
+# (source 1) only marks the window urgent and leaves focus alone.
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" focus "$win"
+wait_for_active_window "$win"
+DISPLAY=$display "$work/netactive" "$floating_win" 1
+sleep 0.3
+wait_for_active_window "$win"
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" focus "$floating_win"
+wait_for_active_window "$floating_win"
+# Activating a window beneath a real-fullscreen peer reveals it instead of
+# focusing it while hidden.
+DISPLAY=$display "$work/xclient" state "$win" 1 _NET_WM_STATE_FULLSCREEN
+wait_for_window_state "$win" _NET_WM_STATE_FULLSCREEN
+DISPLAY=$display "$repo_dir/scripts/dwm-quickshell-state" focus "$floating_win"
+wait_for_window_state_absent "$win" _NET_WM_STATE_FULLSCREEN
 wait_for_active_window "$floating_win"
 
 # Explicit floating toggles shrink around the tile center and retile without drift.

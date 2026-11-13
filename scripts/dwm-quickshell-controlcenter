@@ -1475,7 +1475,7 @@ info() {
 
 	printf 'OS\t%s\n' "$os_name"
 	printf 'Kernel\t%s\n' "$(uname -sr)"
-	printf 'Host\t%s\n' "$(hostname 2>/dev/null || printf unknown)"
+	printf 'Host\t%s\n' "$(uname -n 2>/dev/null || printf unknown)"
 	printf 'Uptime\t%s\n' "$(uptime -p 2>/dev/null || uptime 2>/dev/null || printf unknown)"
 	printf 'Terminal\t%s\n' "${TERMINAL:-dwm-terminal}"
 	printf 'Compositor\t%s\n' "$compositor"

@@ -77,7 +77,8 @@ restart is required.
   (1 success, 0 rejected). Distinct reply windows prevent stale or concurrent
   requests satisfying one another. The helper destroys its reply window on
   success, rejection or timeout. The ordinary `_NET_ACTIVE_WINDOW` and
-  WM_TAKE_FOCUS policies are preserved.
+  WM_TAKE_FOCUS policies are preserved: pager requests (source 2) focus the
+  window, and application requests only mark it urgent.
 
 ## Validation
 

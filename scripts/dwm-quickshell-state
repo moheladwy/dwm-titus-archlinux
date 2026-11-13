@@ -444,6 +444,13 @@ request_keyboard_group() {
 	fi
 }
 
+# xdotool is a runtime requirement (dwm_packages arch runtime-required).
+require_xdotool() {
+	command -v xdotool >/dev/null 2>&1 && return 0
+	printf 'xdotool is required for %s\n' "$*" >&2
+	return 127
+}
+
 switch_workspace() {
 	target=${1:-}
 	case $target in
@@ -452,11 +459,9 @@ switch_workspace() {
 		return 2
 		;;
 	esac
-	command -v wmctrl >/dev/null 2>&1 || {
-		printf 'wmctrl is required for workspace switching\n' >&2
-		return 127
-	}
-	wmctrl -s "$target"
+	require_xdotool workspace switching || return
+	# Sends _NET_CURRENT_DESKTOP, which dwm handles in clientmessage().
+	xdotool set_desktop "$target"
 }
 
 focus_window() {
@@ -468,7 +473,9 @@ focus_window() {
 		return 2
 		;;
 	esac
-	wmctrl -ia "$target"
+	require_xdotool window focus || return
+	# Sends _NET_ACTIVE_WINDOW and switches to the window's workspace first.
+	xdotool windowactivate "$target"
 }
 
 case ${1:-state} in

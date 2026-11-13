@@ -172,6 +172,60 @@ Singleton {
         }
     }
 
+    // Whether a tray item belongs to an app that has a window in the
+    // running-apps list. Tray items carry no window class, so this compares
+    // names: the item id ("timedoctor2", "lark_status_icon_1"), title, and
+    // tooltip title against the window class ("lark") or the last part of a
+    // reverse-DNS class ("dev.zed.zed" -> "zed"). A name may extend the class
+    // only after a separator, so "zen" does not claim "zenity".
+    function trayItemMatchesApp(trayItem, appClass) {
+        const appName = String(appClass || "").toLowerCase();
+
+        if (!trayItem || appName.length === 0) {
+            return false;
+        }
+
+        const classNames = [appName];
+        const lastPart = appName.substring(appName.lastIndexOf(".") + 1);
+
+        if (lastPart !== appName && lastPart.length >= 3) {
+            classNames.push(lastPart);
+        }
+
+        const itemNames = [trayItem.id, trayItem.title, trayItem.tooltipTitle];
+
+        for (let i = 0; i < itemNames.length; i++) {
+            const itemName = String(itemNames[i] || "").trim().toLowerCase();
+
+            for (let j = 0; itemName.length > 0 && j < classNames.length; j++) {
+                const className = classNames[j];
+
+                if (itemName === className) {
+                    return true;
+                }
+
+                if (itemName.indexOf(className) === 0 && /[^a-z0-9]/.test(itemName.charAt(className.length))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // The one tray item a running-app button takes over: the first match in
+    // tray order. The tray hides only this item, so any further items of the
+    // same app stay reachable in the tray.
+    function trayItemForApp(trayItems, appClass) {
+        for (let i = 0; i < trayItems.length; i++) {
+            if (trayItemMatchesApp(trayItems[i], appClass)) {
+                return trayItems[i];
+            }
+        }
+
+        return null;
+    }
+
     function trayIconSources(trayItem) {
         const icon = trayItem && trayItem.icon;
         const sources = [];

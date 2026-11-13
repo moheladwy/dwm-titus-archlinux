@@ -272,7 +272,7 @@ scan_identity() {
 	fi
 
 	emit_check overview info host-os "Operating system" "$os_name" "Kernel $(uname -sr 2>/dev/null || printf unknown)"
-	emit_check overview info host-uptime "Uptime" "$uptime_text" "Host $(hostname 2>/dev/null || printf unknown)"
+	emit_check overview info host-uptime "Uptime" "$uptime_text" "Host $(uname -n 2>/dev/null || printf unknown)"
 }
 
 scan_memory() {
