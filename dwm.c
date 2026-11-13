@@ -209,6 +209,7 @@ enum { RuleFullscreenNone, RuleFullscreenReal, RuleFullscreenWindowed };
 /* core client and layout declarations */
 static int applyrules(Client *c);
 static int applytitlerules(Client *c);
+static void activateclient(Client *c);
 static void applyfullscreenrule(Client *c, int mode);
 static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
 static void arrange(Monitor *m);
@@ -1125,6 +1126,30 @@ cleanupmon(Monitor *mon)
 	free(mon);
 }
 
+/* Focus a client for a pager or panel request: select its monitor, show
+ * one of its tags there if none is visible, then focus and raise it. */
+void
+activateclient(Client *c)
+{
+	unsigned int target;
+	Arg arg;
+
+	if (selmon != c->mon) {
+		unfocus(selmon->sel, 0);
+		selmon = c->mon;
+	}
+	if (!(c->tags & selmon->tagset[selmon->seltags])) {
+		target = c->tags & getmontagmask(selmon->num);
+		if (!target)
+			return;
+		arg.ui = target & (~target + 1U);
+		view(&arg);
+	}
+	focus(c);
+	restack(selmon);
+	updatecurrentdesktop();
+}
+
 void
 clientmessage(XEvent *e)
 {
@@ -1271,7 +1296,13 @@ clientmessage(XEvent *e)
 			restack(c->mon);
 		}
 	} else if (cme->message_type == netatom[NetActiveWindow]) {
-		if (c != selmon->sel && !c->isurgent)
+		/* EWMH source indication 2 is a pager or panel acting on a user
+		 * click (the panel's running-app buttons), so honor it. Requests
+		 * from applications only mark the client urgent, so windows cannot
+		 * steal focus. */
+		if (cme->data.l[0] == 2)
+			activateclient(c);
+		else if (c != selmon->sel && !c->isurgent)
 			seturgent(c, 1);
 	} else if (cme->message_type == netatom[NetWMDesktop]) {
 		/* Handle external desktop/workspace change requests */

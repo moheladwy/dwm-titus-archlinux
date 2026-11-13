@@ -307,7 +307,11 @@ the port.
 
 - Clicking a panel workspace switches to it again, and clicking a running-app
   button focuses its window. Both used `wmctrl`, which the Arch package list
-  does not install; they now use the required `xdotool`.
+  does not install; they now use the required `xdotool`. dwm now honors
+  `_NET_ACTIVE_WINDOW` requests from pagers and panels (EWMH source 2) by
+  focusing the window, switching to its tag if needed; requests from
+  applications still only mark the window urgent, so windows cannot steal
+  focus.
 - System Info and System Health show the host name instead of "unknown". They
   ran `hostname`, which Arch does not install by default (`inetutils`); they
   now use `uname -n`.
