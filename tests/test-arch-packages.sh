@@ -116,7 +116,7 @@ cat >"$work/bin/pacman" <<'EOF'
 #!/bin/sh
 case "$*" in
 '-T power-profiles-daemon') [ "${DWM_TEST_PPD_PROVIDER:-0}" = 1 ] ;;
-'-Q pulseaudio') [ "${DWM_TEST_PULSEAUDIO:-0}" = 1 ] ;;
+'-T pulseaudio') [ "${DWM_TEST_PULSEAUDIO:-0}" = 1 ] ;;
 *) exit 2 ;;
 esac
 EOF
