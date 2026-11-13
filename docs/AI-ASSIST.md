@@ -34,8 +34,8 @@ they are not pinned desktop dependencies.
 Skills live in `${XDG_DATA_HOME:-$HOME/.local/share}/dwm-titus/config/agents/skills/`.
 Desktop installation links them into `~/.agents/skills`, `~/.claude/skills`,
 `~/.cursor/skills`, and `~/.hermes/skills`, but only for agents that are
-already set up (their home folder exists; `~/.agents` or `~/.codex` for the
-first). Choosing an agent with `dwm-agent setup`, launching it, or running
+already set up (their home folder exists; for `~/.agents/skills`, any of
+`~/.agents`, `~/.codex`, `~/.gemini`, or `~/.config/opencode`). Choosing an agent with `dwm-agent setup`, launching it, or running
 `dwm-agent link-skills` links every folder. Existing files, directories, and
 custom symlinks are preserved. Links already targeting the managed desktop or
 system skill trees follow package installation/removal. Run `dwm-agent link-skills` to retry missing links.

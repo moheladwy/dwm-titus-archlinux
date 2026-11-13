@@ -189,12 +189,15 @@ login_agent() {
 	esac
 }
 
-# Whether the agent that reads a skills folder is already set up: its home
-# folder exists. ~/.agents/skills serves Codex as well as the agents that use
-# ~/.agents directly.
+# Whether an agent that reads a skills folder is already set up: its home
+# folder exists. ~/.agents/skills serves Codex, Gemini CLI and OpenCode as
+# well as agents that use ~/.agents directly.
 skills_target_ready() {
 	case $1 in
-	"$skills_target") [[ -d $HOME/.agents || -d $HOME/.codex ]] ;;
+	"$skills_target")
+		[[ -d $HOME/.agents || -d $HOME/.codex || -d $HOME/.gemini ||
+			-d ${XDG_CONFIG_HOME:-$HOME/.config}/opencode ]]
+		;;
 	*) [[ -d ${1%/skills} ]] ;;
 	esac
 }
