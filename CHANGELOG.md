@@ -171,6 +171,10 @@ the port.
 
 ### Changed
 
+- An app with an open window shows one panel icon instead of two. Its tray
+  icon is hidden while the running-app button is shown, and right-clicking
+  that button opens the app's tray menu. The tray icon returns when the last
+  window closes, and apps that only live in the tray are unaffected.
 - The panel menu button shows the Arch Linux logo instead of the Chris Titus
   Tech logo. It uses `/usr/share/pixmaps/archlinux-logo.svg` from Arch's
   `filesystem` package and shows "Arch" if that file is missing.
@@ -298,6 +302,12 @@ the port.
 
 ### Fixed
 
+- Clicking a panel workspace switches to it again, and clicking a running-app
+  button focuses its window. Both used `wmctrl`, which the Arch package list
+  does not install; they now use the required `xdotool`.
+- System Info and System Health show the host name instead of "unknown". They
+  ran `hostname`, which Arch does not install by default (`inetutils`); they
+  now use `uname -n`.
 - Show the correct panel icon for running applications whose window class is
   not an icon name, such as Firefox (`org.mozilla.firefox`). The panel now
   falls back to the matching desktop entry's icon, and unknown applications
