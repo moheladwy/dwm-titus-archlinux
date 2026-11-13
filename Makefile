@@ -429,7 +429,7 @@ install-user-files:
 	done
 	@echo "==> Linking agent skills..."
 	HOME="${USER_HOME}" XDG_DATA_HOME="${XDG_DATA_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
-		scripts/dwm-agent link-skills || echo "  Skipping agent skill links."
+		scripts/dwm-agent link-skills --existing || echo "  Skipping agent skill links."
 	@echo "==> Applying initial theme convergence..."
 	HOME="${USER_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" scripts/theme-apply.sh
 	HOME="${USER_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" XDG_DATA_HOME="${XDG_DATA_HOME}" XDG_STATE_HOME="${XDG_STATE_HOME}" \
