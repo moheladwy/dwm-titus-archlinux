@@ -250,7 +250,7 @@ cleanup() {
 	# A test interrupted while dwm is stopped must resume it first, or the
 	# pending SIGTERM never lands and wait blocks forever.
 	[ -n "${dwm_pid:-}" ] && kill -CONT "$dwm_pid" 2>/dev/null
-	for pid in ${watch_pid:-} ${spy_pid:-} ${dwm_pid:-} ${xvfb_pid:-}; do
+	for pid in ${watch_pid:-} ${spy_pid:-} ${dwm_pid:-} ${xvfb_pid:-} ${placeholder_pid:-}; do
 		kill "$pid" 2>/dev/null
 	done
 	# The watcher's xprop -spy child outlives its parent; sweep everything
@@ -277,18 +277,28 @@ printf '%s\n' \
 	'  { mod="SUPER SHIFT", key="k", desc="Previous keyboard layout", func="cyclelayout", i=-1 },' \
 	']' >"$home/.config/dwm-titus/hotkeys.toml"
 
-# -displayfd lets the server pick a free display number itself.
-exec 3>"$work/displayfd"
-Xvfb -displayfd 3 -noreset -nolisten tcp -screen 0 800x600x24 >"$work/xvfb.log" 2>&1 &
-xvfb_pid=$!
-exec 3>&-
-i=0
-while [ "$i" -lt 100 ] && [ ! -s "$work/displayfd" ]; do
-	i=$((i + 1))
-	sleep 0.05
-done
-[ -s "$work/displayfd" ] || fail "Xvfb did not report a display"
-display=":$(head -n 1 "$work/displayfd")"
+# -displayfd lets the server pick a free display number itself. In a fresh
+# container that is :0, which this test never uses; a second server started
+# while the first holds :0 gets the next display, and the first stays only as
+# a placeholder until cleanup.
+start_xvfb() {
+	exec 3>"$work/displayfd"
+	Xvfb -displayfd 3 -noreset -nolisten tcp -screen 0 800x600x24 >>"$work/xvfb.log" 2>&1 &
+	xvfb_pid=$!
+	exec 3>&-
+	i=0
+	while [ "$i" -lt 100 ] && [ ! -s "$work/displayfd" ]; do
+		i=$((i + 1))
+		sleep 0.05
+	done
+	[ -s "$work/displayfd" ] || fail "Xvfb did not report a display"
+	display=":$(head -n 1 "$work/displayfd")"
+}
+start_xvfb
+if [ "$display" = ":0" ]; then
+	placeholder_pid=$xvfb_pid
+	start_xvfb
+fi
 case $display in
 :0) fail "refusing to run on :0" ;;
 esac
