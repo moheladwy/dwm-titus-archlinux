@@ -15,6 +15,11 @@ ColumnLayout {
     property var selectedKeys: []
     readonly property var history: root.notificationModel.history
     readonly property int selectedCount: root.selectedKeys.length
+    readonly property real scrollY: entryFlick.contentY
+    // Keyboard focus may move to an entry, or a button inside it, that is
+    // scrolled out of view; scroll it back in.
+    readonly property Item focusedItem: root.Window.activeFocusItem
+    onFocusedItemChanged: root.revealFocused()
 
     // Emitted after an entry was opened, so a popup can close itself.
     signal sourceOpened(string key, string result)
@@ -59,6 +64,17 @@ ColumnLayout {
     function clearAll() {
         root.selectedKeys = [];
         root.notificationModel.clearHistory();
+    }
+
+    function revealFocused() {
+        let item = root.focusedItem;
+        while (item && item.parent !== entryColumn) item = item.parent;
+        if (!item) return;
+        const top = item.y;
+        const bottom = item.y + item.height;
+        if (top < entryFlick.contentY) entryFlick.contentY = top;
+        else if (bottom > entryFlick.contentY + entryFlick.height)
+            entryFlick.contentY = Math.min(top, bottom - entryFlick.height);
     }
 
     // Gives keyboard focus to the entry at index (newest first).
@@ -127,6 +143,8 @@ ColumnLayout {
     }
 
     Flickable {
+        id: entryFlick
+
         Layout.fillWidth: true
         Layout.fillHeight: true
         contentWidth: width

@@ -80,6 +80,7 @@ ShellRoot {
         function clearOne(key: string): void { list.clearOne(key); }
         function clearAll(): void { list.clearAll(); }
         function focusEntry(index: int): bool { return list.focusEntry(index); }
+        function scrollY(): real { return list.scrollY; }
         function openPanel(): void { model.openPanel(); }
         function closePanel(): void { model.closePanel(); }
         function capture(path: string): void { list.grabToImage(result => result.saveToFile(path)); }
@@ -258,7 +259,18 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
         key("Delete")
         wait_for(lambda: not any(e["key"] == delete_key for e in state()["history"]),
                  "Delete clears the entry")
-        print("Keyboard: select, open and clear an entry PASS")
+        # Tab past the visible entries scrolls the focused one into view.
+        for index in range(12):
+            notify("Overflow " + str(index))
+            key_of("Overflow " + str(index))
+        assert ipc("focusEntry", "0") == "true"
+        wait_for(lambda: float(ipc("scrollY")) == 0, "list scrolled to the top")
+        for _ in range(len(state()["history"]) - 1):
+            key("Tab")
+        wait_for(lambda: float(ipc("scrollY")) > 0, "Tab scrolls the focused entry into view")
+        assert ipc("focusEntry", "0") == "true"
+        wait_for(lambda: float(ipc("scrollY")) == 0, "focusing the first entry scrolls back up")
+        print("Keyboard: select, open and clear an entry; focus stays in view PASS")
 
         # Optional screenshot of the center list for manual review.
         capture = os.environ.get("DWM_NOTIFICATION_CENTER_CAPTURE")
