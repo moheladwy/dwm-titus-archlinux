@@ -41,6 +41,7 @@ ShellRoot {
     function closePanelWidgets() {
         calendarModel.close();
         weatherModel.close();
+        notificationModel.closePanel();
     }
 
     function selectPanelPopup(panel, popupId) {
@@ -61,6 +62,7 @@ ShellRoot {
         if (popupId !== "network") networkModel.close();
         if (popupId !== "power") powerMenuModel.close("panel");
         if (popupId !== "updatecenter") updateCenterModel.close();
+        if (popupId !== "notifications") notificationModel.closePanel();
         root.selectedPanelWindow = panel;
     }
 
@@ -74,6 +76,9 @@ ShellRoot {
         } else if (popupId === "weather") {
             if (!samePanel) weatherModel.close();
             weatherModel.toggle();
+        } else if (popupId === "notifications") {
+            if (!samePanel) notificationModel.closePanel();
+            notificationModel.togglePanel();
         }
         else if (popupId === "updatecenter") {
             root.updateCenterAnchorX = panel.updateCenterAnchorX();
@@ -85,6 +90,7 @@ ShellRoot {
     function openCommandMenu(screen) {
         calendarModel.close();
         weatherModel.close();
+        notificationModel.closePanel();
         networkModel.close();
         bluetoothModel.close();
         controlCenterModel.close();
@@ -371,6 +377,7 @@ ShellRoot {
 
     NotificationModel {
         id: notificationModel
+        desktopState: dwmState
         onHistoryVisibleChanged: if (historyVisible) { root.closePanelWidgets(); updateCenterModel.close(); clipboardModel.close(); }
     }
 
@@ -636,6 +643,15 @@ ShellRoot {
 
         function toggleHistory(): void {
             notificationModel.toggleHistory();
+        }
+
+        // Opens or closes the notification center under the panel bell.
+        function toggleCenter(): void {
+            root.requestPanelPopup(root.activePanelWindow, "notifications");
+        }
+
+        function unreadCount(): int {
+            return notificationModel.unreadCount;
         }
     }
 
@@ -1323,6 +1339,7 @@ ShellRoot {
             powerModel: powerModel
             powerMenuModel: powerMenuModel
             updateCenterModel: updateCenterModel
+            notificationModel: notificationModel
             primaryPanel: modelData === Quickshell.screens[0]
             onPopupRequested: (panel, popupId) => root.requestPanelPopup(panel, popupId)
             onSettingsSectionRequested: (panel, section) => root.runCommandMenuAction("settings", "select", section, panel.screen)
@@ -1344,6 +1361,11 @@ ShellRoot {
 
     NotificationHistoryWindow {
         notificationModel: notificationModel
+    }
+
+    NotificationCenterPopup {
+        notificationModel: notificationModel
+        panelWindow: root.activePanelWindow
     }
 
     ControlsWindow {

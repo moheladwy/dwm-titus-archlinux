@@ -14,6 +14,14 @@ Scope {
     // out of history because history is saved as JSON.
     property var actionable: ({})
     property bool historyVisible: false
+    // The notification center dropped down from the panel bell.
+    property bool panelVisible: false
+    // Desktop state (running windows and focus), used to bring a
+    // notification's app forward when its own action is no longer available.
+    property var desktopState: null
+    // Entries newer than this were not yet seen in the notification center.
+    property real seenAt: 0
+    readonly property int unreadCount: root.history.filter(entry => (entry.timestamp || 0) > root.seenAt).length
     property int sequence: 0
     readonly property string sessionKey: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
     property bool doNotDisturb: false
@@ -168,6 +176,9 @@ Scope {
             "body": notification.body || "",
             "urgency": notification.urgency,
             "urgencyName": root.urgencyName(notification.urgency),
+            "desktopEntry": notification.desktopEntry || "",
+            "appIcon": notification.appIcon || "",
+            "transient": notification.transient === true,
             "actions": actions,
             "hasDefaultAction": actions.some(action => action.identifier === "default"),
             // A critical notification that asks for a decision stays up until
@@ -204,8 +215,9 @@ Scope {
             if (updated.actions.length > 0) root.rememberActionable(key, notification);
             else root.forgetActionable(key);
             root.addHistory(updated);
-            if ((root.popupSuppressed && updated.urgencyName !== "critical")
-                    || (!visible && !root.keepsOpen(updated))) notification.expire();
+            if (!root.keepsOpen(updated)
+                    && ((root.popupSuppressed && updated.urgencyName !== "critical") || !visible))
+                notification.expire();
         };
         // Quickshell may emit label signals while it is still replacing the
         // list. Refresh once after the whole update, not from partial state.
@@ -227,7 +239,13 @@ Scope {
         root.addHistory(item);
 
         if (root.popupSuppressed && item.urgencyName !== "critical") {
-            notification.expire();
+            if (!root.keepsOpen(item)) {
+                // Closing it while it is still being delivered emits no
+                // closed signal, so forget it here.
+                closed = true;
+                root.forgetActionable(item.key);
+                notification.expire();
+            }
             return;
         }
 
@@ -241,10 +259,13 @@ Scope {
         }
     }
 
-    // A critical notification that asks for a decision stays open until it is
-    // answered or dismissed, even when its popup is pushed off screen.
+    // A notification with actions stays open after its popup goes away, so the
+    // notification center can still run them (clicking an entry runs its
+    // default action, which takes you to the chat, tab or file it is about).
+    // It closes when it is answered, cleared, or pushed out of the history.
+    // Transient notifications ask not to be kept, so they close with their popup.
     function keepsOpen(item) {
-        return item.urgencyName === "critical" && (item.actions || []).length > 0;
+        return item.transient !== true && (item.actions || []).length > 0;
     }
 
     function rememberActionable(key, notification) {
@@ -307,6 +328,8 @@ Scope {
             "body": item.body,
             "urgency": item.urgency,
             "urgencyName": item.urgencyName,
+            "desktopEntry": item.desktopEntry || "",
+            "appIcon": item.appIcon || "",
             "timestamp": Date.now()
         };
 
@@ -332,16 +355,119 @@ Scope {
         root.saveHistory();
     }
 
+    // Clears the given history entries. A notification that is still open is
+    // dismissed too, so its app knows it was cleared.
+    function removeHistory(keys) {
+        const removed = (keys || []).filter(key => root.history.some(entry => entry.key === key));
+        if (removed.length === 0) return;
+        for (const key of removed) {
+            const popup = root.notifications.find(item => item.key === key);
+            const notification = root.actionable[key];
+            if (popup) root.closeItem(popup, false);
+            else if (notification) notification.dismiss();
+            root.forgetActionable(key);
+        }
+        root.history = root.history.filter(entry => removed.indexOf(entry.key) < 0);
+        root.saveHistory();
+    }
+
+    function markSeen() {
+        const newest = root.history.reduce((latest, entry) => Math.max(latest, entry.timestamp || 0), 0);
+        if (newest <= root.seenAt) return;
+        root.seenAt = newest;
+        root.saveHistory();
+    }
+
     function closeHistory() {
         root.historyVisible = false;
     }
 
     function openHistory() {
         root.historyVisible = true;
+        root.markSeen();
     }
 
     function toggleHistory() {
-        root.historyVisible = !root.historyVisible;
+        if (root.historyVisible) root.closeHistory();
+        else root.openHistory();
+    }
+
+    function closePanel() {
+        root.panelVisible = false;
+    }
+
+    function openPanel() {
+        root.panelVisible = true;
+        root.markSeen();
+    }
+
+    function togglePanel() {
+        if (root.panelVisible) root.closePanel();
+        else root.openPanel();
+    }
+
+    // Lower-case names a window class of the notification's app could have:
+    // its desktop entry id (and that id's last reverse-DNS part), the entry's
+    // StartupWMClass, and its app name.
+    function sourceNames(entry) {
+        const names = [];
+        function addName(value) {
+            const name = (value || "").toString().trim().toLowerCase();
+            if (name.length === 0) return;
+            for (const candidate of [name, name.replace(/\s+/g, "-"), name.split(".").pop()])
+                if (candidate.length > 0 && names.indexOf(candidate) < 0) names.push(candidate);
+        }
+        addName(entry.desktopEntry);
+        addName(entry.appName);
+        const app = root.sourceApp(entry);
+        if (app) {
+            addName(app.id);
+            addName(app.startupClass);
+        }
+        return names;
+    }
+
+    function sourceApp(entry) {
+        const desktopEntry = (entry.desktopEntry || "").toString();
+        const byId = desktopEntry.length > 0 ? DesktopEntries.byId(desktopEntry) : null;
+        if (byId) return byId;
+        const name = (entry.appName || "").toString();
+        return name.length > 0 ? DesktopEntries.heuristicLookup(name) : null;
+    }
+
+    // The first open window of the notification's app, or "".
+    function sourceWindow(entry) {
+        const apps = root.desktopState ? (root.desktopState.runningApps || []) : [];
+        const names = root.sourceNames(entry);
+        const match = apps.find(app => {
+            const appClass = (app.appClass || "").toLowerCase();
+            return names.indexOf(appClass) >= 0 || names.indexOf(appClass.split(".").pop()) >= 0;
+        });
+        return match ? match.windowId : "";
+    }
+
+    // Takes the user to what a notification is about. A notification that is
+    // still open runs its default action, which lets the app show the exact
+    // chat, tab or file. The app's window is then brought forward (dwm only
+    // marks an app's own focus request as urgent). When the window is closed,
+    // the app is started instead. Returns what it did.
+    function openSource(key) {
+        const entry = root.history.find(item => item.key === key);
+        if (!entry) return "missing";
+        const ranAction = root.actionsFor(key).some(action => action.identifier === "default")
+            && root.invokeAction(key, "default");
+        const windowId = root.sourceWindow(entry);
+        if (windowId.length > 0 && root.desktopState) {
+            root.desktopState.focusWindow(windowId);
+            return ranAction ? "action" : "window";
+        }
+        if (ranAction) return "action";
+        const app = root.sourceApp(entry);
+        if (app && !app.noDisplay) {
+            app.execute();
+            return "launch";
+        }
+        return "none";
     }
 
     function historyLatestSummary() {
@@ -350,10 +476,12 @@ Scope {
 
     function loadHistory() {
         root.history = (historyFile.notifications || []).slice(0, root.maxHistory);
+        root.seenAt = Number(historyFile.seenAt) || 0;
     }
 
     function saveHistory() {
         historyFile.notifications = root.history;
+        historyFile.seenAt = root.seenAt;
         historyFile.writeAdapter();
     }
 
@@ -449,6 +577,7 @@ Scope {
         id: historyFile
 
         property alias notifications: historyAdapter.notifications
+        property alias seenAt: historyAdapter.seenAt
 
         path: root.historyPath
         printErrors: false
@@ -464,6 +593,7 @@ Scope {
             id: historyAdapter
 
             property var notifications: []
+            property real seenAt: 0
         }
     }
 

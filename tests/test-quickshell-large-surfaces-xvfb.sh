@@ -412,6 +412,19 @@ if DISPLAY=$display xdotool search --onlyvisible --name '^dwm notification histo
 	printf 'Notification history did not close on Escape\n' >&2
 	exit 1
 fi
+# The panel bell's notification center marks every saved entry as seen.
+ipc notifications toggleCenter >/dev/null
+i=0
+while [ "$i" -lt 100 ]; do
+	[ "$(ipc notifications unreadCount)" = 0 ] && break
+	i=$((i + 1))
+	sleep 0.05
+done
+if [ "$(ipc notifications unreadCount)" != 0 ]; then
+	printf 'Opening the notification center left unread entries\n' >&2
+	exit 1
+fi
+ipc notifications toggleCenter >/dev/null
 ipc notifications setDoNotDisturb true >/dev/null
 i=0
 while [ "$i" -lt 100 ]; do
