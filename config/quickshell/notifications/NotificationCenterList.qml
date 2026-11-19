@@ -66,9 +66,20 @@ ColumnLayout {
         root.notificationModel.clearHistory();
     }
 
-    function revealFocused() {
+    // The entry holding keyboard focus, itself or through a button inside it.
+    function focusedEntry() {
         let item = root.focusedItem;
         while (item && item.parent !== entryColumn) item = item.parent;
+        return item;
+    }
+
+    function focusedKey() {
+        const item = root.focusedEntry();
+        return item && item.key !== undefined ? item.key : "";
+    }
+
+    function revealFocused() {
+        const item = root.focusedEntry();
         if (!item) return;
         const top = item.y;
         const bottom = item.y + item.height;
@@ -170,8 +181,11 @@ ColumnLayout {
                     readonly property string key: entry.modelData.key
                     readonly property bool critical: entry.modelData.urgencyName === "critical"
                     readonly property bool selected: root.isSelected(entry.key)
-                    readonly property var liveActions: root.notificationModel.actionable[entry.key]
-                        ? root.notificationModel.actionsFor(entry.key) : []
+                    // Read both so the buttons follow the notification closing
+                    // and the history changing.
+                    readonly property var entryActions: root.notificationModel.actionable
+                        && root.notificationModel.history
+                        ? root.notificationModel.entryActions(entry.key) : []
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: entryContent.implicitHeight + Theme.spacingLg * 2
@@ -308,12 +322,13 @@ ColumnLayout {
 
                             // Clicking the entry already runs the default
                             // action; the other actions get buttons while the
-                            // notification is still open.
+                            // notification is still open. Saved dwm-titus
+                            // alerts keep Diagnose with AI and Ignore.
                             NotificationActions {
                                 Layout.topMargin: Theme.tightSpacing
-                                actions: entry.liveActions
+                                actions: entry.entryActions
                                 critical: entry.critical
-                                onInvoked: identifier => root.notificationModel.invokeAction(entry.key, identifier)
+                                onInvoked: identifier => root.notificationModel.runEntryAction(entry.key, identifier)
                             }
                         }
 

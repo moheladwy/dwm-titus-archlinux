@@ -40,17 +40,31 @@ command -v notify-send >/dev/null 2>&1 || exit 0
 
 declare -A last_notified
 
+# One argument for the x-dwm-titus-diagnose hint: tabs and line breaks are
+# the field separators there, so they cannot appear inside a field.
+hint_field() {
+	local value=${1//[$'\t\r\n']/ }
+	printf '%s' "${value:0:256}"
+}
+
 # notify-send waits for the click, so each announcement runs on its own.
 announce() {
-	local name=$1 pid=$2 exe=$3 signal=$4 timestamp=$5 boot=$6 action label
+	local name=$1 pid=$2 exe=$3 signal=$4 timestamp=$5 boot=$6 action label diagnose field
 
 	if [[ -n $(dwm-agent default 2>/dev/null) ]]; then
 		label="Diagnose with AI"
 	else
 		label="Set up AI diagnosis"
 	fi
+	# The panel saves this with the notification, so Diagnose with AI still
+	# works from the notification history after the notification has closed.
+	diagnose=crash
+	for field in "$pid" "$name" "$exe" "$signal" "$timestamp" "$boot"; do
+		diagnose+=$'\t'$(hint_field "$field")
+	done
 	(
 		action=$(notify-send --app-name=dwm-titus --urgency=critical \
+			--hint="string:x-dwm-titus-diagnose:$diagnose" \
 			--action=diagnose="$label" --action=ignore=Ignore \
 			"Process crashed: $name" "Signal $signal. Click to diagnose with AI." 2>/dev/null) || exit 0
 		[[ $action == diagnose ]] || exit 0

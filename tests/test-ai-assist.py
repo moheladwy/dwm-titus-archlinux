@@ -222,9 +222,14 @@ class AgentTests(unittest.TestCase):
         self.env["JOURNAL"] = str(journal)
         self.fake("journalctl", '#!/bin/sh\ncat "$JOURNAL"\n')
         self.fake("dwm-agent", "#!/bin/sh\necho codex\n")
-        self.fake("notify-send", '#!/bin/sh\necho notified >> "$ARGS"\necho ignore\n')
+        self.fake("notify-send", '#!/bin/sh\necho notified >> "$ARGS"\nprintf "%s\\n" "$@" > "$ARGS.argv"\necho ignore\n')
         self.run_helper("dwm-crash-watch", "--journal")
         self.assertEqual((self.work / "args").read_text().splitlines(), ["notified"])
+        # The alert carries the diagnosis request, so the panel can offer it
+        # from the history after the alert closes.
+        self.assertIn("--hint=string:x-dwm-titus-diagnose:"
+                      + "\t".join(["crash", "123", "fixture", "/bin/fixture", "SIGSEGV", "-", "-"]),
+                      (self.work / "args.argv").read_text().splitlines())
         self.run_helper("dwm-agent", "set", "crash-notifications", "off")
         self.run_helper("dwm-crash-watch", "--journal")
         self.assertEqual((self.work / "args").read_text().splitlines(), ["notified"])

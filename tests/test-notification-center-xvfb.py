@@ -80,7 +80,10 @@ ShellRoot {
         function clearOne(key: string): void { list.clearOne(key); }
         function clearAll(): void { list.clearAll(); }
         function focusEntry(index: int): bool { return list.focusEntry(index); }
+        function actions(key: string): string { return JSON.stringify(model.entryActions(key)); }
+        function run(key: string, identifier: string): bool { return model.runEntryAction(key, identifier); }
         function scrollY(): real { return list.scrollY; }
+        function focusedKey(): string { return list.focusedKey(); }
         function openPanel(): void { model.openPanel(); }
         function closePanel(): void { model.closePanel(); }
         function capture(path: string): void { list.grabToImage(result => result.saveToFile(path)); }
@@ -99,6 +102,13 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
            "XDG_STATE_HOME": str(work / "state"), "XDG_RUNTIME_DIR": str(work / "r"),
            "QT_QPA_PLATFORMTHEME": "", "QT_QUICK_BACKEND": "software"}
     Path(env["XDG_RUNTIME_DIR"]).mkdir(mode=0o700)
+    # Records what Diagnose with AI runs from a saved alert.
+    stubs = work / "bin"
+    stubs.mkdir()
+    diagnosed = work / "diagnosed"
+    (stubs / "dwm-agent-diagnose").write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "' + str(diagnosed) + '"\n')
+    (stubs / "dwm-agent-diagnose").chmod(0o755)
+    env["PATH"] = str(stubs) + ":" + env["PATH"]
     history_path = Path(env["XDG_CACHE_HOME"]) / "dwm-titus/notification-history.json"
     processes = []
     read_fd, write_fd = os.pipe()
@@ -212,6 +222,20 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
         wait_for(lambda: drop_b not in history_path.read_text(), "cleared entries saved")
         print("Clearing one entry and a selection of entries PASS")
 
+        # dwm-titus alerts save their Diagnose with AI request; a look-alike
+        # from another app does not.
+        crash_args = ["crash", "123", "fixture", "/bin/fixture", "SIGSEGV", "1700000000", "boot"]
+
+        def crash_alert(summary, app="dwm-titus"):
+            return notify("--app-name=" + app, "--urgency=critical",
+                          "--hint=string:x-dwm-titus-diagnose:" + "\t".join(crash_args),
+                          "--action=diagnose=Diagnose with AI", "--action=ignore=Ignore", summary)
+
+        crash_alert("Saved crash")
+        crash_alert("Fake crash", app="Elsewhere")
+        key_of("Saved crash")
+        key_of("Fake crash")
+
         # Unread entries: opening the center marks everything seen, and that
         # survives a restart together with the history.
         assert state()["unread"] == len(state()["history"]) > 0
@@ -233,21 +257,79 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
         assert ipc("open", saved) == "window"
         print("Unread count and history persist across a restart PASS")
 
+        # After the restart the alerts are closed. The saved dwm-titus one
+        # still offers Diagnose with AI and Ignore; Diagnose keeps the entry.
+        saved_crash = key_of("Saved crash")
+        assert json.loads(ipc("actions", saved_crash)) == [
+            {"identifier": "diagnose", "text": "Diagnose with AI"},
+            {"identifier": "ignore", "text": "Ignore"}]
+        assert json.loads(ipc("actions", key_of("Fake crash"))) == []
+        assert ipc("run", saved_crash, "diagnose") == "true"
+        wait_for(lambda: diagnosed.exists() and diagnosed.read_text().splitlines() == crash_args,
+                 "saved alert runs dwm-agent-diagnose with its arguments")
+        assert any(e["key"] == saved_crash for e in state()["history"])
+        assert ipc("run", saved_crash, "ignore") == "true"
+        assert not any(e["key"] == saved_crash for e in state()["history"]), "Ignore kept the entry"
+
+        # While an alert is open its own buttons run: Ignore removes the
+        # entry, any other answer keeps it.
+        live_diagnose = crash_alert("Live diagnose")
+        live_key = key_of("Live diagnose")
+        wait_for(lambda: live_key in state()["live"], "live alert")
+        assert ipc("run", live_key, "diagnose") == "true"
+        assert live_diagnose.communicate(timeout=5)[0].strip() == "diagnose"
+        assert any(e["key"] == live_key for e in state()["history"]), "Diagnose removed the entry"
+        live_ignore = crash_alert("Live ignore")
+        ignore_key = key_of("Live ignore")
+        wait_for(lambda: ignore_key in state()["live"], "live alert to ignore")
+        assert ipc("run", ignore_key, "ignore") == "true"
+        assert live_ignore.communicate(timeout=5)[0].strip() == "ignore"
+        wait_for(lambda: not any(e["key"] == ignore_key for e in state()["history"]),
+                 "Ignore removes the entry")
+        # A resident notification stays open after an action; Ignore must
+        # close it, or the app replacing it would bring the entry back.
+        def gdbus_notify(replaces, summary, actions, hints):
+            result = subprocess.run(["gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
+                "--object-path", "/org/freedesktop/Notifications", "--method",
+                "org.freedesktop.Notifications.Notify", "dwm-titus", str(replaces), "", summary, "",
+                json.dumps(actions), hints, "0"], env=env, text=True, capture_output=True,
+                check=True, timeout=5)
+            return int(result.stdout.split("uint32 ")[1].split(",")[0])
+
+        resident_id = gdbus_notify(0, "Resident alert", ["ignore", "Ignore"],
+                                   "{'resident': <true>, 'urgency': <byte 2>}")
+        resident_key = key_of("Resident alert")
+        wait_for(lambda: resident_key in state()["live"], "resident alert open")
+        assert ipc("run", resident_key, "ignore") == "true"
+        wait_for(lambda: not any(e["key"] == resident_key for e in state()["history"]),
+                 "Ignore removes the resident entry")
+        assert gdbus_notify(resident_id, "Resident replaced", [], "{}") >= 0
+        key_of("Resident replaced")
+        assert not any(e["key"] == resident_key for e in state()["history"]), \
+            "A replacement brought the ignored entry back"
+        print("Alerts: Diagnose with AI and Ignore, open, saved and resident PASS")
+
         # Keyboard: Space selects the focused entry, Delete clears it, and
         # Enter opens it.
         window = subprocess.run(["xdotool", "search", "--name", "^notification center list test$"],
                                 env=env, capture_output=True, text=True, check=True,
                                 timeout=5).stdout.split()[0]
-        subprocess.run(["xdotool", "windowfocus", "--sync", window], env=env, check=True, timeout=5)
+        def focus_entry(index, expected):
+            # Keys go to the window with X focus; wait until the entry has
+            # Qt focus before typing, or the key can arrive first.
+            subprocess.run(["xdotool", "windowfocus", "--sync", window], env=env, check=True, timeout=5)
+            assert ipc("focusEntry", str(index)) == "true"
+            wait_for(lambda: ipc("focusedKey") == expected, "entry " + str(index) + " has keyboard focus")
 
         def key(name):
             subprocess.run(["xdotool", "key", "--window", window, name], env=env, check=True, timeout=5)
 
+        # One at a time, so "Keyboard open" is the newest entry (index 0).
         notify("--app-name=Fixture App", "Keyboard delete")
+        delete_key = key_of("Keyboard delete")
         notify("--app-name=Fixture App", "Keyboard open")
         open_key = key_of("Keyboard open")
-        delete_key = key_of("Keyboard delete")
-        assert ipc("focusEntry", "0") == "true"
+        focus_entry(0, open_key)
         key("space")
         wait_for(lambda: state()["selected"] == [open_key], "Space selects the entry")
         key("space")
@@ -255,7 +337,7 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
         focused_before = len(state()["focused"])
         key("Return")
         wait_for(lambda: len(state()["focused"]) == focused_before + 1, "Enter opens the entry")
-        assert ipc("focusEntry", "1") == "true"
+        focus_entry(1, delete_key)
         key("Delete")
         wait_for(lambda: not any(e["key"] == delete_key for e in state()["history"]),
                  "Delete clears the entry")
@@ -263,7 +345,7 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
         for index in range(12):
             notify("Overflow " + str(index))
             key_of("Overflow " + str(index))
-        assert ipc("focusEntry", "0") == "true"
+        focus_entry(0, state()["history"][0]["key"])
         wait_for(lambda: float(ipc("scrollY")) == 0, "list scrolled to the top")
         for _ in range(len(state()["history"]) - 1):
             key("Tab")
