@@ -44,6 +44,7 @@ PanelWindow {
     required property var panelSettingsModel
     required property var powerModel
     required property var powerMenuModel
+    required property var notificationModel
     required property bool primaryPanel
 
     implicitHeight: Theme.panelHeight
@@ -282,6 +283,52 @@ PanelWindow {
                     }
 
                     PanelPill {
+                        id: notificationPill
+                        objectName: "notificationIndicator"
+                        Layout.preferredWidth: notificationRow.implicitWidth + Theme.compactWidgetHorizontalPadding * 2
+                        Layout.preferredHeight: Theme.compactWidgetSize
+                        active: root.notificationModel.panelVisible
+                        hovered: notificationMouse.containsMouse
+
+                        RowLayout {
+                            id: notificationRow
+                            anchors.centerIn: parent
+                            spacing: Theme.compactSpacing
+
+                            IconText {
+                                text: root.notificationModel.doNotDisturb ? "󰂛"
+                                    : root.notificationModel.unreadCount > 0 ? "󰂚" : "󰂜"
+                                color: root.notificationModel.unreadCount > 0 && !root.notificationModel.doNotDisturb
+                                    ? Theme.accent : Theme.textStrong
+                                font.pixelSize: Theme.scaledFontSize(14 * 1.1, 8)
+                            }
+
+                            UiText {
+                                objectName: "notificationUnreadCount"
+                                visible: root.notificationModel.unreadCount > 0
+                                text: root.notificationModel.unreadCount > 99 ? "99+"
+                                    : root.notificationModel.unreadCount.toString()
+                                color: Theme.textStrong
+                                font.pixelSize: Theme.panelFontSize
+                            }
+                        }
+
+                        MouseArea {
+                            id: notificationMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: function(mouse) {
+                                if (mouse.button === Qt.RightButton)
+                                    root.notificationModel.setDoNotDisturb(!root.notificationModel.doNotDisturb);
+                                else
+                                    root.popupRequested(root, "notifications");
+                            }
+                        }
+                    }
+
+                    PanelPill {
                         id: keyboardPill
                         visible: root.panelSettingsModel.widgetEnabled("keyboard-layout")
                             && root.state.keyboardGroupCount > 1
@@ -503,6 +550,18 @@ PanelWindow {
         anchorWindow: root
         anchorItem: batteryPill
         label: root.powerModel.batteryPercent.toString() + "% - " + root.powerModel.batteryStatus
+        anchorY: Theme.panelHeight
+        rightAligned: true
+    }
+
+    PanelTooltip {
+        visible: notificationMouse.containsMouse
+        anchorWindow: root
+        anchorItem: notificationMouse
+        label: (root.notificationModel.unreadCount > 0
+            ? root.notificationModel.unreadCount + " new" : "Notifications")
+            + (root.notificationModel.doNotDisturb ? " (do not disturb)" : "")
+            + " - click: open, right-click: do not disturb"
         anchorY: Theme.panelHeight
         rightAligned: true
     }
