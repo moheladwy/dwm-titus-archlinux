@@ -83,7 +83,10 @@ Notifications with actions stay available until answered or dismissed,
 including in the notification center (the panel bell) while the notification
 remains open; clicking an entry there runs its default action. Notifications
 marked transient close with their popup. Saved history after a
-shell restart has no executable actions. Replacing a notification refreshes its
+shell restart has no executable actions, except crash and hang alerts: they
+carry their diagnosis request in an `x-dwm-titus-diagnose` hint, so the
+center keeps Diagnose with AI and Ignore on them. Ignore removes an entry from
+the history; Diagnose with AI and the other buttons keep it. Replacing a notification refreshes its
 buttons, urgency, timeout, and history entry. The desktop follows label-change
 signals when Quickshell provides them.
 

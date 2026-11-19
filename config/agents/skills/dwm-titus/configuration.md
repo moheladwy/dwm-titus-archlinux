@@ -223,7 +223,8 @@ These are easiest in Settings (`dwm-settings open`) or the Control Center
   bell also toggles Do Not Disturb.
 - Notification center: click the panel bell. Clicking an entry opens its app
   (and the exact chat or tab while the notification is still open); entries
-  can be cleared one by one, by selection, or all at once. The history (50
+  can be cleared one by one, by selection, or all at once. Crash and hang
+  alerts keep Diagnose with AI and Ignore there; Ignore removes the entry. The history (50
   entries) is `~/.cache/dwm-titus/notification-history.json`. Bind it to a key
   with `quickshell ipc --path ~/.config/quickshell/shell.qml call
   notifications toggleCenter`.

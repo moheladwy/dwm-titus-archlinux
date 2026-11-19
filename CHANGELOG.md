@@ -14,6 +14,10 @@ the port.
 
 ### Added
 
+- Crash and hang alerts keep their Diagnose with AI and Ignore buttons in the
+  notification center after the alert closes, including after a panel restart
+  or reboot. Ignore, in a popup or in the center, removes the entry from the
+  history; every other button keeps it.
 - Add a notification bell to the panel, beside the system tray. It shows how
   many notifications arrived since you last looked, and clicking it opens a
   notification center with your saved history (kept across restarts until you
