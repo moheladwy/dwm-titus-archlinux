@@ -286,7 +286,28 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
         assert live_ignore.communicate(timeout=5)[0].strip() == "ignore"
         wait_for(lambda: not any(e["key"] == ignore_key for e in state()["history"]),
                  "Ignore removes the entry")
-        print("Alerts: Diagnose with AI and Ignore, open and saved PASS")
+        # A resident notification stays open after an action; Ignore must
+        # close it, or the app replacing it would bring the entry back.
+        def gdbus_notify(replaces, summary, actions, hints):
+            result = subprocess.run(["gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
+                "--object-path", "/org/freedesktop/Notifications", "--method",
+                "org.freedesktop.Notifications.Notify", "dwm-titus", str(replaces), "", summary, "",
+                json.dumps(actions), hints, "0"], env=env, text=True, capture_output=True,
+                check=True, timeout=5)
+            return int(result.stdout.split("uint32 ")[1].split(",")[0])
+
+        resident_id = gdbus_notify(0, "Resident alert", ["ignore", "Ignore"],
+                                   "{'resident': <true>, 'urgency': <byte 2>}")
+        resident_key = key_of("Resident alert")
+        wait_for(lambda: resident_key in state()["live"], "resident alert open")
+        assert ipc("run", resident_key, "ignore") == "true"
+        wait_for(lambda: not any(e["key"] == resident_key for e in state()["history"]),
+                 "Ignore removes the resident entry")
+        assert gdbus_notify(resident_id, "Resident replaced", [], "{}") >= 0
+        key_of("Resident replaced")
+        assert not any(e["key"] == resident_key for e in state()["history"]), \
+            "A replacement brought the ignored entry back"
+        print("Alerts: Diagnose with AI and Ignore, open, saved and resident PASS")
 
         # Keyboard: Space selects the focused entry, Delete clears it, and
         # Enter opens it.

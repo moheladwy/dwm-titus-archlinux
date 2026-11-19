@@ -308,8 +308,13 @@ Scope {
         // notification, which forgets it through the closed handler.
         action.invoke();
         // Ignore means the user is done with it; any other answer keeps the
-        // entry in the history.
-        if (identifier === "ignore") root.dropHistory(key);
+        // entry in the history. A resident notification stays open after an
+        // action, so close it too, or it would linger with no entry to clear.
+        if (identifier === "ignore") {
+            const stillOpen = root.actionable[key];
+            if (stillOpen) stillOpen.dismiss();
+            root.dropHistory(key);
+        }
         return true;
     }
 
