@@ -626,6 +626,9 @@ check-ai-assist:
 check-notification-actions-xvfb: all
 	$(call run_managed_test,python3 tests/test-notification-actions-xvfb.py)
 
+check-notification-center-xvfb:
+	$(call run_managed_test,python3 tests/test-notification-center-xvfb.py)
+
 check-ai-assist-xvfb: all
 	$(call run_managed_test,python3 tests/test-ai-assist-xvfb.py)
 
@@ -943,6 +946,7 @@ check: check-picom check-picom-xvfb
 	$(MAKE) check-ai-assist
 	$(MAKE) check-ai-assist-xvfb
 	$(MAKE) check-notification-actions-xvfb
+	$(MAKE) check-notification-center-xvfb
 	$(MAKE) check-quickshell-appearance-model
 	$(MAKE) check-quickshell-settings-xvfb
 	$(MAKE) check-quickshell-settings-responsiveness-xvfb
@@ -1007,7 +1011,7 @@ check: check-picom check-picom-xvfb
 .PHONY: check-clipboard
 .PHONY: check-clipboard-observer
 
-.PHONY: check-ai-assist check-ai-assist-xvfb check-notification-actions-xvfb
+.PHONY: check-ai-assist check-ai-assist-xvfb check-notification-actions-xvfb check-notification-center-xvfb
 
 .PHONY: check-calendar-weather
 .PHONY: check-titlebars
