@@ -14,6 +14,11 @@ the port.
 
 ### Added
 
+- Bar Widgets (Control Center) and Settings > Appearance > Panel widgets have a
+  Notifications switch that shows or hides the notification bell. It is on by
+  default; turning it off also closes the notification center if it is open.
+  Notifications still arrive and are saved to the history while the bell is
+  hidden, and `notifications toggleCenter` still opens the center.
 - Crash and hang alerts keep their Diagnose with AI and Ignore buttons in the
   notification center after the alert closes, including after a panel restart
   or reboot. Ignore, in a popup or in the center, removes the entry from the
