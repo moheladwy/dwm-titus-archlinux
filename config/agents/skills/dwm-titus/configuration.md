@@ -179,7 +179,8 @@ the wrong backlight; replace them with the `dwm-brightness` commands.
 
 ```sh
 dwm-panel-settings status
-dwm-panel-settings set bluetooth disabled   # workspaces|volume|bluetooth|network|power
+dwm-panel-settings set bluetooth disabled   # workspaces|volume|bluetooth|network|power|
+                                            # keyboard-layout|notifications|calendar|weather
 dwm-panel-settings reset
 ```
 

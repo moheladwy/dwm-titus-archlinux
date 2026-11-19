@@ -293,6 +293,7 @@ ShellRoot {
         onValuesChanged: {
             if (!widgetEnabled("calendar")) calendarModel.close();
             if (!widgetEnabled("weather")) weatherModel.close();
+            if (!widgetEnabled("notifications")) notificationModel.closePanel();
         }
     }
 
@@ -652,6 +653,10 @@ ShellRoot {
 
         function unreadCount(): int {
             return notificationModel.unreadCount;
+        }
+
+        function centerOpen(): bool {
+            return notificationModel.panelVisible;
         }
     }
 

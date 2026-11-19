@@ -7,13 +7,15 @@
 - One root `PanelSettingsModel` is instantiated in `shell.qml`. Every `DwmPanel`,
   Control Center, and Settings Appearance consumes that same model, so a change
   is immediately consistent across monitors without duplicate providers.
-- The six persisted choices are Workspaces, Volume, Bluetooth, Network, Power,
-  and Keyboard layout. Files from before Keyboard layout list exactly the other
+- The persisted choices are Workspaces, Volume, Bluetooth, Network, Power,
+  Keyboard layout, Notifications, Calendar, and Weather. Files from before Keyboard layout list exactly the other
   five; it then defaults to enabled. Any other count, a missing legacy widget
   or a duplicate is malformed. The helper only writes the `keyboard-layout`
   line while it is disabled, so a file with the default still loads in an
   older helper; an older helper reading a file with it disabled falls back to
-  all-on defaults. Active-window title, status segments, clock, and tray remain outside
+  all-on defaults. `notifications` (the bell beside the tray) follows the
+  same rule: it defaults to enabled and is written only while disabled.
+  Active-window title, status segments, clock, and tray remain outside
   this setting and retain their existing behavior.
 - Protocol 1.1 adds one `option` line, `clock-seconds` (default disabled), after
   the widget lines. 1.0 files are still read with their widget choices. While

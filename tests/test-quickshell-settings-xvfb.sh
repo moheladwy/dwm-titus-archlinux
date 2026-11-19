@@ -2092,6 +2092,37 @@ for keyboard_value in false true; do
 	fi
 done
 
+# Turning the notification bell off closes its open center, and on again
+# writes nothing (the default is not persisted).
+notification_ipc_retry toggleCenter >/dev/null
+i=0
+while [ "$i" -lt 100 ]; do
+	[ "$(notification_ipc_retry centerOpen)" = true ] && break
+	i=$((i + 1))
+	sleep 0.05
+done
+[ "$(notification_ipc_retry centerOpen)" = true ]
+for bell_value in false true; do
+	i=0
+	while [ "$i" -lt 100 ]; do
+		settings_ipc_retry panelWidgetSet notifications "$bell_value" >/dev/null || true
+		[ "$(settings_ipc_retry panelWidgetEnabled notifications)" = "$bell_value" ] && break
+		i=$((i + 1))
+		sleep 0.05
+	done
+	[ "$(settings_ipc_retry panelWidgetEnabled notifications)" = "$bell_value" ]
+	if [ "$bell_value" = false ]; then
+		grep -Fqx "$(printf 'notifications\tdisabled')" "$config_home/dwm-titus/panel-widgets.conf"
+		if [ "$(notification_ipc_retry centerOpen)" != false ]; then
+			printf 'Hiding the notification bell left its center open\n' >&2
+			exit 1
+		fi
+	elif grep -Fq notifications "$config_home/dwm-titus/panel-widgets.conf"; then
+		printf 'Enabled notifications widget was written to panel-widgets.conf\n' >&2
+		exit 1
+	fi
+done
+
 panel_seconds=$(DISPLAY=$display HOME=$home XDG_CONFIG_HOME=$config_home XDG_DATA_HOME=$data_home \
 	XDG_RUNTIME_DIR=$runtime quickshell ipc --path "$config" call settings panelOptionEnabled clock-seconds)
 [ "$panel_seconds" = false ]

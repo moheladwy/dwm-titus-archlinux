@@ -27,10 +27,10 @@ run_helper() {
 status=$(run_helper status)
 printf '%s\n' "$status" | grep -Fqx 'panel-settings-protocol	1	2'
 printf '%s\n' "$status" | grep -Fqx 'option	clock-seconds	disabled'
-test "$(printf '%s\n' "$status" | wc -l)" -eq 12
+test "$(printf '%s\n' "$status" | wc -l)" -eq 13
 printf '%s\n' "$status" | grep -Fqx \
 	'state	defaults	Using safe defaults; the first change creates persistent state'
-for widget in workspaces volume bluetooth network power keyboard-layout; do
+for widget in workspaces volume bluetooth network power keyboard-layout notifications; do
 	printf '%s\n' "$status" | grep -Fqx "widget	$widget	enabled"
 done
 printf '%s\n' "$status" | grep -Fqx 'complete	status'
@@ -169,6 +169,32 @@ printf '%s\n' "$new_status" | grep -Fqx 'widget	volume	disabled'
 run_helper set calendar disabled >/dev/null
 run_helper set weather disabled >/dev/null
 grep -Fqx 'panel-settings-protocol	1	0' "$state_file"
+# notifications (the bell) defaults on, is written only while off, and keeps
+# the 1.0 header so an older helper still reads the other choices.
+run_helper status | grep -Fqx 'widget	notifications	enabled'
+run_helper set notifications disabled | grep -Fqx 'result	set	notifications	disabled'
+grep -Fqx 'panel-settings-protocol	1	0' "$state_file"
+grep -Fqx 'notifications	disabled' "$state_file"
+run_helper status | grep -Fqx 'widget	notifications	disabled'
+# Every optional line at once is still a complete file.
+run_helper set keyboard-layout disabled >/dev/null
+run_helper set calendar enabled >/dev/null
+run_helper set weather enabled >/dev/null
+test "$(wc -l <"$state_file")" -eq 11
+all_optional=$(run_helper status)
+printf '%s\n' "$all_optional" | grep -Fqx \
+	'state	available	Persistent panel visibility is active for every monitor'
+printf '%s\n' "$all_optional" | grep -Fqx 'widget	notifications	disabled'
+printf '%s\n' "$all_optional" | grep -Fqx 'widget	keyboard-layout	disabled'
+run_helper reset >/dev/null
+run_helper status | grep -Fqx 'widget	notifications	enabled'
+run_helper set calendar disabled >/dev/null
+run_helper set weather disabled >/dev/null
+if grep -Fq 'notifications' "$state_file"; then
+	printf 'An enabled notifications widget was written to the file\n' >&2
+	exit 1
+fi
+test "$(wc -l <"$state_file")" -eq 6
 # Exactly the five legacy widgets are required; keyboard-layout cannot stand
 # in for a missing one, and duplicates are rejected.
 for broken_widgets in \
@@ -236,7 +262,7 @@ printf 'panel-settings-protocol\t2\t0\nvolume\tdisabled\n' >"$state_file"
 future=$(run_helper status)
 printf '%s\n' "$future" | grep -Fqx \
 	'state	partial	Unsupported panel settings version was preserved; using defaults'
-for widget in workspaces volume bluetooth network power keyboard-layout; do
+for widget in workspaces volume bluetooth network power keyboard-layout notifications; do
 	printf '%s\n' "$future" | grep -Fqx "widget	$widget	enabled"
 done
 grep -Fqx 'panel-settings-protocol	2	0' "$state_file"
@@ -294,7 +320,7 @@ run_helper reset >/dev/null
 reset_status=$(run_helper status)
 printf '%s\n' "$reset_status" | grep -Fqx 'option	clock-seconds	enabled'
 run_helper set clock-seconds disabled >/dev/null
-for widget in workspaces volume bluetooth network power keyboard-layout; do
+for widget in workspaces volume bluetooth network power keyboard-layout notifications; do
 	printf '%s\n' "$reset_status" | grep -Fqx "widget	$widget	enabled"
 done
 
@@ -468,7 +494,7 @@ grep -Fq 'panelSettingsModel: panelSettingsModel' "$shell"
 grep -Fq 'function panelWidgetEnabled(widget: string): bool' "$shell"
 grep -Fq 'function panelWidgetSet(widget: string, enabled: bool): void' "$shell"
 grep -Fq 'required property var panelSettingsModel' "$panel"
-for widget in workspaces volume bluetooth network power keyboard-layout; do
+for widget in workspaces volume bluetooth network power keyboard-layout notifications; do
 	grep -Fq "root.panelSettingsModel.widgetEnabled(\"$widget\")" "$panel"
 done
 grep -Fq 'property var panelSettingsModel: null' "$control_model"
@@ -496,6 +522,6 @@ grep -Fq 'onToggled: root.panelSettingsModel.toggleWidget(panelWidgetRow.modelDa
 
 printf 'Quickshell panel settings persistence: PASS\n'
 grep -Fq '"Keyboard layout": "keyboard-layout"' "$control_model"
-grep -Fq 'model: ["Volume", "Bluetooth", "Network", "Power", "Keyboard layout", "Workspaces", "Calendar", "Weather"]' "$control_window"
+grep -Fq 'model: ["Volume", "Bluetooth", "Network", "Power", "Keyboard layout", "Notifications", "Workspaces", "Calendar", "Weather"]' "$control_window"
 grep -Fq '{ "id": "keyboard-layout", "label": "Keyboard layout" }' "$model"
 grep -Fq 'onSettingsSectionRequested: (panel, section) => root.runCommandMenuAction("settings", "select", section, panel.screen)' "$shell"
