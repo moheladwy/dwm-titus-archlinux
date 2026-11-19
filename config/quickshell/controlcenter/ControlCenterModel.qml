@@ -19,6 +19,7 @@ Scope {
         "Network": "network",
         "Power": "power",
         "Keyboard layout": "keyboard-layout",
+        "Notifications": "notifications",
         "Calendar": "calendar",
         "Weather": "weather"
     })

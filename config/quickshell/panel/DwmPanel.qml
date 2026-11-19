@@ -285,6 +285,7 @@ PanelWindow {
                     PanelPill {
                         id: notificationPill
                         objectName: "notificationIndicator"
+                        visible: root.panelSettingsModel.widgetEnabled("notifications")
                         Layout.preferredWidth: notificationRow.implicitWidth + Theme.compactWidgetHorizontalPadding * 2
                         Layout.preferredHeight: Theme.compactWidgetSize
                         active: root.notificationModel.panelVisible

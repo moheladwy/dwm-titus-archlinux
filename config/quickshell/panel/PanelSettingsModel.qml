@@ -25,6 +25,7 @@ Scope {
         "network": true,
         "power": true,
         "keyboard-layout": true,
+        "notifications": true,
         "calendar": false,
         "weather": false
     })
@@ -44,6 +45,7 @@ Scope {
         { "id": "network", "label": "Network" },
         { "id": "power", "label": "Power" },
         { "id": "keyboard-layout", "label": "Keyboard layout" },
+        { "id": "notifications", "label": "Notifications" },
         { "id": "calendar", "label": "Calendar" },
         { "id": "weather", "label": "Weather" }
     ]
@@ -53,7 +55,8 @@ Scope {
 
     function validWidget(id) {
         return id === "workspaces" || id === "volume" || id === "bluetooth"
-            || id === "network" || id === "power" || id === "keyboard-layout" || id === "calendar" || id === "weather";
+            || id === "network" || id === "power" || id === "keyboard-layout" || id === "notifications"
+            || id === "calendar" || id === "weather";
     }
 
     function widgetEnabled(id) {
@@ -76,6 +79,7 @@ Scope {
             "network": true,
             "power": true,
             "keyboard-layout": true,
+            "notifications": true,
             "calendar": false,
             "weather": false
         });
@@ -117,6 +121,7 @@ Scope {
             parsed[fields[1]] = fields[2] === "enabled";
         }
         if (parsed["keyboard-layout"] === undefined) parsed["keyboard-layout"] = true;
+        if (parsed.notifications === undefined) parsed.notifications = true;
         if (parsed.calendar === undefined) parsed.calendar = false;
         if (parsed.weather === undefined) parsed.weather = false;
         for (const widget of root.widgets) {
