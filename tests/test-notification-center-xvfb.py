@@ -52,6 +52,7 @@ ShellRoot {
     PanelWindow { id: panel; anchors { top: true; left: true; right: true } implicitHeight: 30 }
     Notifications.NotificationCenterPopup { notificationModel: model; panelWindow: panel }
     FloatingWindow {
+        title: "notification center list test"
         visible: true
         implicitWidth: 420
         implicitHeight: 520
@@ -78,6 +79,7 @@ ShellRoot {
         function clearSelected(): void { list.clearSelected(); }
         function clearOne(key: string): void { list.clearOne(key); }
         function clearAll(): void { list.clearAll(); }
+        function focusEntry(index: int): bool { return list.focusEntry(index); }
         function openPanel(): void { model.openPanel(); }
         function closePanel(): void { model.closePanel(); }
         function capture(path: string): void { list.grabToImage(result => result.saveToFile(path)); }
@@ -229,6 +231,34 @@ with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
         saved = key_of("Saved fixture")
         assert ipc("open", saved) == "window"
         print("Unread count and history persist across a restart PASS")
+
+        # Keyboard: Space selects the focused entry, Delete clears it, and
+        # Enter opens it.
+        window = subprocess.run(["xdotool", "search", "--name", "^notification center list test$"],
+                                env=env, capture_output=True, text=True, check=True,
+                                timeout=5).stdout.split()[0]
+        subprocess.run(["xdotool", "windowfocus", "--sync", window], env=env, check=True, timeout=5)
+
+        def key(name):
+            subprocess.run(["xdotool", "key", "--window", window, name], env=env, check=True, timeout=5)
+
+        notify("--app-name=Fixture App", "Keyboard delete")
+        notify("--app-name=Fixture App", "Keyboard open")
+        open_key = key_of("Keyboard open")
+        delete_key = key_of("Keyboard delete")
+        assert ipc("focusEntry", "0") == "true"
+        key("space")
+        wait_for(lambda: state()["selected"] == [open_key], "Space selects the entry")
+        key("space")
+        wait_for(lambda: state()["selected"] == [], "Space deselects the entry")
+        focused_before = len(state()["focused"])
+        key("Return")
+        wait_for(lambda: len(state()["focused"]) == focused_before + 1, "Enter opens the entry")
+        assert ipc("focusEntry", "1") == "true"
+        key("Delete")
+        wait_for(lambda: not any(e["key"] == delete_key for e in state()["history"]),
+                 "Delete clears the entry")
+        print("Keyboard: select, open and clear an entry PASS")
 
         # Optional screenshot of the center list for manual review.
         capture = os.environ.get("DWM_NOTIFICATION_CENTER_CAPTURE")

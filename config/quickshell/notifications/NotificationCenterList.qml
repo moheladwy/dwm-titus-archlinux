@@ -61,6 +61,13 @@ ColumnLayout {
         root.notificationModel.clearHistory();
     }
 
+    // Gives keyboard focus to the entry at index (newest first).
+    function focusEntry(index) {
+        const item = entryRepeater.itemAt(index);
+        if (item) item.forceActiveFocus();
+        return item !== null;
+    }
+
     function openEntry(key) {
         root.sourceOpened(key, root.notificationModel.openSource(key));
     }
@@ -134,6 +141,8 @@ ColumnLayout {
             spacing: Theme.spacingMd
 
             Repeater {
+                id: entryRepeater
+
                 model: root.history
 
                 delegate: Rectangle {
@@ -148,13 +157,30 @@ ColumnLayout {
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: entryContent.implicitHeight + Theme.spacingLg * 2
+                    // Keyboard: Tab reaches each entry, Enter opens it, Space
+                    // selects it, and Delete clears it.
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: (entry.modelData.appName || "Notification") + ": "
+                        + (entry.modelData.summary || "")
+                    Accessible.description: "Enter opens, Space selects, Delete clears"
+                    Accessible.onPressAction: root.openEntry(entry.key)
+                    Keys.onPressed: event => {
+                        if (event.isAutoRepeat) return;
+                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.openEntry(entry.key);
+                        else if (event.key === Qt.Key_Space) root.toggleSelected(entry.key);
+                        else if (event.key === Qt.Key_Delete) root.clearOne(entry.key);
+                        else return;
+                        event.accepted = true;
+                    }
                     radius: Theme.popupRadius
                     color: entry.selected ? Theme.controlSelectedFill
                         : entryMouse.containsMouse ? Theme.controlHoverFill
                         : entry.critical ? Theme.dangerSurface : Theme.surface
-                    border.color: entry.selected ? Theme.controlSelectedBorder
+                    border.color: entry.activeFocus ? Theme.controlFocusBorder
+                        : entry.selected ? Theme.controlSelectedBorder
                         : entry.critical ? Theme.danger : Theme.popupBorder
-                    border.width: Theme.controlBorderWidth
+                    border.width: entry.activeFocus ? Theme.controlFocusBorderWidth : Theme.controlBorderWidth
 
                     // Clicking anywhere else on the entry opens its source.
                     MouseArea {
