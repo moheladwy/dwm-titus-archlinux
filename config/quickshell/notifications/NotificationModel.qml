@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
+import qs.core
 
 pragma ComponentBehavior: Bound
 
@@ -179,6 +180,8 @@ Scope {
             "desktopEntry": notification.desktopEntry || "",
             "appIcon": notification.appIcon || "",
             "transient": notification.transient === true,
+            "diagnose": root.diagnoseArgs(notification.appName,
+                (notification.hints || {})["x-dwm-titus-diagnose"]),
             "actions": actions,
             "hasDefaultAction": actions.some(action => action.identifier === "default"),
             // A critical notification that asks for a decision stays up until
@@ -304,7 +307,65 @@ Scope {
         // Quickshell reports ActionInvoked and closes a non-resident
         // notification, which forgets it through the closed handler.
         action.invoke();
+        // Ignore means the user is done with it; any other answer keeps the
+        // entry in the history.
+        if (identifier === "ignore") root.dropHistory(key);
         return true;
+    }
+
+    // dwm-titus crash and hang alerts carry the dwm-agent-diagnose arguments
+    // in an x-dwm-titus-diagnose hint (tab-separated), so Diagnose with AI
+    // keeps working from the history after the alert has closed. Returns the
+    // arguments, or [] when the value is not a well-formed request.
+    function diagnoseArgs(appName, value) {
+        if (appName !== "dwm-titus" || typeof value !== "string" || value.length > 2048) return [];
+        const fields = value.split("\t");
+        if (fields.some(field => field.length > 256)) return [];
+        if (fields[0] === "crash" && fields.length <= 7 && /^[0-9]+$/.test(fields[1] || "")) return fields;
+        if (fields[0] === "hang" && fields.length <= 5 && /^(0x[0-9a-fA-F]+|[0-9]+)$/.test(fields[1] || ""))
+            return fields;
+        return [];
+    }
+
+    function savedDiagnoseArgs(entry) {
+        // History loaded from disk holds Qt lists, not JavaScript arrays.
+        const saved = entry && entry.diagnose && typeof entry.diagnose !== "string"
+            ? Array.from(entry.diagnose) : [];
+        return saved.length > 0 && saved.every(field => typeof field === "string")
+            ? root.diagnoseArgs(entry.appName, saved.join("\t")) : [];
+    }
+
+    // The buttons an entry offers: the notification's own actions while it is
+    // open, otherwise Diagnose with AI and Ignore for a saved dwm-titus alert.
+    function entryActions(key) {
+        if (root.actionable[key]) return root.actionsFor(key);
+        const entry = root.history.find(item => item.key === key);
+        return root.savedDiagnoseArgs(entry).length > 0 ? [
+            { "identifier": "diagnose", "text": "Diagnose with AI" },
+            { "identifier": "ignore", "text": "Ignore" }
+        ] : [];
+    }
+
+    function runEntryAction(key, identifier) {
+        if (root.actionable[key]) return root.invokeAction(key, identifier);
+        const entry = root.history.find(item => item.key === key);
+        const args = root.savedDiagnoseArgs(entry);
+        if (args.length === 0) return false;
+        if (identifier === "ignore") {
+            root.dropHistory(key);
+            return true;
+        }
+        if (identifier !== "diagnose") return false;
+        Quickshell.execDetached(Commands.helperCommand("dwm-agent-diagnose", null, args, false));
+        return true;
+    }
+
+    // Removes an entry whose notification is already answered or closed.
+    function dropHistory(key) {
+        root.forgetActionable(key);
+        if (!root.history.some(entry => entry.key === key)) return;
+        root.history = root.history.filter(entry => entry.key !== key);
+        root.saveHistory();
     }
 
     function remove(key) {
@@ -330,6 +391,7 @@ Scope {
             "urgencyName": item.urgencyName,
             "desktopEntry": item.desktopEntry || "",
             "appIcon": item.appIcon || "",
+            "diagnose": item.diagnose || [],
             "timestamp": Date.now()
         };
 

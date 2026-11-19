@@ -122,7 +122,11 @@ fi
 # handler blocked.
 out=$runtime/$window.$self_start.out
 : >"$out"
+# The panel saves this with the notification, so Diagnose with AI still
+# works from the notification history after the notification has closed.
+diagnose=hang$'\t'$window$'\t'${pid//[$'\t\r\n']/ }$'\t'${class//[$'\t\r\n']/ }
 notify-send --app-name=dwm-titus --urgency=critical --print-id \
+	--hint="string:x-dwm-titus-diagnose:$diagnose" \
 	--action=diagnose="$diagnose_label" --action=kill="Force quit" --action=wait=Wait \
 	"$name is not responding" \
 	"It has not answered for 10 seconds. It may still recover." >"$out" 2>/dev/null 9>&- &
