@@ -14,6 +14,16 @@ the port.
 
 ### Added
 
+- Add a notification bell to the panel, beside the system tray. It shows how
+  many notifications arrived since you last looked, and clicking it opens a
+  notification center with your saved history (kept across restarts until you
+  clear it). Clicking an entry takes you to its source: the app's own Open
+  action while the notification is still open (the chat, tab or file it is
+  about), with the app's window brought forward; otherwise the app's window,
+  or the app is started. Clear entries one at a time, select several and
+  clear them together, or clear all. Right-click the bell to toggle Do Not
+  Disturb. `quickshell ipc --path ~/.config/quickshell/shell.qml call
+  notifications toggleCenter` opens it from a key binding.
 - Choose how many workspaces each monitor owns with `[monitors] tags` in
   `hotkeys.toml` (for example `tags = [3, 6]` for 1-3 on the primary monitor
   and 4-9 on the second). Without it the split stays even. Saving applies it
@@ -171,6 +181,11 @@ the port.
 
 ### Changed
 
+- Notifications with actions now stay open after their popup goes away, until
+  you answer, clear, or push them out of the 50-entry history, so the
+  notification center can still run their actions. Before, only critical ones
+  stayed open. Notifications marked transient still close with their popup.
+
 - An app with an open window shows one panel icon instead of two. Its tray
   icon is hidden while the running-app button is shown, and the button takes
   over its actions: right-click opens the app's tray menu (or activates an
@@ -304,6 +319,9 @@ the port.
   (`Super+Ctrl+R`), the last gaming helper.
 
 ### Fixed
+
+- A notification with actions that arrived during Do Not Disturb no longer
+  stays listed as open after it was closed.
 
 - Clicking a panel workspace switches to it again, and clicking a running-app
   button focuses its window. Both used `wmctrl`, which the Arch package list

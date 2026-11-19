@@ -79,8 +79,10 @@ unverified rather than failed. Window titles are excluded from prompts; process
 identifiers are sanitized and passed as arguments, never evaluated as shell code.
 
 The panel now exposes notification action buttons and default body-click actions.
-Critical notifications with actions stay available until answered or dismissed,
-including in history while the notification remains open. Saved history after a
+Notifications with actions stay available until answered or dismissed,
+including in the notification center (the panel bell) while the notification
+remains open; clicking an entry there runs its default action. Notifications
+marked transient close with their popup. Saved history after a
 shell restart has no executable actions. Replacing a notification refreshes its
 buttons, urgency, timeout, and history entry. The desktop follows label-change
 signals when Quickshell provides them.
